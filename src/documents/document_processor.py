@@ -2,10 +2,12 @@
 Document Processing Module
 Extracts text from PDF, Word (DOCX), and PowerPoint (PPTX) files
 Supports repair manuals, bulletins, and technical documentation
+
+Phase 1-2 Enhancement: Integrated semantic chunking for better RAG retrieval
 """
 import re
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
 # PyPDF2 may be available as 'PyPDF2' or as the newer 'pypdf' package; try both for compatibility.
 try:
@@ -47,11 +49,14 @@ except ImportError:
 
 # Excel support
 try:
-    import openpyxl  # type: ignore
+    import openpyxl  # type: ignore # pyright: ignore[import]
     EXCEL_AVAILABLE = True
 except ImportError:
     openpyxl = None  # type: ignore
     EXCEL_AVAILABLE = False
+
+# Semantic chunking for Phase 1-2 enhancement
+from src.documents.semantic_chunker import SemanticChunker, DocumentType, ChunkMetadata
 
 logger = setup_logger(__name__)
 
@@ -69,6 +74,14 @@ class DocumentProcessor:
         logger.info(f"  - DOCX support: {DOCX_AVAILABLE}")
         logger.info(f"  - PPTX support: {PPTX_AVAILABLE}")
         logger.info(f"  - EXCEL support: {EXCEL_AVAILABLE}")
+        
+        # Initialize semantic chunker for Phase 1-2 enhancement
+        self.semantic_chunker = SemanticChunker(
+            chunk_size=400,
+            chunk_overlap=100,
+            max_recursion_depth=3
+        )
+        logger.info(f"  - Semantic chunking: ENABLED (Phase 1-2 enhancement)")
     
     # =========================================================================
     # PDF PROCESSING
@@ -351,7 +364,8 @@ class DocumentProcessor:
     def process_document(
         self,
         file_path: Path,
-        extract_tables: bool = True
+        extract_tables: bool = True,
+        enable_semantic_chunking: bool = True
     ) -> Optional[Dict]:
         """
         Process any supported document type
@@ -359,6 +373,7 @@ class DocumentProcessor:
         Args:
             file_path: Path to document file
             extract_tables: Whether to extract tables (PDF only)
+            enable_semantic_chunking: Whether to apply semantic chunking (Phase 1-2)
             
         Returns:
             Dictionary with document metadata and content
@@ -394,6 +409,26 @@ class DocumentProcessor:
         # Extract metadata
         metadata = self.extract_metadata(file_path, text)
         
+        # Phase 1-2: Apply semantic chunking if enabled
+        chunks = None
+        chunk_count = 0
+        if enable_semantic_chunking:
+            try:
+                # Detect document type
+                doc_type = self._map_to_document_type(metadata.get("type", "unknown"))
+                
+                # Apply semantic chunking
+                chunks = self.semantic_chunker.chunk_document(
+                    text=text,
+                    source_filename=file_path.name,
+                    doc_type=doc_type
+                )
+                chunk_count = len(chunks)
+                logger.info(f"  Semantic chunking: Created {chunk_count} chunks")
+            except Exception as e:
+                logger.error(f"Error in semantic chunking: {e}")
+                chunks = None
+        
         return {
             "filename": file_path.name,
             "filepath": str(file_path),
@@ -401,7 +436,9 @@ class DocumentProcessor:
             "text": text,
             "metadata": metadata,
             "word_count": len(text.split()),
-            "char_count": len(text)
+            "char_count": len(text),
+            "chunks": chunks,  # Phase 1-2: Semantic chunks
+            "chunk_count": chunk_count
         }
     
     def clean_text(self, text: str) -> str:
@@ -462,6 +499,21 @@ class DocumentProcessor:
         else:
             return "unknown"
     
+    def _map_to_document_type(self, doc_type_str: str) -> DocumentType:
+        """Map document type string to DocumentType enum"""
+        doc_type_lower = doc_type_str.lower()
+        
+        if "bulletin" in doc_type_lower:
+            return DocumentType.SERVICE_BULLETIN
+        elif "guide" in doc_type_lower or "troubleshoot" in doc_type_lower:
+            return DocumentType.TROUBLESHOOTING_GUIDE
+        elif "catalog" in doc_type_lower or "parts" in doc_type_lower:
+            return DocumentType.PARTS_CATALOG
+        elif "safety" in doc_type_lower:
+            return DocumentType.SAFETY_DOCUMENT
+        else:
+            return DocumentType.TECHNICAL_MANUAL  # Default
+    
     def _extract_part_numbers(self, text: str) -> List[str]:
         """Extract Desoutter part numbers from text"""
         patterns = [
@@ -494,7 +546,8 @@ class DocumentProcessor:
     def process_directory(
         self,
         directory: Path,
-        extract_tables: bool = True
+        extract_tables: bool = True,
+        enable_semantic_chunking: bool = True
     ) -> List[Dict]:
         """
         Process all supported documents in a directory
@@ -502,6 +555,7 @@ class DocumentProcessor:
         Args:
             directory: Directory containing documents
             extract_tables: Whether to extract tables
+            enable_semantic_chunking: Whether to apply semantic chunking (Phase 1-2)
             
         Returns:
             List of processed documents
@@ -518,10 +572,15 @@ class DocumentProcessor:
         
         documents = []
         for doc_file in all_files:
-            doc = self.process_document(doc_file, extract_tables)
+            doc = self.process_document(
+                doc_file, 
+                extract_tables=extract_tables,
+                enable_semantic_chunking=enable_semantic_chunking
+            )
             if doc:
                 documents.append(doc)
-                logger.info(f"✓ Processed: {doc_file.name} ({doc['word_count']} words)")
+                chunk_info = f" + {doc['chunk_count']} chunks" if doc.get('chunks') else ""
+                logger.info(f"✓ Processed: {doc_file.name} ({doc['word_count']} words{chunk_info})")
             else:
                 logger.warning(f"✗ Failed: {doc_file.name}")
         
