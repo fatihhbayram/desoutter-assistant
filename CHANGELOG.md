@@ -6,13 +6,14 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 
 ## 📋 Yapılacaklar (TODO)
 
-### 🔴 Yüksek Öncelik (Tamamlandı)
+### 🔴 Yüksek Öncelik (Tamamlanan)
 - [x] **Feedback Sistemi**: Kullanıcı geri bildirimi ile self-learning RAG ✅ (9 Ara)
 - [x] **Dashboard**: Arıza istatistikleri ve trend analizi ✅ (9 Ara)
 - [x] **Tech Page Wizard**: 4-step wizard-style UI ✅ (14 Ara)
 - [x] **Tool Dokumentasyon**: 276 dokument (bulletins + manuals) ✅ (15 Ara)
 - [x] **RAG Ingest**: 1080 chunks ChromaDB'ye ✅ (15 Ara)
 - [x] **RAG Quality**: Similarity threshold optimization ✅ (15 Ara)
+- [x] **Phase 1 Semantic Chunking**: Complete semantic chunking pipeline ✅ (15 Ara)
 
 ### 🟡 Orta Öncelik (Next Sprint)
 - [ ] **TechWizard Entegrasyonu**: App.jsx'e entegre et
@@ -25,6 +26,144 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - [ ] **SAP Entegrasyonu**: Otomatik yedek parça siparişi
 - [ ] **Sesli Asistan**: Hands-free arıza bildirimi
 - [ ] **Predictive Maintenance**: Arıza öncesi uyarı sistemi
+
+---
+
+## 📆 15 Aralık 2025 (Pazar) - CONTINUED
+
+### 🆕 Phase 1: Semantic Chunking Complete ✅
+
+**Major Achievement:** RAG Enhancement Phase 1 fully implemented and tested!
+
+#### SemanticChunker Module Implementation
+- **File**: `src/documents/semantic_chunker.py` (420+ lines)
+- **Purpose**: Intelligent document chunking that preserves semantic boundaries and structure
+
+**Key Components:**
+
+1. **DocumentType Enum** (5 types)
+   - TECHNICAL_MANUAL: Complete product manuals (complex structure, procedures)
+   - SERVICE_BULLETIN: Short technical updates and known issues
+   - TROUBLESHOOTING_GUIDE: Symptom-to-solution mappings
+   - PARTS_CATALOG: Component lists and specifications
+   - SAFETY_DOCUMENT: Safety procedures and warnings (high importance)
+
+2. **SectionType Enum** (8 types)
+   - HEADING, PROCEDURE, PARAGRAPH, TABLE, LIST, WARNING, CODE_BLOCK, EXAMPLE
+   - Enables intelligent content classification
+
+3. **ChunkMetadata Dataclass** (14 fields)
+   - source: Original document filename
+   - chunk_index: Sequential chunk number
+   - document_type: Source document type
+   - section_type: Content section classification
+   - heading_level: 0-6 for hierarchical structure
+   - heading_text: Parent heading context
+   - fault_keywords: Domain-specific repair keywords extracted
+   - is_procedure: Step-by-step instruction detection
+   - contains_warning: Safety warning detection
+   - contains_table: Tabular data detection
+   - importance_score: 0.0-1.0 scoring
+   - position_ratio: Relative document position
+
+4. **DocumentTypeDetector Class**
+   - Auto-detects document type from content
+   - Keyword-based detection with multiple patterns per type
+   - Returns most probable DocumentType enum
+
+5. **FaultKeywordExtractor Class**
+   - 9 repair domain categories:
+     - motor: Motor, spindle, rotation, speed, bearing, etc.
+     - noise: Grinding, squeaking, humming, vibration, etc.
+     - mechanical: Jamming, stuck, resistance, gearbox, etc.
+     - electrical: Voltage, current, short, grounding, etc.
+     - calibration: Tuning, alignment, tolerance, precision, etc.
+     - leakage: Leak, seal, drip, moisture, oil, grease, etc.
+     - corrosion: Rust, oxidation, discoloration, coating, etc.
+     - wear: Worn, erosion, crack, fracture, failure, etc.
+     - connection: Loose, cable, coupling, interface, etc.
+     - torque: Foot-pounds, nm, tightening, wrench, etc.
+
+6. **SemanticChunker Main Class**
+   - Recursive character-level chunking
+   - Preserves paragraph and sentence boundaries
+   - Configuration: chunk_size=400, chunk_overlap=100, max_recursion_depth=3
+   - Methods:
+     - chunk_document(): Main entry point
+     - _split_by_paragraphs(): Structure preservation
+     - _is_heading() / _get_heading_level(): Heading detection
+     - _chunk_paragraph(): Size-aware chunking
+     - _split_by_sentences(): Intelligent segmentation
+     - _detect_section_type(): Content classification
+     - _is_procedure(): Procedure detection
+     - _create_chunk(): Metadata generation with importance scoring
+
+#### DocumentProcessor Integration
+- `src/documents/document_processor.py` updated:
+  - SemanticChunker initialized in `__init__()`
+  - `process_document()` now supports `enable_semantic_chunking` parameter
+  - Returns chunks with rich metadata in output dictionary
+  - Supports PDF, DOCX, PPTX, XLSX document types
+
+#### Configuration Updates
+- `config/ai_settings.py`:
+  - Added EMBEDDING_DIMENSION=384
+  - Added EMBEDDING_POOLING="mean"
+  - Added DOMAIN_EMBEDDING_MODEL_PATH (for Phase 2 fine-tuned model)
+  - Added USE_DOMAIN_EMBEDDINGS toggle
+  - Added DOMAIN_EMBEDDING_TRAINING_ENABLED toggle
+  - Documented Phase 2 training parameters
+
+#### Comprehensive Test Suite
+- **File**: `scripts/test_semantic_chunking.py`
+- **Test 1: Basic Semantic Chunking** ✅ PASS
+  - Sample technical manual chunking
+  - Verifies chunk count, size distribution
+  - Shows sample chunks with metadata
+  
+- **Test 2: Document Type Detection** ✅ PASS
+  - Tests 5 document type classifications
+  - Service Bulletin, Manual, Troubleshooting, Catalog, Safety
+  - All types correctly identified
+
+- **Test 3: Fault Keyword Extraction** ✅ PASS
+  - Tests 9 domain keyword categories
+  - Motor, noise, mechanical, electrical, calibration, leakage, corrosion, wear, connection
+  - Keywords correctly extracted from technical text
+
+- **Test 4: DocumentProcessor Integration** ✅ PASS
+  - End-to-end document processing
+  - Chunk generation with metadata
+  - Section type distribution analysis
+  - Importance score statistics
+  - Warning and procedure detection
+
+**Overall Result: 4/4 TESTS PASSED ✅**
+
+#### Files Created/Modified
+- ✅ `src/documents/semantic_chunker.py` (420+ lines) - NEW
+- ✅ `src/documents/document_processor.py` - UPDATED (semantic chunking integration)
+- ✅ `config/ai_settings.py` - UPDATED (domain embeddings config)
+- ✅ `scripts/test_semantic_chunking.py` - NEW (comprehensive test suite)
+
+#### Metrics
+- Chunk size: 400 characters with 100 character overlap (optimal for embeddings)
+- Recursion depth: 3 levels (paragraph → sentence → word)
+- Minimum chunk size: 50 characters
+- Metadata fields: 14 per chunk
+- Document type classifications: 5
+- Fault keyword categories: 9
+- Section type classifications: 8
+- Importance scoring: 0.0-1.0 based on content
+
+#### Ready for Phase 2
+- ✅ Semantic chunking pipeline implemented
+- ✅ Document type detection working
+- ✅ Metadata extraction tested
+- ✅ Configuration ready for domain embeddings
+- ⏳ Next: Re-ingest 276 documents with semantic chunks
+- ⏳ Next: Domain embeddings fine-tuning on feedback data
+- ⏳ Next: ChromaDB refresh with improved metadata filtering
 
 ---
 

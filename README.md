@@ -223,7 +223,7 @@ curl -X POST http://localhost:8000/diagnose \
   -d '{"part_number":"6151659770","fault_description":"motor not starting","language":"en"}'
 ```
 
-## � System Metrics (15 Aralık 2025)
+## 📊 System Metrics (15 Aralık 2025)
 
 | Metrik | Değer |
 |--------|-------|
@@ -234,6 +234,12 @@ curl -X POST http://localhost:8000/diagnose \
 | Sources Per Diagnosis | 3-5 relevant documents |
 | LLM Model | qwen2.5:7b-instruct |
 | Embedding Model | all-MiniLM-L6-v2 |
+| **Semantic Chunking** | **✅ Phase 1 COMPLETE** |
+| Chunking Strategy | Recursive with structure preservation |
+| Chunk Size | 400 characters with 100 char overlap |
+| Metadata Fields | 14 per chunk (importance, keywords, type, etc) |
+| Document Type Detection | 5 types (Manual, Bulletin, Guide, Catalog, Safety) |
+| Fault Keywords | 9 categories (motor, noise, mechanical, electrical, etc) |
 | GPU | NVIDIA RTX A2000 (6GB) |
 
 ## 📖 Additional Documentation

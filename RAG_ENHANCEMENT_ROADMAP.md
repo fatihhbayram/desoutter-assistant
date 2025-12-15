@@ -1,6 +1,7 @@
 # 🚀 RAG Enhancement Roadmap - Semantic Chunking, Domain Embeddings & Performance Optimization
 
 > **Created:** 15 December 2025  
+> **Updated:** 15 December 2025 - **PHASE 1 COMPLETE ✅**
 > **Purpose:** Comprehensive enhancement of RAG system with semantic chunking, domain-specific embeddings, and performance monitoring  
 > **Target:** Production-ready, high-accuracy repair diagnosis system
 
@@ -11,123 +12,265 @@
 ### ✅ Existing Implementation
 - **RAG Engine**: ChromaDB + Ollama qwen2.5:7b-instruct
 - **Embeddings**: HuggingFace all-MiniLM-L6-v2 (384-dim)
-- **Chunking**: Basic sentence-based (500 tokens, 50 overlap)
-- **Retrieval**: Top-K (5 results) with distance threshold (2.0)
+- **Chunking**: ~~Basic sentence-based (500 tokens, 50 overlap)~~ → **Semantic chunking LIVE ✅**
+- **Retrieval**: Top-K (5 results) with dynamic similarity threshold (0.30)
 - **Feedback System**: User feedback collection + learned mappings
 - **Dashboard**: Basic analytics (total diagnoses, confidence breakdown, top products)
 
-### ⚠️ Current Limitations
-1. **Chunking**: Naive sentence splitting → loses semantic boundaries
-2. **Embeddings**: Generic model → misses domain-specific terminology (torque, calibration, etc.)
-3. **Retrieval**: Simple L2 distance + fixed top-K → misses rare-but-critical documents
-4. **Metadata**: Basic (source, line_number) → no filtering capability
-5. **Caching**: No query/embedding caching → slow repeated searches
-6. **Ingestion**: Synchronous, blocking → UI hangs during bulk uploads
-7. **Performance**: No metrics on latency, accuracy, hit rate
-8. **Feedback Loop**: Basic counting → no learning signal propagation to embeddings
+### ⚠️ Previous Limitations (NOW RESOLVED)
+1. ~~Chunking: Naive sentence splitting → loses semantic boundaries~~ → **FIXED: Recursive chunking** ✅
+2. **Embeddings**: Generic model → misses domain-specific terminology (pending Phase 2)
+3. ~~Retrieval: Simple L2 distance + fixed top-K~~ → **OPTIMIZED: Dynamic threshold 0.30** ✅
+4. **Metadata**: ~~Basic~~ → **Rich 14-field metadata** ✅
+5. **Caching**: No query/embedding caching → slow repeated searches (Phase 2)
+6. **Ingestion**: Synchronous, blocking → UI hangs during bulk uploads (Phase 2)
+7. **Performance**: No metrics on latency, accuracy, hit rate (Phase 2)
+8. **Feedback Loop**: Basic counting → no learning signal propagation to embeddings (Phase 2)
 
 ---
 
-## 🎯 Phase 1: Semantic Chunking (Week 1-2)
+## ✅ 🎯 Phase 1: Semantic Chunking - COMPLETE (15 December 2025)
 
-### 1.1 Implement Recursive Character Chunking
-**Goal:** Split documents at semantic boundaries (paragraphs → sentences → characters)
+### 1.1 Implement Recursive Character Chunking ✅
+**Status:** COMPLETE  
+**File:** `src/documents/semantic_chunker.py` (420+ lines)
 
-**File:** `src/documents/semantic_chunker.py` (NEW)
+**Implementation Details:**
+- Recursive character-level chunking (paragraph → sentence → word → character)
+- Preserves document structure (headings, procedures, warnings, tables, lists)
+- Configuration: chunk_size=400, chunk_overlap=100, max_recursion_depth=3
+- Minimum chunk size: 50 characters (prevents empty chunks)
 
-```python
-class SemanticChunker:
-    """
-    Recursive chunking that preserves semantic meaning
-    Uses document structure to split intelligently
-    """
-    
-    def chunk_documents(self, text: str, doc_type: str = "pdf"):
-        """
-        Chunk strategy:
-        1. Split by paragraphs (primary boundaries)
-        2. Split by sentences (secondary, if paragraph too long)
-        3. Split by characters (fallback for dense text)
-        """
-        # Preserve heading structure (h1, h2, h3 → weight/priority)
-        # Detect code blocks, tables, lists → keep together
-        # Maintain cross-references and footnotes
-        
-        chunks = []
-        for chunk in self._recursive_split(text):
-            # Metadata: section_type, heading_level, relative_importance
-            chunks.append({
-                "text": chunk,
-                "metadata": {
-                    "type": section_type,      # "heading", "paragraph", "list", "table"
-                    "level": level,             # 1-3 (heading level)
-                    "importance": importance,   # 0.0-1.0 (heading proximity)
-                    "word_count": len(chunk.split()),
-                    "contains_numbers": bool(re.search(r'\d+', chunk))
-                }
-            })
-        return chunks
-```
+**Key Features:**
+- `_split_by_paragraphs()`: Preserve paragraph boundaries
+- `_is_heading()` / `_get_heading_level()`: Structure detection (markdown, all-caps, numbered)
+- `_chunk_paragraph()`: Size-aware chunking with overlap
+- `_split_by_sentences()`: Intelligent segmentation
+- `_detect_section_type()`: Content classification (8 types)
 
-**Configuration:** `config/ai_settings.py`
-```python
-# Semantic chunking settings
-CHUNK_STRATEGY = "recursive"  # 'recursive', 'sliding_window', 'document'
-CHUNK_SIZE = 400              # tokens
-CHUNK_OVERLAP = 100           # tokens (higher for semantic coherence)
-MAX_RECURSION_DEPTH = 3       # section → paragraph → sentence → character
-```
+**Testing:** ✅ Test 1: Basic Semantic Chunking - PASS
 
-### 1.2 Add Document Structure Recognition
-**Goal:** Detect document type and apply type-specific chunking
+---
 
+### 1.2 Add Document Structure Recognition ✅
+**Status:** COMPLETE  
+**Class:** `DocumentTypeDetector`
+
+**Implementation:**
 ```python
 class DocumentTypeDetector:
-    """Detect PDF type and apply specialized chunking"""
+    """Auto-detect document type and apply specialized strategies"""
     
-    def detect_type(self, text: str):
-        # Technical Manual: headings + step-by-step → keep procedures intact
-        # Service Bulletin: bullet points + tables → preserve structure
-        # Troubleshooting Guide: Q&A format → chunk by problem/solution pair
-        # Parts Catalog: tables with part numbers → high importance on numbers
-        
-        if "troubleshooting" in text.lower():
-            return "troubleshooting_guide"
-        elif "procedure" in text.lower():
-            return "technical_manual"
-        elif any(["CAUTION", "WARNING"] in text):
-            return "safety_bulletin"
+    TYPES = {
+        TECHNICAL_MANUAL: "procedure, operation, maintenance, specifications",
+        SERVICE_BULLETIN: "bulletin, known issue, update, revision",
+        TROUBLESHOOTING_GUIDE: "symptom, problem, solution, diagnosis",
+        PARTS_CATALOG: "parts, catalog, component, assembly, specification",
+        SAFETY_DOCUMENT: "warning, danger, caution, safety, hazard"
+    }
+    
+    def detect_type(self, text: str) -> DocumentType:
+        # Keyword-based detection with scoring
+        # Returns most probable type
 ```
 
-### 1.3 Implement Metadata-Rich Chunking
-**Metadata fields per chunk:**
-```
-{
-    "source": "EPB_Manual_v2.pdf",
-    "section": "3.2 Troubleshooting",
-    "heading_level": 2,
-    "doc_type": "technical_manual",
-    "product_category": ["Battery Tools", "Torque Wrenches"],
-    "fault_keywords": ["motor", "grinding", "noise"],  # Extracted
-    "importance_score": 0.85,  # Based on heading level + size
-    "is_procedure": true,  # Contains step-by-step
-    "contains_warning": false,
-    "position": 0.34,  # Relative position in document (0.0-1.0)
-    "page_number": 12
+**Document Types:** 5 classifications
+- TECHNICAL_MANUAL: Complex structure, procedures
+- SERVICE_BULLETIN: Short updates, known issues
+- TROUBLESHOOTING_GUIDE: Symptom→solution mappings
+- PARTS_CATALOG: Structured parts data
+- SAFETY_DOCUMENT: Critical safety content (highest importance)
+
+**Testing:** ✅ Test 2: Document Type Detection - PASS
+
+---
+
+### 1.3 Extract and Classify Content ✅
+**Status:** COMPLETE  
+**Class:** `FaultKeywordExtractor`
+
+**Domain-Specific Keywords:** 9 categories
+```python
+CATEGORIES = {
+    "motor": [motor, spindle, rotation, rpm, speed, stall, bearing, brush],
+    "noise": [noise, grinding, squealing, clicking, humming, vibration],
+    "mechanical": [jamming, stuck, resistance, gearbox, wear],
+    "electrical": [voltage, current, circuit, short, grounding],
+    "calibration": [calibration, adjust, alignment, tolerance, precision],
+    "leakage": [leak, seal, gasket, drip, moisture, oil],
+    "corrosion": [corrosion, rust, oxidation, tarnish],
+    "wear": [wear, worn, erosion, crack, failure],
+    "connection": [connection, loose, cable, disconnect],
+    "torque": [torque, nm, tightening, wrench, tension]
 }
 ```
 
-**Expected Impact:**
-- ✅ Better context preservation (+15% relevance)
-- ✅ Reduced hallucination (-20% wrong suggestions)
-- ✅ Faster retrieval (smaller chunks = faster search)
+**Testing:** ✅ Test 3: Fault Keyword Extraction - PASS
 
 ---
 
-## 🧠 Phase 2: Domain-Specific Embeddings (Week 2-3)
+### 1.4 Rich Metadata Per Chunk ✅
+**Status:** COMPLETE  
+**Class:** `ChunkMetadata` dataclass
 
-### 2.1 Fine-Tune Embeddings on Desoutter Corpus
-**Goal:** Create embeddings that understand repair domain terminology
+**14 Metadata Fields:**
+1. `source` - Original filename
+2. `chunk_index` - Sequential number
+3. `document_type` - Type classification
+4. `section_type` - Content type (8 options)
+5. `heading_level` - 0-6 for hierarchy
+6. `heading_text` - Parent heading context
+7. `fault_keywords` - Extracted repair keywords
+8. `is_procedure` - Step-by-step detection
+9. `is_warning` - Safety warning flag
+10. `contains_table` - Tabular data flag
+11. `importance_score` - 0.0-1.0 scoring
+12. `position_ratio` - Relative doc position
+13. `page_number` - Optional PDF page
+14. `word_count` - Chunk word count
+
+**Importance Scoring Logic:**
+- Base: 0.5
+- +0.3 for warnings
+- +0.2 for procedures
+- +0.1 for headings (scaled by level)
+- +0.15 for safety documents
+- Range: 0.0-1.0
+
+**Testing:** ✅ Test 4: DocumentProcessor Integration - PASS (metadata extraction verified)
+
+---
+
+### 1.5 DocumentProcessor Integration ✅
+**Status:** COMPLETE  
+**File:** `src/documents/document_processor.py` (UPDATED)
+
+**Changes:**
+- SemanticChunker initialized in `__init__()`
+- `process_document()` now supports `enable_semantic_chunking` parameter
+- `process_directory()` processes all docs with semantic chunking
+- Output includes: text, metadata, chunks, chunk_count
+- Supports: PDF, DOCX, PPTX, XLSX, XLS
+
+**Integration Method:**
+```python
+# Detect document type
+doc_type = self._map_to_document_type(metadata["type"])
+
+# Apply semantic chunking
+chunks = self.semantic_chunker.chunk_document(
+    text=text,
+    source_filename=file_path.name,
+    doc_type=doc_type
+)
+
+return {
+    "filename": file_path.name,
+    "text": text,
+    "metadata": metadata,
+    "chunks": chunks,  # NEW: Rich semantic chunks
+    "chunk_count": len(chunks)
+}
+```
+
+---
+
+### 1.6 Configuration for Phase 2 ✅
+**Status:** COMPLETE  
+**File:** `config/ai_settings.py` (UPDATED)
+
+**New Settings:**
+```python
+# Semantic Chunking
+CHUNK_SIZE = 400              # characters
+CHUNK_OVERLAP = 100           # characters
+MAX_RECURSION_DEPTH = 3       # levels
+
+# Domain Embeddings (Phase 2)
+DOMAIN_EMBEDDING_MODEL_PATH = None  # Will be set after fine-tuning
+USE_DOMAIN_EMBEDDINGS = False
+DOMAIN_EMBEDDING_TRAINING_ENABLED = False
+EMBEDDING_DIMENSION = 384
+EMBEDDING_POOLING = "mean"
+```
+
+---
+
+### 1.7 Comprehensive Test Suite ✅
+**Status:** COMPLETE  
+**File:** `scripts/test_semantic_chunking.py` (NEW, 355 lines)
+
+**Tests Implemented:**
+1. ✅ **Test 1: Basic Semantic Chunking** - PASS
+   - Chunks sample manual text
+   - Verifies chunk count and metadata
+   - Shows importance scoring
+
+2. ✅ **Test 2: Document Type Detection** - PASS
+   - Tests 5 document type classifications
+   - Detects Service Bulletin, Manual, Troubleshooting, Catalog, Safety
+
+3. ✅ **Test 3: Fault Keyword Extraction** - PASS
+   - Tests 9 domain categories
+   - Extracts motor, noise, mechanical, electrical, etc.
+
+4. ✅ **Test 4: DocumentProcessor Integration** - PASS
+   - End-to-end document processing
+   - Chunk generation with metadata
+   - Section type distribution
+   - Importance score statistics
+
+**Overall Result: 4/4 TESTS PASSED ✅**
+
+---
+
+### Phase 1 Summary
+
+| Component | Status | Lines | Tests |
+|-----------|--------|-------|-------|
+| SemanticChunker | ✅ Complete | 420+ | 4/4 PASS |
+| DocumentTypeDetector | ✅ Complete | 50+ | 1/1 PASS |
+| FaultKeywordExtractor | ✅ Complete | 60+ | 1/1 PASS |
+| ChunkMetadata | ✅ Complete | 30+ | - |
+| DocumentProcessor Integration | ✅ Complete | 50+ | 1/1 PASS |
+| Config Updates | ✅ Complete | 20+ | - |
+| Test Suite | ✅ Complete | 355 | 4/4 PASS |
+| Documentation | ✅ Complete | - | - |
+
+**Deliverables:**
+- ✅ SemanticChunker module (recursive chunking)
+- ✅ Document type detection (5 types)
+- ✅ Metadata extraction (14 fields)
+- ✅ Fault keyword extraction (9 categories)
+- ✅ Integration with DocumentProcessor
+- ✅ Comprehensive test suite (100% passing)
+- ✅ Configuration for Phase 2
+
+**Ready for Phase 2:**
+- ✅ Semantic chunking pipeline implemented
+- ✅ Document structure preservation working
+- ✅ Rich metadata available for filtering
+- ⏳ Next: Re-ingest 276 documents with semantic chunks
+- ⏳ Next: Domain embeddings fine-tuning
+- ⏳ Next: ChromaDB refresh with improved retrieval
+
+---
+
+## 🧠 Phase 2: Domain-Specific Embeddings & Retrieval Enhancement (Week 3-4)
+
+### 2.1 Prepare Domain Training Data ⏳
+**Goal:** Collect positive feedback pairs for embeddings fine-tuning
+
+**Data Sources:**
+- User feedback from successful RAG interactions
+- Query-document pairs with high user ratings
+- Manual expert-labeled semantic similarities
+- Failure pairs from negative feedback
+
+**Target:** 100-200 positive pairs (query → correct document chunk)
+
+### 2.2 Fine-Tune Embeddings on Desoutter Corpus ⏳
+**Goal:** Create embeddings optimized for repair domain
 
 **Approach:** Contrastive learning with domain-specific pairs
 
@@ -137,58 +280,255 @@ class DomainEmbeddingTrainer:
     
     def __init__(self):
         self.base_model = "sentence-transformers/all-MiniLM-L6-v2"
-        self.device = "cuda"  # Use GPU for training
+        self.device = "cuda"
     
-    def prepare_training_data(self):
-        """Generate positive/negative pairs from documents"""
-        pairs = [
-            # Positive: similar in repair context
-            {
-                "anchor": "Motor makes grinding noise during operation",
-                "positive": "Grinding sound from drive motor indicates bearing wear",
-                "negative": "Visual inspection shows no external damage"
-            },
-            # More pairs from real documents...
+    def fine_tune(self, training_pairs: List[Dict]):
+        """
+        Training pair format:
+        {
+            "query": "Motor grinding noise and overheating",
+            "positive": "Bearing wear causes grinding and temperature rise",
+            "similarity": 1.0  # Perfect match
+        }
+        """
+        # Load model
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        
+        # Create training data
+        train_examples = [
+            InputExample(
+                texts=[p["query"], p["positive"]],
+                label=p["similarity"]
+            )
+            for p in training_pairs
         ]
-        return pairs
-    
-    def fine_tune(self, train_pairs: List[Dict], epochs: int = 3):
-        """
-        Fine-tune with SentenceTransformer
-        Loss: MultipleNegativesRankingLoss
-        """
+        
+        # Fine-tune with contrastive loss
         train_dataloader = DataLoader(
-            SentencesDataset(train_pairs, model),
+            train_examples,
             shuffle=True,
             batch_size=32
         )
         
+        train_loss = losses.CosineSimilarityLoss(
+            model=model,
+            sentence_embedding_dimension=384
+        )
+        
         model.fit(
             train_objectives=[(train_dataloader, train_loss)],
-            epochs=epochs,
-            warmup_steps=100
+            epochs=3,
+            warmup_steps=100,
+            show_progress_bar=True
         )
         
         model.save("/data/embeddings/desoutter-domain-model")
+        return model
 ```
 
 **Configuration:**
 ```python
-EMBEDDING_MODEL = "desoutter-domain-model"  # Custom fine-tuned
-EMBEDDING_DIMENSION = 384  # Keep same as base
-EMBEDDING_POOLING = "mean"  # Aggregate token embeddings
+DOMAIN_EMBEDDING_MODEL_PATH = "/data/embeddings/desoutter-domain-model"
+USE_DOMAIN_EMBEDDINGS = True  # Switch to fine-tuned model
+EMBEDDING_DIMENSION = 384     # Maintain compatibility
+EMBEDDING_POOLING = "mean"    # Token aggregation method
 ```
 
-### 2.2 Add Sparse + Dense Hybrid Search
-**Goal:** Combine keyword matching with semantic search
+**Expected Impact:**
+- Domain terminology better understood
+- 15-25% improvement in semantic relevance
+- Reduced false positives on generic terms
+
+### 2.3 Document Re-ingestion with Semantic Chunks ⏳
+**Goal:** Re-ingest 276 documents with semantic chunking enabled
+
+**Process:**
+```bash
+# 1. Backup existing data
+cp -r /data/chromadb /data/chromadb-backup-phase1
+
+# 2. Clear ChromaDB
+python scripts/clear_chromadb.py
+
+# 3. Re-ingest with semantic chunking + domain embeddings
+python scripts/ingest_documents.py \
+    --input-dir documents/ \
+    --enable-semantic-chunking \
+    --use-domain-embeddings \
+    --embedding-model /data/embeddings/desoutter-domain-model \
+    --batch-size 16
+```
+
+**Expected Results:**
+- Input: 276 documents
+- Output: ~3000-5000 semantic chunks (3-5x increase from 1080 basic chunks)
+- Metadata: 14 fields per chunk
+- ChromaDB: Updated collection with domain embeddings
+- Processing time: ~15-20 minutes (GPU-accelerated)
+
+**Quality Checks:**
+- Verify chunk count and distribution
+- Sample random chunks for semantic validity
+- Check metadata field population
+- Validate document type detection accuracy
+
+### 2.4 Hybrid Search: Semantic + BM25 ⏳
+**Goal:** Combine dense and sparse retrieval for better coverage
 
 ```python
-class HybridRetriever:
-    """
-    BM25 (sparse) + Dense (semantic) search
-    Better recall for both exact matches and semantic similarity
-    """
+class HybridSearcher:
+    """Combine semantic search + BM25 keyword matching"""
     
+    def __init__(self):
+        self.chromadb = ChromaDB(collection="documents")
+        self.bm25_index = BM25Retriever(
+            documents=self._load_documents(),
+            k1=1.5,
+            b=0.75
+        )
+    
+    def search(self, query: str, top_k: int = 5) -> List[Dict]:
+        """
+        1. Get semantic results (dense retrieval)
+        2. Get keyword results (sparse retrieval)
+        3. Combine using Reciprocal Rank Fusion
+        """
+        # Semantic search
+        semantic_results = self.chromadb.query(
+            query_embeddings=self.embed_query(query),
+            n_results=top_k * 2,
+            where={"importance_score": {"$gte": 0.5}}
+        )
+        
+        # BM25 search
+        bm25_results = self.bm25_index.retrieve(query, k=top_k * 2)
+        
+        # Reciprocal Rank Fusion
+        hybrid_results = self._reciprocal_rank_fusion(
+            semantic_results,
+            bm25_results,
+            top_k=top_k
+        )
+        
+        return hybrid_results
+    
+    def _reciprocal_rank_fusion(self, results1, results2, top_k):
+        """Combine rankings: RRF = 1/(60 + rank)"""
+        scores = {}
+        
+        for rank, result in enumerate(results1, 1):
+            doc_id = result["id"]
+            scores[doc_id] = scores.get(doc_id, 0) + 1/(60 + rank)
+        
+        for rank, result in enumerate(results2, 1):
+            doc_id = result["id"]
+            scores[doc_id] = scores.get(doc_id, 0) + 1/(60 + rank)
+        
+        # Return top-k by combined score
+        ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        return ranked[:top_k]
+```
+
+**Benefits:**
+- Better coverage: catches exact matches and semantic similarities
+- Reduced false negatives from purely semantic search
+- Improved precision for domain-specific terminology
+
+### 2.5 Query Expansion Pipeline ⏳
+**Goal:** Automatically expand queries with related domain terms
+
+```python
+class QueryExpander:
+    """Expand queries with domain-aware synonyms"""
+    
+    DOMAIN_SYNONYMS = {
+        "noise": ["squealing", "grinding", "humming", "clicking", "vibration"],
+        "heat": ["overheating", "temperature", "thermal"],
+        "motor": ["spindle", "drive", "actuator", "rotation"],
+        "bearing": ["ball bearing", "roller bearing", "bushing"],
+        "leak": ["leakage", "seepage", "drip", "moisture"]
+    }
+    
+    def expand(self, query: str) -> List[str]:
+        """Generate expanded query variations"""
+        
+        expanded = [query]  # Original query
+        
+        # 1. Expand with domain synonyms
+        for term, synonyms in DOMAIN_SYNONYMS.items():
+            if term in query.lower():
+                for synonym in synonyms[:2]:  # Top 2 synonyms
+                    expanded.append(query.replace(term, synonym, flags=re.IGNORECASE))
+        
+        # 2. LLM-based expansion for low-confidence queries
+        confidence = self._compute_confidence(query)
+        if confidence < 0.7:
+            llm_expansions = self.llm.expand_query(
+                query,
+                context="You are a repair technician expert. Expand this query:",
+                max_tokens=100
+            )
+            expanded.extend(llm_expansions)
+        
+        # Return unique, de-duplicated expansions
+        return list(dict.fromkeys(expanded))[:5]  # Max 5 variations
+    
+    def multi_search(self, query: str, searcher, top_k: int = 5):
+        """Search with all query expansions"""
+        expanded_queries = self.expand(query)
+        all_results = {}
+        
+        for q in expanded_queries:
+            results = searcher.search(q, top_k=top_k)
+            for result in results:
+                doc_id = result["id"]
+                if doc_id not in all_results:
+                    all_results[doc_id] = result
+                else:
+                    all_results[doc_id]["score"] += result["score"] * 0.8  # Decay
+        
+        # Return re-ranked combined results
+        ranked = sorted(all_results.values(), key=lambda x: x["score"], reverse=True)
+        return ranked[:top_k]
+```
+
+**Query Expansion Examples:**
+- "Motor noise" → ["Motor noise", "Spindle squealing", "Actuator grinding"]
+- "Battery not charging" → ["Battery not charging", "Power supply failure"]
+- "Loose connection" → ["Loose connection", "Cable disconnect", "Poor contact"]
+
+### 2.6 Metadata-Based Filtering ⏳
+**Goal:** Use rich metadata to improve retrieval precision
+
+```python
+# Advanced filtering options
+filters = {
+    "document_type": {"$in": ["troubleshooting_guide", "service_bulletin"]},
+    "importance_score": {"$gte": 0.7},
+    "is_procedure": True,
+    "contains_warning": {"$in": [True]},
+    "section_type": {"$in": ["PROCEDURE", "WARNING", "TROUBLESHOOTING"]}
+}
+
+results = chromadb.query(
+    query_embeddings=embedding,
+    n_results=10,
+    where=filters
+)
+```
+
+**Filter Dimensions:**
+- By document type (5 options)
+- By importance score (0.0-1.0)
+- By section type (8 options)
+- By fault keywords (9 categories)
+- By document source
+- By heading level
+- By presence of procedures/warnings/tables
+
+---
+
+## 🎯 Phase 3: Performance Monitoring & Optimization (Week 5-6)
     def __init__(self):
         self.dense_retriever = ChromaDBClient()
         self.sparse_retriever = BM25Retriever.from_documents(documents)
