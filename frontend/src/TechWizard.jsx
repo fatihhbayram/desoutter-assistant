@@ -27,6 +27,7 @@ export const TechWizard = ({ token }) => {
   const [search, setSearch] = useState('');
   const [filterSeries, setFilterSeries] = useState('');
   const [filterWireless, setFilterWireless] = useState(false);
+  const [filterType, setFilterType] = useState('all'); // 'all', 'tool', 'cvi3_controller'
 
   // Load products once
   React.useEffect(() => {
@@ -59,14 +60,30 @@ export const TechWizard = ({ token }) => {
       const matchesWireless = !filterWireless || 
         p.wireless_communication?.toLowerCase().includes('yes');
       
-      return matchesSearch && matchesSeries && matchesWireless;
+      const matchesType = filterType === 'all' || (p.product_type || 'tool') === filterType;
+      
+      return matchesSearch && matchesSeries && matchesWireless && matchesType;
     });
-  }, [products, search, filterSeries, filterWireless]);
+  }, [products, search, filterSeries, filterWireless, filterType]);
 
-  // Get unique series for filter
+  // Get unique series for filter (dynamic based on product type)
   const uniqueSeries = useMemo(() => {
-    return [...new Set(products.map(p => p.series_name).filter(Boolean))].sort();
-  }, [products]);
+    let filtered = products;
+    
+    // Filter by type
+    if (filterType === 'tool') {
+      filtered = products.filter(p => !p.product_type || p.product_type === 'tool');
+    } else if (filterType === 'cvi3_controller') {
+      filtered = products.filter(p => p.product_type === 'cvi3_controller');
+    }
+    
+    // Get unique series/category field
+    const series = filtered
+      .map(p => p.series_name || p.category)
+      .filter(Boolean);
+    
+    return [...new Set(series)].sort();
+  }, [products, filterType]);
 
   // Handle diagnosis
   const handleDiagnose = async () => {
@@ -181,13 +198,14 @@ export const TechWizard = ({ token }) => {
 
               {/* Filters */}
               <div className="filters-section">
+                {/* Product Series/Category Filter */}
                 <div className="filter-group">
-                  <label>Series</label>
+                  <label>Product {filterType === 'cvi3_controller' ? 'Category' : 'Series'}</label>
                   <select 
                     value={filterSeries}
                     onChange={(e) => setFilterSeries(e.target.value)}
                   >
-                    <option value="">All Series</option>
+                    <option value="">All {filterType === 'cvi3_controller' ? 'Categories' : 'Series'}</option>
                     {uniqueSeries.map(s => (
                       <option key={s} value={s}>{s}</option>
                     ))}
@@ -203,6 +221,30 @@ export const TechWizard = ({ token }) => {
                     />
                     <span>📶 Wireless Only</span>
                   </label>
+                </div>
+
+                <div className="filter-group">
+                  <label>Product Type</label>
+                  <div className="type-buttons">
+                    <button 
+                      className={`type-btn ${filterType === 'all' ? 'active' : ''}`}
+                      onClick={() => setFilterType('all')}
+                    >
+                      All ({products.length})
+                    </button>
+                    <button 
+                      className={`type-btn ${filterType === 'tool' ? 'active' : ''}`}
+                      onClick={() => setFilterType('tool')}
+                    >
+                      Tools ({products.filter(p => !p.product_type || p.product_type === 'tool').length})
+                    </button>
+                    <button 
+                      className={`type-btn ${filterType === 'cvi3_controller' ? 'active' : ''}`}
+                      onClick={() => setFilterType('cvi3_controller')}
+                    >
+                      CVI3 Units ({products.filter(p => p.product_type === 'cvi3_controller').length})
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -275,7 +317,12 @@ export const TechWizard = ({ token }) => {
 
                     {/* Product Info */}
                     <div className="product-info">
-                      <h3 className="product-name">{product.model_name}</h3>
+                      <div className="product-header">
+                        <h3 className="product-name">{product.model_name}</h3>
+                        <span className={`product-type-badge ${product.product_type === 'cvi3_controller' ? 'cvi3' : 'tool'}`}>
+                          {product.product_type === 'cvi3_controller' ? '⚙️ CVI3' : '🔧 Tool'}
+                        </span>
+                      </div>
                       <div className="product-meta">
                         <span className="part-number">{product.part_number}</span>
                         {product.series_name && (

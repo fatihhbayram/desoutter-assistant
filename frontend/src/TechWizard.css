@@ -1006,3 +1006,67 @@
     font-size: 12px;
   }
 }
+
+/* ==========================================
+   PRODUCT TYPE FILTERS
+   ========================================== */
+
+.type-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.type-btn {
+  padding: 8px 14px;
+  border: 2px solid #e5e7eb;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #6b7280;
+  transition: all 0.2s ease;
+}
+
+.type-btn:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.type-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: transparent;
+}
+
+/* ==========================================
+   PRODUCT TYPE BADGE
+   ========================================== */
+
+.product-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.product-type-badge {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.product-type-badge.tool {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.product-type-badge.cvi3 {
+  background: #fcd34d;
+  color: #92400e;
+}
+

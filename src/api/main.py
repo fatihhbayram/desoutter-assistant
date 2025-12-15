@@ -276,20 +276,36 @@ async def health_check():
 
 @app.get("/products")
 async def list_products():
-    """List all products"""
+    """List all products (Tools + CVI3 Units)"""
     try:
-        with MongoDBClient() as db:
-            products = db.get_products(limit=0)  # 0 = no limit
-            
-            # Remove MongoDB _id field
-            for product in products:
-                if '_id' in product:
-                    product['_id'] = str(product['_id'])
-            
-            return {
-                "total": len(products),
-                "products": products
-            }
+        # Get regular tools
+        with MongoDBClient(collection_name="products") as db:
+            tools = db.get_products(limit=0)
+        
+        # Get CVI3 units
+        with MongoDBClient(collection_name="tool_units") as db:
+            units = db.get_products(limit=0)
+        
+        # Add type field to distinguish
+        for tool in tools:
+            if '_id' in tool:
+                tool['_id'] = str(tool['_id'])
+            tool['product_type'] = 'tool'
+        
+        for unit in units:
+            if '_id' in unit:
+                unit['_id'] = str(unit['_id'])
+            unit['product_type'] = 'cvi3_controller'
+        
+        # Merge lists
+        all_products = tools + units
+        
+        return {
+            "total": len(all_products),
+            "tools_count": len(tools),
+            "cvi3_units_count": len(units),
+            "products": all_products
+        }
     except Exception as e:
         logger.error(f"Error listing products: {e}")
         raise HTTPException(status_code=500, detail=str(e))
