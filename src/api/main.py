@@ -916,7 +916,7 @@ async def admin_list_documents(authorization: Optional[str] = Header(None)):
         documents = []
         
         # Supported extensions for document listing
-        doc_extensions = ['*.pdf', '*.docx', '*.doc', '*.pptx', '*.ppt']
+        doc_extensions = ['*.pdf', '*.docx', '*.doc', '*.pptx', '*.ppt', '*.xlsx', '*.xls']
         
         # List manuals
         if MANUALS_DIR.exists():
@@ -973,7 +973,9 @@ async def download_document(filename: str):
                 '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 '.doc': 'application/msword',
                 '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                '.ppt': 'application/vnd.ms-powerpoint'
+                '.ppt': 'application/vnd.ms-powerpoint',
+                '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                '.xls': 'application/vnd.ms-excel'
             }
             media_type = media_types.get(ext, 'application/octet-stream')
             
@@ -998,12 +1000,12 @@ async def admin_upload_document(
     
     # Validate file type
     file_ext = Path(file.filename).suffix.lower()
-    allowed_extensions = {'.pdf', '.docx', '.doc', '.pptx', '.ppt'}
+    allowed_extensions = {'.pdf', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.xls'}
     
     if file_ext not in allowed_extensions:
         raise HTTPException(
             status_code=400, 
-            detail=f"Unsupported file type. Allowed: PDF, DOCX, PPTX"
+            detail=f"Unsupported file type. Allowed: PDF, DOCX, PPTX, XLSX, XLS"
         )
     
     # Validate doc type

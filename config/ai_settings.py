@@ -137,7 +137,9 @@ RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
 # Minimum similarity score (0.0-1.0) to consider a chunk relevant
 # Higher = stricter matching, may miss relevant info
 # Lower = more results, may include noise
-RAG_SIMILARITY_THRESHOLD = float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.7"))
+# Set to 0.30: Filters off absolute worst matches while keeping top results
+# Best combined with user feedback learning for quality improvement
+RAG_SIMILARITY_THRESHOLD = float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.30"))
 
 # =============================================================================
 # API SERVER CONFIGURATION

@@ -1,7 +1,7 @@
 # 🗺️ Desoutter Servis Yönetim Sistemi - Geliştirme Yol Haritası
 
-> **Son Güncelleme:** 14 Aralık 2025  
-> **Durum:** Tech Page UI Redesign Başlandı ✅ | MongoDB Config Fixed ✅
+> **Son Güncelleme:** 15 Aralık 2025  
+> **Durum:** RAG Dokumentasyon Tamamlandı ✅ | ChromaDB 1080 chunks ✅ | TechWizard UI Ready ✅
 
 ---
 
@@ -68,13 +68,16 @@ Bu belge, Desoutter Repair Assistant'a eklenecek **Servis Yönetim Sistemi** ve 
 
 ## 🔄 Devam Edilecek İşler (Next Steps)
 
-### Documentation & RAG Enhancement - Öncelikli
-- [ ] CVI3 ünitelere bağlanabilen toollar için veri taşı
-- [ ] Tool bulletins (ürün bültenlerine ait PDF'ler) yükle
-- [ ] Tool maintenance dosyaları (bakım dökümanları) ekle
-- [ ] Admin panel aracılığıyla RAG'a ingest et (Document Upload)
-- [ ] ChromaDB'ye vektör arama entegrasyonu
-- [ ] Diagnosis sonuçlarında tool dökümanları referans göster
+### Documentation & RAG Enhancement - Tamamlandı ✅ (15 Aralık 2025)
+- [x] CVI3 ünitelere bağlanabilen toollar için veri taşı
+- [x] Tool bulletins (ürün bültenlerine ait PDF'ler) yükle
+- [x] Tool maintenance dosyaları (bakım dökümanları) ekle
+- [x] Admin panel aracılığıyla RAG'a ingest et (Document Upload) - 276 doc, 1080 chunks ✅
+- [x] ChromaDB'ye vektör arama entegrasyonu ✅ (1080 chunks in vector DB)
+- [x] Diagnosis sonuçlarında tool dökümanları referans göster ✅ (Sources returned)
+- [x] RAG Retrieval Quality Optimization - Dynamic similarity threshold ✅
+
+**Detaylar:** [CHANGELOG.md](CHANGELOG.md#-15-aralık-2025-pazar) - RAG Retrieval Quality Optimization section
 
 ### Tech Page Wizard - Yakında
 - [ ] TechWizard componentini App.jsx'e entegre et
@@ -300,25 +303,47 @@ Bu belge, Desoutter Repair Assistant'a eklenecek **Servis Yönetim Sistemi** ve 
 
 ---
 
-## 🚀 Mevcut Durum (14 Aralık 2025)
+## 🚀 Mevcut Durum (15 Aralık 2025)
 
 **Tamamlanan:**
-- ✅ Backend: FastAPI çalışıyor (http://192.168.1.125:8000)
-- ✅ Frontend: React çalışıyor (http://192.168.1.125:3001)
+- ✅ Backend: FastAPI çalışıyor (http://localhost:8000)
+- ✅ Frontend: React çalışıyor (http://localhost:3001)
 - ✅ Database: MongoDB çalışıyor (237 products + 7 CVI3 units)
-- ✅ RAG Engine: Ollama LLM + ChromaDB
+- ✅ RAG Engine: Ollama LLM + ChromaDB (1080 chunks, 5 sources per diagnosis)
 - ✅ Admin Dashboard: Tamamen işlevsel
-- ✅ Tech Page: Yeni Wizard component oluşturuldu
+- ✅ Tech Page: TechWizard component (4-step wizard - ready to integrate)
+- ✅ Documentation: 276 dokument ingested (bulletins + manuals)
+- ✅ Vector DB: ChromaDB fully operational with similarity search
+- ✅ Excel Support: PDF, DOCX, PPTX, XLSX, XLS parsing
 
 **Yakında Yapılacak:**
-1. TechWizard componentini production'a al
+1. TechWizard entegrasyonu (App.jsx'e import)
 2. Admin page UI iyileştirmeleri
-3. Servis talepleri modülü
-4. KPI raporları
+3. Servis talepleri modülü (service_requests collection)
+4. KPI raporları ve dashboards
 
 ---
 
 ## 📝 Son Yapılan Çalışmalar
+
+### 15 Aralık 2025 - RAG Dokumentasyon & ChromaDB Integration
+
+**Tamamlanan:**
+```
+✅ Excel desteği: XLSX, XLS parsing eklendi
+✅ Dokument yükleme: 276 dokument (bulletins + manuals)
+✅ RAG Ingest: 1080 chunk oluşturuldu ve ChromaDB'ye eklendi
+✅ Vector Search: Diagnosis'te 5 kaynak bulunuyor (similarity score ile)
+✅ API Test: Grinding noise → CVI3 evolution, ExD measurement dökümanları
+✅ Sources: Diagnosis sonuçlarında referans gösteriliyyor
+```
+
+**Docker Compose:**
+```
+✅ ai-stack.yml ile 7 servis running
+✅ Tüm bileşenler healthy ve synced
+✅ ChromaDB persistent volume çalışıyor
+```
 
 ### 14 Aralık 2025 - Tech Page Wizard & Infrastructure Fix
 
@@ -338,35 +363,21 @@ Bu belge, Desoutter Repair Assistant'a eklenecek **Servis Yönetim Sistemi** ve 
 ✅ Docker build: npm dependencies + new components
 ```
 
-**Docker Compose:**
-```
-✅ Tüm 7 servis running
-✅ Frontend rebuild: TechWizard entegre
-✅ API rebuild: collection_name parameter
-```
-
-**Planlanan İşler (Hazırlanıyor):**
-```
-📋 CVI3 ünitelere bağlanabilen tool datası taşınacak
-📄 Tool bulletins (ürün bültenlerine ait PDF'ler) yüklenecek
-🔧 Tool maintenance dosyaları (bakım dökümanları) eklenecek
-🧠 RAG'a ingest edilecek (ChromaDB vektör arama)
-```
-
 ---
 
-## 🚀 Başlangıç Noktası (Sonraki Aşama)
+## 🚀 Başlangıç Noktası (Sonraki Aşama - Sırada)
 
-**Hemen Yapılacak:**
-1. **CVI3 tool datası** - Bağlanabilen toolları database'e taşı
-2. **Dokümantasyon yükleme** - Bulletins + Maintenance dosyalarını upload et
-3. **RAG ingest** - Admin panel > Documents > Ingest ile vektör arama'ya ekle
-4. **Test** - Diagnosis yaptığında tool dökümanları referans alınsın
+**Hemen Yapılacak (Priority Order):**
+1. **[HIGH]** TechWizard entegrasyonu - App.jsx'e import et (Sources göster)
+2. **[HIGH]** Admin page UI iyileştirmeleri - Doküman yönetimi basitleştir
+3. **[MEDIUM]** Servis talepleri modülü - service_requests collection + API
+4. **[MEDIUM]** KPI Dashboard - Real-time metrics ve raporlar
 
-**Ardından:**
-1. TechWizard entegrasyonu - App.jsx'e import et
-2. Admin page iyileştirmeleri - Layout basitleştir
-3. Servis talepleri modülü - Database schema + API
+**Daha Sonra:**
+1. Cihaz kaydı sistemi (device registry)
+2. Müşteri yönetimi
+3. Rol yapısı güncelleme (Manager, Supervisor roles)
+4. Raporlama ve Excel dışa aktarım
 
 ---
 

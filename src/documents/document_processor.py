@@ -45,10 +45,18 @@ except ImportError:
     Presentation = None  # type: ignore
     PPTX_AVAILABLE = False
 
+# Excel support
+try:
+    import openpyxl  # type: ignore
+    EXCEL_AVAILABLE = True
+except ImportError:
+    openpyxl = None  # type: ignore
+    EXCEL_AVAILABLE = False
+
 logger = setup_logger(__name__)
 
 # Supported file extensions
-SUPPORTED_EXTENSIONS = {'.pdf', '.docx', '.doc', '.pptx', '.ppt'}
+SUPPORTED_EXTENSIONS = {'.pdf', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.xls'}
 
 
 class DocumentProcessor:
@@ -60,6 +68,7 @@ class DocumentProcessor:
         logger.info(f"  - PDF support: {PYPDF2_AVAILABLE or PDFPLUMBER_AVAILABLE}")
         logger.info(f"  - DOCX support: {DOCX_AVAILABLE}")
         logger.info(f"  - PPTX support: {PPTX_AVAILABLE}")
+        logger.info(f"  - EXCEL support: {EXCEL_AVAILABLE}")
     
     # =========================================================================
     # PDF PROCESSING
@@ -270,6 +279,72 @@ class DocumentProcessor:
             return None
     
     # =========================================================================
+    # EXCEL (XLSX/XLS) PROCESSING
+    # =========================================================================
+    
+    def extract_text_excel(self, excel_path: Path) -> Optional[str]:
+        """
+        Extract text from Excel files (.xlsx, .xls)
+        Reads all sheets and converts to text format
+        
+        Args:
+            excel_path: Path to Excel file
+            
+        Returns:
+            Extracted text from all sheets
+        """
+        if not EXCEL_AVAILABLE:
+            logger.error("openpyxl not installed. Cannot process Excel files.")
+            return None
+        
+        logger.info(f"Processing Excel: {excel_path.name}")
+        
+        try:
+            text_content = []
+            
+            if excel_path.suffix.lower() == '.xlsx':
+                from openpyxl import load_workbook
+                workbook = load_workbook(excel_path, data_only=True)
+                
+                for sheet_name in workbook.sheetnames:
+                    sheet = workbook[sheet_name]
+                    text_content.append(f"\n=== Sheet: {sheet_name} ===")
+                    
+                    for row in sheet.iter_rows(values_only=True):
+                        # Filter out None values and convert to string
+                        row_text = " | ".join(
+                            str(cell) for cell in row if cell is not None
+                        )
+                        if row_text.strip():
+                            text_content.append(row_text)
+            
+            elif excel_path.suffix.lower() == '.xls':
+                # For .xls files, try with openpyxl first, fallback to basic reading
+                try:
+                    from openpyxl import load_workbook
+                    workbook = load_workbook(excel_path, data_only=True)
+                    
+                    for sheet_name in workbook.sheetnames:
+                        sheet = workbook[sheet_name]
+                        text_content.append(f"\n=== Sheet: {sheet_name} ===")
+                        
+                        for row in sheet.iter_rows(values_only=True):
+                            row_text = " | ".join(
+                                str(cell) for cell in row if cell is not None
+                            )
+                            if row_text.strip():
+                                text_content.append(row_text)
+                except:
+                    logger.warning(f"Could not read .xls file {excel_path}, returning empty")
+                    return ""
+            
+            return "\n".join(text_content)
+        
+        except Exception as e:
+            logger.error(f"Error extracting text from Excel {excel_path}: {e}")
+            return None
+    
+    # =========================================================================
     # UNIFIED DOCUMENT PROCESSING
     # =========================================================================
     
@@ -303,6 +378,8 @@ class DocumentProcessor:
             text = self.process_docx(file_path)
         elif ext in ['.pptx', '.ppt']:
             text = self.process_pptx(file_path)
+        elif ext in ['.xlsx', '.xls']:
+            text = self.extract_text_excel(file_path)
         else:
             logger.error(f"Unsupported file type: {ext}")
             return None

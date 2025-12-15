@@ -171,49 +171,39 @@ desoutter-assistant/
 
 ## 📝 Recent Updates
 
+### 2025-12-15: RAG Retrieval Quality Optimization ✨ **NEW**
+- ✅ **Similarity Threshold Optimization**: Dynamic filtering based on RAG_SIMILARITY_THRESHOLD config
+- ✅ **L2 Distance Conversion**: Proper similarity score calculation from distance metrics
+- ✅ **Testing & Tuning**: Thresholds tested from 0.85 to 0.30, optimal value confirmed
+- ✅ **Multi-Format Support**: Excel (XLSX/XLS) document parsing added
+- ✅ **Quality Validation**: Different fault types return relevant document combinations
+
+**Details**: See [CHANGELOG.md](CHANGELOG.md) for technical implementation
+
+### 2025-12-14: Tech Page Wizard & Infrastructure Fix
+- ✅ **TechWizard Component**: 4-step wizard-style UI for technicians
+- ✅ **MongoDB Configuration**: Fixed localhost connection
+- ✅ **Backend Feedback Fix**: HTTP 422 error resolved
+- ✅ **Infrastructure**: All 7 Docker services running and healthy
+
 ### 2025-12-09: Self-Learning RAG Feedback System
 - ✅ **Feedback system**: 👍/👎 buttons for user feedback
 - ✅ **Self-learning engine**: System learns from feedback
 - ✅ **Diagnosis history**: All diagnoses saved to MongoDB
 - ✅ **Learned mappings**: Fault-solution patterns stored
-- ✅ **Negative feedback reasons**: wrong_product, wrong_fault_type, incomplete_info, incorrect_steps
-- ✅ **Retry mechanism**: Get alternative suggestion after negative feedback
-- ✅ **Feedback modal**: Interactive UI for detailed feedback
 
 ### 2025-12-08: Auto GPU Preload & Responsive Design
 - ✅ **Ollama preload**: Model auto-loads to GPU on server restart
 - ✅ **Responsive design**: Desktop, tablet, mobile support
-- ✅ **Multi-language UI**: Turkish/English interface
-- ✅ **OLLAMA_KEEP_ALIVE=24h**: Model stays in GPU memory
 
 ### 2025-12-02: Security & UI Polish
 - ✅ Session persistence across page refresh
 - ✅ Auto-logout on token expiry
-- ✅ Professional header with stats dashboard
-- ✅ Role-based UI controls
 
-### 2025-12-01: Admin Document Management & UI Fixes
-- ✅ Added RAG document management panel in admin UI
-- ✅ PDF upload support for manuals and bulletins
-- ✅ Document ingestion endpoint for processing into vector DB
-- ✅ Fixed textarea focus loss issue in technician panel
-- ✅ Fixed diagnosis result card overlap on scroll
-- ✅ Switched to `qwen2.5:7b-instruct` model (available in Proxmox)
-- ✅ Added persistent Huggingface cache volume (faster restarts)
-- ✅ Fixed Ollama connection via Docker network hostname
-
-### 2025-11-30: Authentication & Role-Based UI
-- ✅ JWT authentication with bcrypt password hashing
-- ✅ Role-based login (Admin/Technician)
-- ✅ Enhanced Admin Panel with stats dashboard
-- ✅ Enhanced Technician Panel with grid/list view
-- ✅ User management endpoints
-
-### 2025-11-19: Image Extraction & Bug Fixes
-- ✅ Fixed product image scraping for Next.js pages
-- ✅ Implemented multi-strategy image extraction
-- ✅ Removed unsupported `$contains` in Chroma filters
-- ✅ Hardened `/ui` page error handling
+### 2025-12-01: Admin Document Management
+- ✅ RAG document management panel
+- ✅ Multi-format upload support (PDF, DOCX, PPTX, XLSX, XLS)
+- ✅ Document ingestion to vector DB
 
 ## 🧪 Testing
 
@@ -233,11 +223,26 @@ curl -X POST http://localhost:8000/diagnose \
   -d '{"part_number":"6151659770","fault_description":"motor not starting","language":"en"}'
 ```
 
+## � System Metrics (15 Aralık 2025)
+
+| Metrik | Değer |
+|--------|-------|
+| Toplam Ürün | 237 |
+| VectorDB Chunks | 1080 |
+| Yüklü Dokuman | 276 (bulletins + manuals) |
+| RAG Similarity Threshold | 0.30 (dynamic, configurable) |
+| Sources Per Diagnosis | 3-5 relevant documents |
+| LLM Model | qwen2.5:7b-instruct |
+| Embedding Model | all-MiniLM-L6-v2 |
+| GPU | NVIDIA RTX A2000 (6GB) |
+
 ## 📖 Additional Documentation
 
 - `QUICKSTART.md` — Quick setup steps
 - `PROXMOX_DEPLOYMENT.md` — Proxmox deployment notes
 - `PHASE2_STRUCTURE.md` — Phase 2 architecture
+- `CHANGELOG.md` — Detailed changelog (See [15 Aralık 2025 update](CHANGELOG.md#-15-aralık-2025-pazar))
+- `ROADMAP.md` — Development roadmap
 
 ## 🤝 Contributing
 

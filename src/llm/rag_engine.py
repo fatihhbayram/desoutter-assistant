@@ -123,29 +123,34 @@ class RAGEngine:
         metadatas = results.get("metadatas", [[]])[0]
         distances = results.get("distances", [[]])[0]
         
-        # Filter by distance threshold (lower is better for L2)
-        # L2 distance: 0 = identical, higher = more different
-        # We use distance threshold instead of similarity
-        DISTANCE_THRESHOLD = 2.0  # Accept documents with L2 distance < 2.0
+        # Filter by distance threshold based on RAG_SIMILARITY_THRESHOLD config
+        # L2 distance conversion: similarity_score = max(0, 1 - distance/2)
+        # So: distance_threshold = 2 * (1 - similarity_threshold)
+        # Example: similarity_threshold=0.7 → distance_threshold=0.6
+        #          similarity_threshold=0.85 → distance_threshold=0.3
+        similarity_threshold = RAG_SIMILARITY_THRESHOLD
+        distance_threshold = 2 * (1 - similarity_threshold)
         
         filtered_docs = []
         for doc, meta, dist in zip(documents, metadatas, distances):
             # Skip if distance is too high (not similar enough)
-            if dist > DISTANCE_THRESHOLD:
-                logger.debug(f"Skipping doc with distance {dist:.3f} > {DISTANCE_THRESHOLD}")
+            if dist > distance_threshold:
+                similarity_score = max(0, 1 - dist/2)
+                logger.debug(f"Skipping doc with distance {dist:.3f} (similarity {similarity_score:.3f}) < threshold {similarity_threshold:.2f}")
                 continue
 
             # Note: We removed the part_number filter because most bulletins 
             # are general and don't have specific product references.
             # The LLM will determine relevance based on the context.
 
+            similarity_score = max(0, 1 - dist/2)
             filtered_docs.append({
                 "text": doc,
                 "metadata": meta,
-                "similarity": max(0, 1 - dist/2)  # Normalize to 0-1 range approximately
+                "similarity": similarity_score
             })
         
-        logger.info(f"Retrieved {len(filtered_docs)} relevant documents (threshold: {DISTANCE_THRESHOLD})")
+        logger.info(f"Retrieved {len(filtered_docs)} relevant documents (similarity threshold: {similarity_threshold:.2f}, distance threshold: {distance_threshold:.2f})")
         
         return {
             "documents": filtered_docs,
