@@ -78,8 +78,41 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM
 # Device for embedding computation: 'cpu' (default) or 'cuda' (GPU acceleration)
 EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "cpu")
 
+# Embedding output dimension (do not change - must match model)
+EMBEDDING_DIMENSION = 384
+
+# Pooling method for token-level embeddings
+EMBEDDING_POOLING = os.getenv("EMBEDDING_POOLING", "mean")  # 'mean', 'cls', 'max'
+
 # Batch size for processing multiple texts at once (higher = faster, more memory)
 EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
+
+# Enable embedding caching to reduce API calls (for remote APIs)
+EMBEDDING_CACHE_ENABLED = os.getenv("EMBEDDING_CACHE_ENABLED", "false").lower() == "true"
+
+# Cache TTL in seconds (3600 = 1 hour)
+EMBEDDING_CACHE_TTL = int(os.getenv("EMBEDDING_CACHE_TTL", "3600"))
+
+# === Phase 2: Domain Embeddings (Future Enhancement) ===
+# Path to fine-tuned domain-specific embedding model
+# When available, this overrides EMBEDDING_MODEL for better domain accuracy
+DOMAIN_EMBEDDING_MODEL_PATH = os.getenv(
+    "DOMAIN_EMBEDDING_MODEL_PATH",
+    None  # Will be set after fine-tuning on Phase 2
+)
+
+# Enable domain embeddings when fine-tuned model is available
+USE_DOMAIN_EMBEDDINGS = os.getenv("USE_DOMAIN_EMBEDDINGS", "false").lower() == "true"
+
+# Domain embeddings fine-tuning parameters (reference only)
+# These are used by the domain_embedding_trainer.py script:
+# - Training data: Positive feedback pairs (fault -> solution)
+# - Training method: Siamese network with contrastive loss
+# - Epochs: 3-5 with early stopping
+# - Batch size: 8 (depends on VRAM)
+# - Learning rate: 2e-5
+# - Warmup steps: 100
+DOMAIN_EMBEDDING_TRAINING_ENABLED = os.getenv("DOMAIN_EMBEDDING_TRAINING_ENABLED", "false").lower() == "true"
 
 # =============================================================================
 # TEXT CHUNKING CONFIGURATION
