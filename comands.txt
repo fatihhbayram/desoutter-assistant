@@ -1,0 +1,16 @@
+# Logs izle
+docker logs -f desoutter-api
+
+# Stats kontrol
+curl http://localhost:8000/stats | jq
+
+# Container restart
+docker restart desoutter-api
+
+# Yeni PDF ekle
+cp manual.pdf ~/desoutter-assistant/documents/manuals/
+docker exec desoutter-api python3 scripts/ingest_documents.py
+
+# Backup
+docker exec mongodb mongodump --db desoutter --out /data/backup
+docker cp mongodb:/data/backup ~/desoutter-backup/

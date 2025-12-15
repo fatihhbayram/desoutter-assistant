@@ -1,0 +1,258 @@
+# Desoutter Repair Assistant
+
+AI-powered repair assistant for Desoutter industrial tools. Uses RAG (Retrieval Augmented Generation) with **self-learning capabilities** to provide intelligent repair suggestions based on technical manuals and service bulletins.
+
+**Repository**: https://github.com/fatihhbayramm/desoutter-assistant
+
+## 🎯 Key Features
+
+- **🧠 Self-Learning RAG**: System learns from user feedback to improve future suggestions
+- **📊 Admin Dashboard**: Comprehensive analytics with trends, top products, and feedback stats
+- **Smart Product Scraping**: Handles Next.js rendered pages with advanced image extraction from DatoCMS assets
+- **MongoDB Integration**: Stores 237+ products, users, and learning data
+- **RAG Engine**: Vector search with ChromaDB + Ollama for intelligent repair suggestions
+- **Multi-Format Documents**: Support for PDF, Word (DOCX), and PowerPoint (PPTX)
+- **Document Viewer**: Open source documents directly from diagnosis results
+- **Multi-Language UI**: Turkish and English interface support
+- **Responsive Design**: Works on desktop, tablet, and mobile
+- **JWT Authentication**: Role-based access control (Admin / Technician)
+- **Modern Stack**: FastAPI + React + Docker Compose for easy deployment
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Docker & Docker Compose
+- NVIDIA GPU with CUDA (optional, for faster inference)
+- Ollama with `qwen2.5:7b-instruct` or `llama3:latest` model
+
+### Run with Docker
+
+```bash
+# Start API (connect to existing ai-net network with MongoDB & Ollama)
+sudo docker run -d --name desoutter-api \
+  --network ai-net \
+  -p 8000:8000 \
+  -e MONGO_HOST=mongodb \
+  -e OLLAMA_BASE_URL=http://ollama:11434 \
+  -e OLLAMA_MODEL=qwen2.5:7b-instruct \
+  -v desoutter_data:/app/data \
+  -v /path/to/documents:/app/documents \
+  -v huggingface_cache:/root/.cache/huggingface \
+  --gpus all \
+  desoutter-api
+
+# Start Frontend
+cd frontend
+docker build -t desoutter-frontend .
+docker run -d --name desoutter-frontend -p 3001:3001 desoutter-frontend
+```
+
+### Access
+- **Frontend**: http://localhost:3001
+- **API Docs**: http://localhost:8000/docs
+- **Simple UI**: http://localhost:8000/ui
+
+### Default Users
+| Username | Password | Role |
+|----------|----------|------|
+| admin | admin123 | Admin |
+| tech | tech123 | Technician |
+
+## 📚 API Endpoints
+
+### Authentication
+- `POST /auth/login` - Login and get JWT token
+
+### Diagnosis
+- `POST /diagnose` - Get AI-powered repair suggestion
+- `POST /diagnose/feedback` - Submit feedback (👍/👎) for learning
+- `GET /diagnose/history` - Get user's diagnosis history
+- `GET /products` - List all products
+- `GET /stats` - System statistics
+
+### Admin (requires admin role)
+- `GET /admin/dashboard` - Get comprehensive dashboard statistics
+- `GET /admin/users` - List users
+- `POST /admin/users` - Create user
+- `DELETE /admin/users/{username}` - Delete user
+- `GET /admin/documents` - List uploaded documents
+- `POST /admin/documents/upload` - Upload document (PDF, DOCX, PPTX)
+- `DELETE /admin/documents/{type}/{filename}` - Delete document
+- `POST /admin/documents/ingest` - Process documents into RAG
+
+### Documents
+- `GET /documents/download/{filename}` - Download/view source document
+
+## 🖥️ Frontend Features
+
+### Admin Panel
+- System statistics dashboard
+- User management (add/delete users)
+- **RAG Document Management**:
+  - Upload PDF, Word (DOCX), PowerPoint (PPTX) documents
+  - View uploaded documents list with format icons
+  - Delete documents
+  - Re-index all documents into vector database
+- Maintenance actions (scraper, refresh data)
+
+### Technician Panel
+- Product browser with grid/list view (237+ products)
+- Search and filters (series, wireless)
+- Product selection with details
+- Fault description input (Turkish/English)
+- AI-powered diagnosis with confidence level
+- **Feedback System**: 👍/👎 buttons for self-learning
+- **Source Document Viewer**: Open related documents directly from results
+
+## 🧠 Self-Learning RAG System
+
+The system learns from user feedback to continuously improve:
+
+### How It Works
+1. **User submits feedback** after receiving a diagnosis
+2. **Positive feedback (👍)**: Reinforces the fault-solution mapping
+3. **Negative feedback (👎)**: Records the pattern to avoid, offers alternative
+
+### Learning Components
+- `DiagnosisFeedback`: Records all user feedback
+- `LearnedMapping`: Stores successful fault-solution patterns
+- `DiagnosisHistory`: Tracks all diagnoses for analytics
+
+### Confidence Score
+- Based on positive/negative feedback ratio
+- Boosted with more samples (max at 10+ feedbacks)
+- High confidence patterns prioritized in future suggestions
+
+## 🔧 Configuration
+
+### Environment Variables
+```bash
+# MongoDB
+MONGO_HOST=mongodb
+MONGO_PORT=27017
+MONGO_DATABASE=desoutter
+
+# Ollama LLM
+OLLAMA_BASE_URL=http://ollama:11434
+OLLAMA_MODEL=qwen2.5:7b-instruct
+
+# Embeddings
+EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+EMBEDDING_DEVICE=cpu  # or cuda
+
+# JWT
+JWT_SECRET=your-secret-key
+```
+
+## 📁 Project Structure
+
+```
+desoutter-assistant/
+├── src/
+│   ├── api/           # FastAPI application
+│   ├── database/      # MongoDB client, feedback models
+│   ├── documents/     # PDF processor, chunker, embeddings
+│   ├── llm/           # Ollama client, RAG engine, feedback engine
+│   ├── scraper/       # Product scraper
+│   ├── vectordb/      # ChromaDB client
+│   └── utils/         # Logger, helpers
+├── frontend/
+│   └── src/           # React Vite application
+├── config/
+│   ├── settings.py    # Base configuration
+│   └── ai_settings.py # AI/RAG configuration
+├── documents/
+│   ├── manuals/       # PDF manuals
+│   └── bulletins/     # Service bulletins
+├── scripts/           # Utility scripts
+├── Dockerfile
+└── docker-compose.yml
+```
+
+## 📝 Recent Updates
+
+### 2025-12-09: Self-Learning RAG Feedback System
+- ✅ **Feedback system**: 👍/👎 buttons for user feedback
+- ✅ **Self-learning engine**: System learns from feedback
+- ✅ **Diagnosis history**: All diagnoses saved to MongoDB
+- ✅ **Learned mappings**: Fault-solution patterns stored
+- ✅ **Negative feedback reasons**: wrong_product, wrong_fault_type, incomplete_info, incorrect_steps
+- ✅ **Retry mechanism**: Get alternative suggestion after negative feedback
+- ✅ **Feedback modal**: Interactive UI for detailed feedback
+
+### 2025-12-08: Auto GPU Preload & Responsive Design
+- ✅ **Ollama preload**: Model auto-loads to GPU on server restart
+- ✅ **Responsive design**: Desktop, tablet, mobile support
+- ✅ **Multi-language UI**: Turkish/English interface
+- ✅ **OLLAMA_KEEP_ALIVE=24h**: Model stays in GPU memory
+
+### 2025-12-02: Security & UI Polish
+- ✅ Session persistence across page refresh
+- ✅ Auto-logout on token expiry
+- ✅ Professional header with stats dashboard
+- ✅ Role-based UI controls
+
+### 2025-12-01: Admin Document Management & UI Fixes
+- ✅ Added RAG document management panel in admin UI
+- ✅ PDF upload support for manuals and bulletins
+- ✅ Document ingestion endpoint for processing into vector DB
+- ✅ Fixed textarea focus loss issue in technician panel
+- ✅ Fixed diagnosis result card overlap on scroll
+- ✅ Switched to `qwen2.5:7b-instruct` model (available in Proxmox)
+- ✅ Added persistent Huggingface cache volume (faster restarts)
+- ✅ Fixed Ollama connection via Docker network hostname
+
+### 2025-11-30: Authentication & Role-Based UI
+- ✅ JWT authentication with bcrypt password hashing
+- ✅ Role-based login (Admin/Technician)
+- ✅ Enhanced Admin Panel with stats dashboard
+- ✅ Enhanced Technician Panel with grid/list view
+- ✅ User management endpoints
+
+### 2025-11-19: Image Extraction & Bug Fixes
+- ✅ Fixed product image scraping for Next.js pages
+- ✅ Implemented multi-strategy image extraction
+- ✅ Removed unsupported `$contains` in Chroma filters
+- ✅ Hardened `/ui` page error handling
+
+## 🧪 Testing
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Login
+curl -X POST http://localhost:8000/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin123"}'
+
+# Diagnose (with token)
+curl -X POST http://localhost:8000/diagnose \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{"part_number":"6151659770","fault_description":"motor not starting","language":"en"}'
+```
+
+## 📖 Additional Documentation
+
+- `QUICKSTART.md` — Quick setup steps
+- `PROXMOX_DEPLOYMENT.md` — Proxmox deployment notes
+- `PHASE2_STRUCTURE.md` — Phase 2 architecture
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+MIT License - see LICENSE file for details.
+
+---
+
+**Powered by**: Ollama + ChromaDB + FastAPI + React
+
+🏗️ Running on Proxmox AI Infrastructure

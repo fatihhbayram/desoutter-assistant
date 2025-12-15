@@ -1,0 +1,66 @@
+# Add this to your ai-stack.yml
+
+  desoutter-api:
+    build: 
+      context: /home/adentechio/desoutter-assistant
+      dockerfile: Dockerfile
+    container_name: desoutter-api
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8000:8000"
+    volumes:
+      - desoutter_data:/app/data
+      - /home/adentechio/desoutter-assistant/data/documents:/app/data/documents
+    networks:
+      - ai-net
+    environment:
+      # MongoDB
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_DATABASE=desoutter
+      - MONGO_URI=mongodb://mongodb:27017/
+      
+      # Ollama
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=llama3.2:3b
+      - OLLAMA_TEMPERATURE=0.1
+      - OLLAMA_TIMEOUT=120
+      
+      # Embeddings
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - EMBEDDING_DEVICE=cpu
+      - EMBEDDING_BATCH_SIZE=32
+      
+      # RAG
+      - RAG_TOP_K=5
+      - RAG_SIMILARITY_THRESHOLD=0.7
+      - CHUNK_SIZE=500
+      - CHUNK_OVERLAP=50
+      
+      # API
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_RELOAD=false
+      
+      # Language
+      - DEFAULT_LANGUAGE=tr
+      
+      # Logging
+      - LOG_LEVEL=INFO
+      - LOG_FILE=/app/data/logs/scraper.log
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# Add volume
+volumes:
+  desoutter_data:
+    name: desoutter_data

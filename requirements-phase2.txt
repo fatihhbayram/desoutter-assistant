@@ -1,0 +1,56 @@
+# Phase 1 - Web Scraping (EXISTING)
+aiohttp==3.9.1
+beautifulsoup4==4.12.2
+lxml==4.9.3
+pymongo==4.6.1
+python-dotenv==1.0.0
+pydantic==2.5.3
+coloredlogs==15.0.1
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# Phase 2 - RAG & AI Components (NEW)
+
+# Document Processing
+PyPDF2==3.0.1
+pypdf==3.17.4
+pdfplumber==0.10.3
+python-docx==1.1.0
+python-pptx==0.6.23
+
+# Text Processing & Chunking
+langchain==0.1.0
+langchain-community==0.0.10
+tiktoken==0.5.2
+
+# Embeddings (Local)
+sentence-transformers==2.2.2
+torch==2.1.2
+transformers==4.36.2
+
+# Ensure compatible huggingface_hub for sentence-transformers and transformers
+# must be >=0.19.3 for transformers 4.36.2; choose 0.19.3 which still provides cached_download
+huggingface_hub==0.19.3
+
+# Vector Database
+chromadb==0.4.22
+# Alternative: qdrant-client==1.7.0
+
+# LLM Integration
+ollama==0.1.6
+openai==1.6.1  # For API compatibility
+
+# Web API
+fastapi==0.109.0
+uvicorn[standard]==0.25.0
+python-multipart==0.0.6
+websockets==12.0
+
+# Frontend (optional)
+jinja2==3.1.3
+
+# Utilities
+tqdm==4.66.1
+# pinned to 0.25.x to remain compatible with ollama (which requires httpx<0.26.0,>=0.25.2)
+# pinned to 0.25.2 to remain compatible with ollama (ollama requires httpx<0.26.0,>=0.25.2)
+httpx==0.25.2

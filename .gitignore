@@ -1,0 +1,68 @@
+# General
+.DS_Store
+.idea/
+.vscode/
+*.log
+*.tmp
+*.swp
+
+# Sensitive Data
+documents/  # Company-sensitive documents (bulletins, manuals, maintenance)
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+
+# Node / Vite
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.parcel-cache/
+.npm/
+
+# Env files
+.env
+**/.env
+.env.local
+.env.*.local
+.env.proxmox
+**/.env.proxmox
+
+# Docker
+*.pid
+*.pid.lock
+.docker/
+
+# Project data/output (keep .gitkeep files)
+data/cache/**
+data/exports/**
+data/logs/**
+!data/**/.gitkeep
+
+desoutter-scraper/data/cache/**
+desoutter-scraper/data/exports/**
+desoutter-scraper/data/logs/**
+!desoutter-scraper/data/**/.gitkeep
+
+# Documents (user uploaded files - manuals, bulletins, etc.)
+documents/manuals/**
+documents/bulletins/**
+!documents/manuals/.gitkeep
+!documents/bulletins/.gitkeep
+
+# Build artifacts
+frontend/dist/
+desoutter-scraper/frontend/dist/
+
+# Misc
+*.wt
+WiredTiger*
+journal/
