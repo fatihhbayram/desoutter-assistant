@@ -2,6 +2,7 @@
 RAG Engine - Retrieval-Augmented Generation
 Combines vector search with LLM generation
 Now with self-learning capabilities from user feedback
+Phase 2.2: Hybrid Search (Semantic + BM25) integration
 """
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -12,7 +13,11 @@ from src.vectordb.chroma_client import ChromaDBClient
 from src.llm.ollama_client import OllamaClient
 from src.llm.prompts import get_system_prompt, build_rag_prompt, build_fallback_response
 from src.database import MongoDBClient
-from config.ai_settings import RAG_TOP_K, RAG_SIMILARITY_THRESHOLD, DEFAULT_LANGUAGE
+from config.ai_settings import (
+    RAG_TOP_K, RAG_SIMILARITY_THRESHOLD, DEFAULT_LANGUAGE,
+    USE_HYBRID_SEARCH, HYBRID_SEMANTIC_WEIGHT, HYBRID_BM25_WEIGHT,
+    HYBRID_RRF_K, ENABLE_QUERY_EXPANSION
+)
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -30,8 +35,27 @@ class RAGEngine:
         self.llm = OllamaClient()
         self.mongodb = None
         self.feedback_engine = None
+        self.hybrid_searcher = None
+        
+        # Initialize hybrid search if enabled
+        if USE_HYBRID_SEARCH:
+            self._init_hybrid_search()
         
         logger.info("✅ RAG Engine initialized")
+    
+    def _init_hybrid_search(self):
+        """Lazy initialize hybrid search to avoid circular imports"""
+        try:
+            from src.llm.hybrid_search import HybridSearcher
+            self.hybrid_searcher = HybridSearcher(
+                rrf_k=HYBRID_RRF_K,
+                semantic_weight=HYBRID_SEMANTIC_WEIGHT,
+                bm25_weight=HYBRID_BM25_WEIGHT
+            )
+            logger.info("✅ Hybrid search enabled (Semantic + BM25)")
+        except Exception as e:
+            logger.warning(f"Failed to initialize hybrid search: {e}")
+            self.hybrid_searcher = None
     
     def _get_feedback_engine(self):
         """Lazy load feedback engine"""
@@ -87,6 +111,7 @@ class RAGEngine:
     ) -> Dict:
         """
         Retrieve relevant context from vector database
+        Uses hybrid search (semantic + BM25) when enabled
         
         Args:
             query: Search query (fault description)
@@ -97,6 +122,48 @@ class RAGEngine:
             Dict with retrieved documents and metadata
         """
         logger.info(f"Retrieving context for query: {query[:50]}...")
+        
+        # Use hybrid search if available
+        if self.hybrid_searcher:
+            return self._retrieve_with_hybrid_search(query, top_k)
+        
+        # Fallback to standard semantic search
+        return self._retrieve_with_semantic_search(query, part_number, top_k)
+    
+    def _retrieve_with_hybrid_search(self, query: str, top_k: int) -> Dict:
+        """Retrieve using hybrid search (semantic + BM25)"""
+        results = self.hybrid_searcher.search(
+            query=query,
+            top_k=top_k,
+            expand_query=ENABLE_QUERY_EXPANSION,
+            use_hybrid=True,
+            min_similarity=RAG_SIMILARITY_THRESHOLD
+        )
+        
+        filtered_docs = []
+        for result in results:
+            filtered_docs.append({
+                "text": result.content,
+                "metadata": result.metadata,
+                "similarity": result.similarity if result.similarity > 0 else result.score,
+                "search_type": result.source,  # 'semantic', 'bm25', or 'hybrid'
+                "bm25_score": result.bm25_score
+            })
+        
+        logger.info(f"Hybrid search retrieved {len(filtered_docs)} documents")
+        return {
+            "documents": filtered_docs,
+            "query": query,
+            "search_type": "hybrid"
+        }
+    
+    def _retrieve_with_semantic_search(
+        self, 
+        query: str, 
+        part_number: Optional[str],
+        top_k: int
+    ) -> Dict:
+        """Fallback: retrieve using standard semantic search"""
         
         # Generate query embedding
         query_embedding = self.embeddings.generate_embedding(query)

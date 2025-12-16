@@ -14,8 +14,11 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - [x] **RAG Ingest**: 1080 chunks ChromaDB'ye ✅ (15 Ara)
 - [x] **RAG Quality**: Similarity threshold optimization ✅ (15 Ara)
 - [x] **Phase 1 Semantic Chunking**: Complete semantic chunking pipeline ✅ (15 Ara)
+- [x] **Phase 2.1 Re-ingestion**: 276 docs → 1229 semantic chunks ✅ (16 Ara)
+- [x] **Phase 2.2 Hybrid Search**: BM25 + Semantic + RRF Fusion ✅ (16 Ara)
 
 ### 🟡 Orta Öncelik (Next Sprint)
+- [ ] **Phase 2.3 Response Caching**: LRU cache for faster responses
 - [ ] **TechWizard Entegrasyonu**: App.jsx'e entegre et
 - [ ] **Admin Page Redesign**: Layout basitleştir, UX iyileştir
 - [ ] **Servis Talepleri Modülü**: Service request management
@@ -26,6 +29,104 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - [ ] **SAP Entegrasyonu**: Otomatik yedek parça siparişi
 - [ ] **Sesli Asistan**: Hands-free arıza bildirimi
 - [ ] **Predictive Maintenance**: Arıza öncesi uyarı sistemi
+
+---
+
+## 📆 16 Aralık 2025 (Pazartesi)
+
+### 🆕 Phase 2.1: Document Re-ingestion Complete ✅
+
+**Achievement:** All 276 documents re-ingested with semantic chunking!
+
+**Results:**
+- **Input:** 276 documents (bulletins + manuals)
+- **Output:** 1229 semantic chunks with rich metadata
+- **Total in ChromaDB:** 2309 vectors (1080 original + 1229 semantic)
+- **Processing Time:** ~3 minutes
+
+**Path Fix Applied:**
+- Config pointed to `/app/data/documents/` but PDFs were at `/app/documents/`
+- Fixed `DOCUMENTS_DIR = BASE_DIR / "documents"` in `ai_settings.py`
+
+---
+
+### 🆕 Phase 2.2: Hybrid Search Implementation ✅
+
+**Major Achievement:** Complete hybrid search system with BM25 + Semantic + RRF Fusion!
+
+#### HybridSearcher Module (`src/llm/hybrid_search.py` - 700+ lines)
+
+**1. HybridSearcher Class (Main)**
+- Combines semantic search (ChromaDB) + keyword search (BM25)
+- **RRF (Reciprocal Rank Fusion)** for score combination
+- Configurable weights: semantic=0.7, BM25=0.3
+- RRF k parameter: 60 (default)
+
+**2. BM25Index Class**
+- Full BM25 implementation with TF-IDF weighting
+- **Stats:** 2309 documents indexed, 13026 unique terms
+- Tokenization with stopword removal
+- Efficient term frequency caching
+
+**3. QueryExpander Class**
+- Domain-specific synonym expansion
+- **9 synonym categories:**
+  - motor → spindle, drive
+  - error/fault → failure, warning
+  - battery → power, cell
+  - calibration → calibrate, adjustment
+  - torque → tightening, tension
+  - connection → cable, wire
+  - noise → squealing, grinding
+  - bearing → ball bearing, bushing
+  - controller → CVI3, unit
+- Error code normalization (e.g., e047 → E47)
+
+**4. MetadataFilter Class**
+- Document type filtering (manual, bulletin, guide, catalog, safety)
+- Importance score boosting (≥0.7 for high-importance docs)
+- Product-specific filtering support
+
+#### Configuration Added (`config/ai_settings.py`)
+```python
+# Hybrid Search Configuration (Phase 2.2)
+USE_HYBRID_SEARCH = True
+HYBRID_SEMANTIC_WEIGHT = 0.7
+HYBRID_BM25_WEIGHT = 0.3
+HYBRID_RRF_K = 60
+ENABLE_QUERY_EXPANSION = True
+MAX_QUERY_EXPANSIONS = 3
+```
+
+#### RAGEngine Integration (`src/llm/rag_engine.py`)
+- `_init_hybrid_search()`: Lazy initialization of HybridSearcher
+- `_retrieve_with_hybrid_search()`: New retrieval method
+- `retrieve_context()`: Uses hybrid search when enabled
+
+#### Test Suite (`scripts/test_hybrid_search.py`)
+**5/5 Tests PASSED:**
+1. ✅ **Query Expansion**: "Motor grinding noise" → 5 variations
+2. ✅ **BM25 Search**: Correct keyword-based retrieval
+3. ✅ **Hybrid Search**: Combined semantic + BM25 results
+4. ✅ **Metadata Filtering**: Type and importance filters working
+5. ✅ **Semantic vs Hybrid Comparison**: 
+   - Query: "E047 battery voltage low"
+   - Semantic-only: similarity 0.4145 ✅
+   - Hybrid: score 0.0460 (BM25 + semantic fusion) ✅
+
+#### Files Created/Modified
+- ✅ `src/llm/hybrid_search.py` (700+ lines) - **NEW**
+- ✅ `config/ai_settings.py` - Hybrid search configuration added
+- ✅ `src/llm/rag_engine.py` - Hybrid search integration
+- ✅ `scripts/test_hybrid_search.py` - **NEW** (5 test cases)
+
+#### Technical Details
+- **Fusion Method:** Reciprocal Rank Fusion (RRF)
+  - Formula: `score = Σ 1/(k + rank)` where k=60
+  - Weights: semantic × 0.7, BM25 × 0.3
+- **Query Expansion:** Max 3 expansions per query
+- **BM25 Parameters:** k1=1.5, b=0.75 (standard)
+- **Minimum Similarity:** 0.30 threshold maintained
 
 ---
 

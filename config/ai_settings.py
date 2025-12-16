@@ -37,7 +37,8 @@ from .settings import *
 # - manuals/: Product technical manuals and repair guides
 # - bulletins/: Service bulletins and technical updates
 
-DOCUMENTS_DIR = DATA_DIR / "documents"
+# Documents are mounted at /app/documents in Docker
+DOCUMENTS_DIR = BASE_DIR / "documents"
 MANUALS_DIR = DOCUMENTS_DIR / "manuals"
 BULLETINS_DIR = DOCUMENTS_DIR / "bulletins"
 
@@ -173,6 +174,30 @@ RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
 # Set to 0.30: Filters off absolute worst matches while keeping top results
 # Best combined with user feedback learning for quality improvement
 RAG_SIMILARITY_THRESHOLD = float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.30"))
+
+# =============================================================================
+# HYBRID SEARCH CONFIGURATION (Phase 2.2)
+# =============================================================================
+# Hybrid search combines semantic (dense) and BM25 (sparse) retrieval
+# for improved coverage of both semantic meaning and exact keyword matches
+
+# Enable hybrid search (combines semantic + BM25)
+USE_HYBRID_SEARCH = os.getenv("USE_HYBRID_SEARCH", "true").lower() == "true"
+
+# Weight for semantic search in fusion (0.0-1.0)
+HYBRID_SEMANTIC_WEIGHT = float(os.getenv("HYBRID_SEMANTIC_WEIGHT", "0.7"))
+
+# Weight for BM25 keyword search in fusion (0.0-1.0)
+HYBRID_BM25_WEIGHT = float(os.getenv("HYBRID_BM25_WEIGHT", "0.3"))
+
+# RRF (Reciprocal Rank Fusion) constant - higher = more uniform weighting
+HYBRID_RRF_K = int(os.getenv("HYBRID_RRF_K", "60"))
+
+# Enable query expansion with domain synonyms
+ENABLE_QUERY_EXPANSION = os.getenv("ENABLE_QUERY_EXPANSION", "true").lower() == "true"
+
+# Maximum query expansions to generate
+MAX_QUERY_EXPANSIONS = int(os.getenv("MAX_QUERY_EXPANSIONS", "3"))
 
 # =============================================================================
 # API SERVER CONFIGURATION

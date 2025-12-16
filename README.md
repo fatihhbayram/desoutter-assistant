@@ -171,7 +171,17 @@ desoutter-assistant/
 
 ## 📝 Recent Updates
 
-### 2025-12-15: RAG Retrieval Quality Optimization ✨ **NEW**
+### 2025-12-16: Phase 2.2 Hybrid Search ✨ **NEW**
+- ✅ **Hybrid Search**: BM25 keyword search + Semantic search combined
+- ✅ **RRF Fusion**: Reciprocal Rank Fusion for score combination
+- ✅ **Query Expansion**: Domain-specific synonym expansion (9 categories)
+- ✅ **BM25 Index**: 13026 unique terms indexed for keyword search
+- ✅ **Document Re-ingestion**: 276 docs → 1229 semantic chunks → 2309 total vectors
+- ✅ **Test Suite**: 5/5 hybrid search tests passing
+
+**Details**: See [CHANGELOG.md](CHANGELOG.md#-16-aralık-2025-pazartesi) for implementation
+
+### 2025-12-15: RAG Retrieval Quality Optimization
 - ✅ **Similarity Threshold Optimization**: Dynamic filtering based on RAG_SIMILARITY_THRESHOLD config
 - ✅ **L2 Distance Conversion**: Proper similarity score calculation from distance metrics
 - ✅ **Testing & Tuning**: Thresholds tested from 0.85 to 0.30, optimal value confirmed
@@ -223,23 +233,27 @@ curl -X POST http://localhost:8000/diagnose \
   -d '{"part_number":"6151659770","fault_description":"motor not starting","language":"en"}'
 ```
 
-## 📊 System Metrics (15 Aralık 2025)
+## 📊 System Metrics (16 Aralık 2025)
 
 | Metrik | Değer |
 |--------|-------|
 | Toplam Ürün | 237 |
-| VectorDB Chunks | 1080 |
+| VectorDB Chunks | **2309** (1080 original + 1229 semantic) |
 | Yüklü Dokuman | 276 (bulletins + manuals) |
+| BM25 Index | **13026 unique terms** |
 | RAG Similarity Threshold | 0.30 (dynamic, configurable) |
 | Sources Per Diagnosis | 3-5 relevant documents |
 | LLM Model | qwen2.5:7b-instruct |
-| Embedding Model | all-MiniLM-L6-v2 |
+| Embedding Model | all-MiniLM-L6-v2 (384-dim) |
 | **Semantic Chunking** | **✅ Phase 1 COMPLETE** |
+| **Hybrid Search** | **✅ Phase 2.2 COMPLETE** |
 | Chunking Strategy | Recursive with structure preservation |
 | Chunk Size | 400 characters with 100 char overlap |
 | Metadata Fields | 14 per chunk (importance, keywords, type, etc) |
 | Document Type Detection | 5 types (Manual, Bulletin, Guide, Catalog, Safety) |
 | Fault Keywords | 9 categories (motor, noise, mechanical, electrical, etc) |
+| Query Expansion | 9 synonym categories (domain-specific) |
+| Hybrid Weights | Semantic: 0.7, BM25: 0.3 |
 | GPU | NVIDIA RTX A2000 (6GB) |
 
 ## 📖 Additional Documentation
@@ -247,7 +261,7 @@ curl -X POST http://localhost:8000/diagnose \
 - `QUICKSTART.md` — Quick setup steps
 - `PROXMOX_DEPLOYMENT.md` — Proxmox deployment notes
 - `PHASE2_STRUCTURE.md` — Phase 2 architecture
-- `CHANGELOG.md` — Detailed changelog (See [15 Aralık 2025 update](CHANGELOG.md#-15-aralık-2025-pazar))
+- `CHANGELOG.md` — Detailed changelog (See [16 Aralık 2025 update](CHANGELOG.md#-16-aralık-2025-pazartesi))
 - `ROADMAP.md` — Development roadmap
 
 ## 🤝 Contributing
@@ -264,6 +278,6 @@ MIT License - see LICENSE file for details.
 
 ---
 
-**Powered by**: Ollama + ChromaDB + FastAPI + React
+**Powered by**: Ollama + ChromaDB + FastAPI + React + BM25
 
 🏗️ Running on Proxmox AI Infrastructure

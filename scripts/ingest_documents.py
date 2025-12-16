@@ -2,6 +2,8 @@
 """
 Ingest PDF documents into vector database
 Process repair manuals and bulletins
+
+Phase 2 Update: Uses SemanticChunker for improved RAG retrieval
 """
 import sys
 from pathlib import Path
@@ -9,8 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.ai_settings import MANUALS_DIR, BULLETINS_DIR
-from src.documents.pdf_processor import PDFProcessor
-from src.documents.chunker import TextChunker
+from src.documents.document_processor import DocumentProcessor
 from src.documents.embeddings import EmbeddingsGenerator
 from src.vectordb.chroma_client import ChromaDBClient
 from src.utils.logger import setup_logger
@@ -19,15 +20,14 @@ logger = setup_logger(__name__)
 
 
 def main():
-    """Main ingestion workflow"""
+    """Main ingestion workflow with semantic chunking"""
     logger.info("=" * 80)
-    logger.info("📄 Starting Document Ingestion")
+    logger.info("📄 Starting Document Ingestion (Phase 2 - Semantic Chunking)")
     logger.info("=" * 80)
     
     # Initialize components
     logger.info("\n🔧 Initializing components...")
-    pdf_processor = PDFProcessor()
-    chunker = TextChunker()
+    doc_processor = DocumentProcessor()  # Includes SemanticChunker
     embeddings_gen = EmbeddingsGenerator()
     vectordb = ChromaDBClient()
     
@@ -43,47 +43,67 @@ def main():
         return
     
     all_documents = []
+    all_chunks = []
     
-    # Process manuals
+    # Process manuals with semantic chunking
     if manuals_exist:
         logger.info(f"\n📖 Processing Repair Manuals from {MANUALS_DIR}")
-        manuals = pdf_processor.process_directory(MANUALS_DIR)
-        all_documents.extend(manuals)
-        logger.info(f"   Processed {len(manuals)} manuals")
+        manuals = doc_processor.process_directory(
+            MANUALS_DIR, 
+            enable_semantic_chunking=True
+        )
+        for doc in manuals:
+            all_documents.append(doc)
+            if doc.get("chunks"):
+                all_chunks.extend(doc["chunks"])
+        logger.info(f"   Processed {len(manuals)} manuals → {sum(d.get('chunk_count', 0) for d in manuals)} chunks")
     
-    # Process bulletins
+    # Process bulletins with semantic chunking
     if bulletins_exist:
         logger.info(f"\n📰 Processing Bulletins from {BULLETINS_DIR}")
-        bulletins = pdf_processor.process_directory(BULLETINS_DIR)
-        all_documents.extend(bulletins)
-        logger.info(f"   Processed {len(bulletins)} bulletins")
+        bulletins = doc_processor.process_directory(
+            BULLETINS_DIR,
+            enable_semantic_chunking=True
+        )
+        for doc in bulletins:
+            all_documents.append(doc)
+            if doc.get("chunks"):
+                all_chunks.extend(doc["chunks"])
+        logger.info(f"   Processed {len(bulletins)} bulletins → {sum(d.get('chunk_count', 0) for d in bulletins)} chunks")
     
     if not all_documents:
         logger.error("❌ No documents were successfully processed")
         return
     
-    logger.info(f"\n✅ Total documents processed: {len(all_documents)}")
+    logger.info(f"\n✅ Total documents: {len(all_documents)}")
+    logger.info(f"✅ Total semantic chunks: {len(all_chunks)}")
     
-    # Chunk documents
-    logger.info("\n✂️  Chunking documents...")
-    chunks = chunker.chunk_documents(all_documents)
-    logger.info(f"   Created {len(chunks)} chunks")
+    # Prepare chunks for ChromaDB
+    logger.info("\n📦 Preparing chunks for vector database...")
+    prepared_chunks = []
+    for idx, chunk in enumerate(all_chunks):
+        chunk_id = f"chunk_{idx}_{chunk.get('metadata', {}).get('source', 'unknown')}"
+        prepared_chunks.append({
+            "chunk_id": chunk_id,
+            "text": chunk["text"],
+            "metadata": chunk.get("metadata", {})
+        })
     
     # Generate embeddings
     logger.info("\n🧮 Generating embeddings...")
-    texts = [chunk["text"] for chunk in chunks]
+    texts = [chunk["text"] for chunk in prepared_chunks]
     embeddings = embeddings_gen.generate_embeddings(texts)
     logger.info(f"   Generated {len(embeddings)} embeddings")
     
     # Add to vector database
     logger.info("\n💾 Storing in vector database...")
-    vectordb.add_documents(chunks, embeddings)
+    vectordb.add_documents(prepared_chunks, embeddings)
     
     # Summary
     logger.info("\n" + "=" * 80)
-    logger.info("✅ INGESTION COMPLETED!")
+    logger.info("✅ INGESTION COMPLETED (Phase 2 - Semantic Chunking)!")
     logger.info(f"   Documents: {len(all_documents)}")
-    logger.info(f"   Chunks: {len(chunks)}")
+    logger.info(f"   Semantic Chunks: {len(prepared_chunks)}")
     logger.info(f"   Total in DB: {vectordb.get_count()}")
     logger.info("=" * 80)
 

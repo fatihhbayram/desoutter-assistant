@@ -1,7 +1,7 @@
 # 🗺️ Desoutter Servis Yönetim Sistemi - Geliştirme Yol Haritası
 
-> **Son Güncelleme:** 15 Aralık 2025  
-> **Durum:** RAG Dokumentasyon Tamamlandı ✅ | ChromaDB 1080 chunks ✅ | TechWizard UI Ready ✅
+> **Son Güncelleme:** 16 Aralık 2025  
+> **Durum:** Phase 2.2 Hybrid Search Complete ✅ | ChromaDB 2309 vectors ✅ | BM25 13026 terms ✅
 
 ---
 
@@ -68,6 +68,34 @@ Bu belge, Desoutter Repair Assistant'a eklenecek **Servis Yönetim Sistemi** ve 
 
 ## 🔄 Devam Edilecek İşler (Next Steps)
 
+### Phase 2.1: Document Re-ingestion - TAMAMLANDI ✅ (16 Aralık 2025)
+- [x] Path configuration fix (DOCUMENTS_DIR)
+- [x] 276 documents re-processed with semantic chunking
+- [x] 1229 new semantic chunks generated
+- [x] Total vectors in ChromaDB: 2309
+
+### Phase 2.2: Hybrid Search - TAMAMLANDI ✅ (16 Aralık 2025)
+- [x] HybridSearcher class (700+ lines)
+- [x] BM25Index - Keyword search (13026 unique terms)
+- [x] QueryExpander - Domain synonym expansion (9 categories)
+- [x] MetadataFilter - Document type and importance filtering
+- [x] RRF Fusion - Reciprocal Rank Fusion algorithm
+- [x] RAGEngine integration - USE_HYBRID_SEARCH toggle
+- [x] Test suite - 5/5 tests PASSED
+
+**Technical Details:**
+- Semantic weight: 0.7, BM25 weight: 0.3
+- RRF k parameter: 60
+- Query expansion: Max 3 synonyms per query
+- Similarity threshold: 0.30
+
+**Detaylar:** [CHANGELOG.md](CHANGELOG.md#-16-aralık-2025-pazartesi)
+
+### Phase 2.3: Response Caching - Planlanan
+- [ ] LRU cache for repeated queries
+- [ ] Cache invalidation on document update
+- [ ] Cache statistics and monitoring
+
 ### Phase 1: Semantic Chunking - TAMAMLANDI ✅ (15 Aralık 2025)
 - [x] SemanticChunker module (400+ lines) - Recursive chunking with structure preservation
 - [x] DocumentTypeDetector - 5 document type classifications
@@ -83,8 +111,6 @@ Bu belge, Desoutter Repair Assistant'a eklenecek **Servis Yönetim Sistemi** ve 
 - Fault keywords: Motor, noise, mechanical, electrical, calibration, leakage, corrosion, wear, connection, torque
 - Structure preservation: Headings, procedures, warnings, tables, lists
 - Importance scoring: 0.0-1.0 based on content type
-
-**Next Phase 2:** Re-ingest 276 documents + domain embeddings fine-tuning
 
 ### Documentation & RAG Enhancement - Tamamlandı ✅ (15 Aralık 2025)
 - [x] CVI3 ünitelere bağlanabilen toollar için veri taşı
