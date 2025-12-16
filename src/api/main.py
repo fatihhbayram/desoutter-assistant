@@ -1126,3 +1126,129 @@ async def admin_ingest_documents(authorization: Optional[str] = Header(None)):
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+
+
+# =============================================================================
+# PHASE 2.3: RESPONSE CACHE MANAGEMENT ENDPOINTS
+# =============================================================================
+
+@app.get("/admin/cache/stats")
+async def get_cache_stats(authorization: str = Header(...)):
+    """
+    Get response cache statistics.
+    
+    Returns:
+    - size: Current number of cached entries
+    - max_size: Maximum cache capacity
+    - hit_rate: Cache hit rate percentage
+    - hits/misses: Total hit and miss counts
+    - evictions: Number of LRU evictions
+    - ttl_expirations: Number of TTL-based expirations
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        rag = get_rag_engine()
+        
+        if not rag.response_cache:
+            return {
+                "status": "disabled",
+                "message": "Response cache is not enabled"
+            }
+        
+        stats = rag.response_cache.get_stats()
+        return {
+            "status": "enabled",
+            "stats": stats
+        }
+    except Exception as e:
+        logger.error(f"Error getting cache stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/cache/clear")
+async def clear_cache(authorization: str = Header(...)):
+    """
+    Clear all cached responses.
+    
+    Useful after:
+    - Document updates/re-ingestion
+    - Model changes
+    - Configuration updates
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        rag = get_rag_engine()
+        
+        if not rag.response_cache:
+            return {
+                "status": "disabled",
+                "message": "Response cache is not enabled"
+            }
+        
+        # Get stats before clearing
+        stats_before = rag.response_cache.get_stats()
+        entries_before = stats_before.get("size", 0)
+        
+        # Clear cache
+        rag.response_cache.clear()
+        
+        logger.info(f"✅ Cache cleared: {entries_before} entries removed")
+        
+        return {
+            "status": "ok",
+            "message": f"Cache cleared successfully",
+            "entries_removed": entries_before
+        }
+    except Exception as e:
+        logger.error(f"Error clearing cache: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/admin/cache/entry")
+async def delete_cache_entry(
+    part_number: str,
+    fault_description: str,
+    language: str = "en",
+    authorization: str = Header(...)
+):
+    """
+    Delete a specific cache entry.
+    
+    Args:
+    - part_number: Product part number
+    - fault_description: Fault description used in the query
+    - language: Language code (en/tr)
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        rag = get_rag_engine()
+        
+        if not rag.response_cache:
+            return {
+                "status": "disabled",
+                "message": "Response cache is not enabled"
+            }
+        
+        # Build cache key (same format as in generate_repair_suggestion)
+        cache_key = f"{part_number}:{fault_description}:{language}"
+        
+        # Try to delete
+        deleted = rag.response_cache.delete(cache_key)
+        
+        if deleted:
+            logger.info(f"✅ Cache entry deleted: {cache_key[:50]}...")
+            return {
+                "status": "ok",
+                "message": "Cache entry deleted successfully"
+            }
+        else:
+            return {
+                "status": "not_found",
+                "message": "Cache entry not found"
+            }
+    except Exception as e:
+        logger.error(f"Error deleting cache entry: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

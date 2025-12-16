@@ -3,6 +3,7 @@ RAG Engine - Retrieval-Augmented Generation
 Combines vector search with LLM generation
 Now with self-learning capabilities from user feedback
 Phase 2.2: Hybrid Search (Semantic + BM25) integration
+Phase 2.3: Response Caching for improved performance
 """
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -16,7 +17,8 @@ from src.database import MongoDBClient
 from config.ai_settings import (
     RAG_TOP_K, RAG_SIMILARITY_THRESHOLD, DEFAULT_LANGUAGE,
     USE_HYBRID_SEARCH, HYBRID_SEMANTIC_WEIGHT, HYBRID_BM25_WEIGHT,
-    HYBRID_RRF_K, ENABLE_QUERY_EXPANSION
+    HYBRID_RRF_K, ENABLE_QUERY_EXPANSION,
+    USE_CACHE, CACHE_TTL
 )
 from src.utils.logger import setup_logger
 
@@ -36,10 +38,15 @@ class RAGEngine:
         self.mongodb = None
         self.feedback_engine = None
         self.hybrid_searcher = None
+        self.response_cache = None
         
         # Initialize hybrid search if enabled
         if USE_HYBRID_SEARCH:
             self._init_hybrid_search()
+        
+        # Initialize response cache if enabled (Phase 2.3)
+        if USE_CACHE:
+            self._init_response_cache()
         
         logger.info("✅ RAG Engine initialized")
     
@@ -56,6 +63,20 @@ class RAGEngine:
         except Exception as e:
             logger.warning(f"Failed to initialize hybrid search: {e}")
             self.hybrid_searcher = None
+    
+    def _init_response_cache(self):
+        """Initialize response cache (Phase 2.3)"""
+        try:
+            from src.llm.response_cache import get_response_cache
+            self.response_cache = get_response_cache(
+                max_size=1000,
+                default_ttl=CACHE_TTL,
+                enable_similarity=True
+            )
+            logger.info(f"✅ Response cache enabled (TTL: {CACHE_TTL}s)")
+        except Exception as e:
+            logger.warning(f"Failed to initialize response cache: {e}")
+            self.response_cache = None
     
     def _get_feedback_engine(self):
         """Lazy load feedback engine"""
@@ -252,6 +273,18 @@ class RAGEngine:
         start_time = time.time()
         logger.info(f"Generating repair suggestion for {part_number} (retry={is_retry})")
         
+        # Phase 2.3: Check response cache (skip for retry requests)
+        cache_key = None
+        if self.response_cache and not is_retry and not excluded_sources:
+            cache_key = f"{part_number}:{fault_description}:{language}"
+            cached_response = self.response_cache.get(cache_key)
+            if cached_response:
+                # Add cache hit metadata
+                cached_response["from_cache"] = True
+                cached_response["response_time_ms"] = int((time.time() - start_time) * 1000)
+                logger.info(f"✅ Cache HIT - returning cached response in {cached_response['response_time_ms']}ms")
+                return cached_response
+        
         # Get learning context from feedback engine
         feedback_engine = self._get_feedback_engine()
         learned_context = feedback_engine.get_learned_context(
@@ -387,6 +420,22 @@ class RAGEngine:
             response["diagnosis_id"] = None
         
         logger.info(f"✅ Generated suggestion with {confidence} confidence in {response_time_ms}ms")
+        
+        # Phase 2.3: Store in response cache (only for non-retry, successful responses)
+        if self.response_cache and cache_key and confidence != "low":
+            # Create a copy for caching (without mutable references)
+            cache_entry = {
+                "suggestion": response["suggestion"],
+                "confidence": response["confidence"],
+                "product_model": response["product_model"],
+                "part_number": response["part_number"],
+                "sources": response["sources"],
+                "language": response["language"],
+                "cached_at": time.time()
+            }
+            self.response_cache.set(cache_key, cache_entry)
+            logger.info(f"✅ Cached response (key={cache_key[:50]}...)")
+        
         return response
     
     def stream_repair_suggestion(
