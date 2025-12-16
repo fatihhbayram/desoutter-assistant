@@ -3,8 +3,8 @@ Embeddings Generation Module
 Generate vector embeddings for text chunks
 """
 from typing import List
-import torch
-from sentence_transformers import SentenceTransformer
+import torch  # type: ignore
+from sentence_transformers import SentenceTransformer  # type: ignore
 from config.ai_settings import EMBEDDING_MODEL, EMBEDDING_DEVICE, EMBEDDING_BATCH_SIZE
 from src.utils.logger import setup_logger
 

@@ -316,7 +316,7 @@ class DocumentProcessor:
             text_content = []
             
             if excel_path.suffix.lower() == '.xlsx':
-                from openpyxl import load_workbook
+                from openpyxl import load_workbook  # type: ignore
                 workbook = load_workbook(excel_path, data_only=True)
                 
                 for sheet_name in workbook.sheetnames:
@@ -334,7 +334,7 @@ class DocumentProcessor:
             elif excel_path.suffix.lower() == '.xls':
                 # For .xls files, try with openpyxl first, fallback to basic reading
                 try:
-                    from openpyxl import load_workbook
+                    from openpyxl import load_workbook  # type: ignore
                     workbook = load_workbook(excel_path, data_only=True)
                     
                     for sheet_name in workbook.sheetnames:
