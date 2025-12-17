@@ -175,17 +175,33 @@ desoutter-assistant/
 
 ## 📝 Recent Updates
 
-### 2025-12-17: Phase 3.3 & 3.4 Complete ✨ **NEW**
+### 2025-12-17: Async Concurrency & Domain Knowledge ✨ **NEW**
+- ✅ **Async Concurrency Fix**: Wrapped blocking LLM calls with `asyncio.to_thread()` 
+  - Multiple users can now access the system simultaneously
+  - Health/products endpoints respond in ~40ms even during diagnose operations
+  - Previously blocked for 30+ seconds during LLM inference
+- ✅ **Desoutter Connection Architecture**: Dynamic tool connection guidance
+  - WiFi-enabled tools: Connect via WiFi to Connect Unit or AP
+  - Non-WiFi tools: Connect via tool cable to CVI3
+  - No more incorrect "check ethernet" suggestions
+- ✅ **Self-Learning Verified**: Feedback system actively learning
+  - 4 learned mappings with confidence scores up to 1.0
+  - Boost sources automatically applied for similar queries
+  - Negative feedback excludes problematic sources
+
+### 2025-12-17: Phase 4.1 Metadata Boosting
+- ✅ **Metadata-Based Filtering & Boosting**
+  - Service bulletins (ESD/ESB) get 1.5x boost
+  - Procedure sections get 1.3x boost
+  - Warning content gets 1.2x boost
+- ✅ **Re-ingested Documents**: 1514 semantic chunks with full metadata
+- ✅ **BM25 Index**: 17,050 unique terms for keyword search
+
+### 2025-12-17: Phase 3.3 & 3.4 Complete
 - ✅ **Source Relevance Feedback**: Users can rate each source as relevant/irrelevant
 - ✅ **Context Window Optimization**: Token budget, deduplication, warning prioritization
 - ✅ **Ollama GPU Activation**: NVIDIA RTX A2000 GPU inference enabled
 - ✅ **Test Suites**: 5/5 context optimizer tests passing
-
-**Context Optimizer Features:**
-- Deduplication: Removes similar chunks (85% Jaccard threshold)
-- Token Budget: 8000 token limit with smart truncation
-- Priority Scoring: Warnings +15%, Procedures +10%, Similarity 40%, Importance 30%
-- Metadata-enriched formatting
 
 ### 2025-12-16: Phase 2.2 & 2.3 Complete
 - ✅ **Hybrid Search**: BM25 keyword search + Semantic search combined

@@ -40,6 +40,78 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 
 ## 📆 17 Aralık 2025 (Salı) - Güncellemeler
 
+### 🆕 Async Concurrency Fix ✅ **YENİ**
+
+**Problem:** Bir teknisyen sorgu yaparken diğer teknisyenler web sayfasına erişemiyordu (30+ saniye bekleme).
+
+**Root Cause:** `async def diagnose()` endpoint'i içinde synchronous blocking `rag.generate_repair_suggestion()` çağrısı event loop'u bloke ediyordu.
+
+**Solution:** `asyncio.to_thread()` ile blocking çağrıları thread pool'a taşındı:
+```python
+# ÖNCE (blocking)
+result = rag.generate_repair_suggestion(...)
+
+# SONRA (non-blocking)
+result = await asyncio.to_thread(
+    rag.generate_repair_suggestion,
+    part_number=request.part_number,
+    ...
+)
+```
+
+**Fixed Endpoints:**
+- `/diagnose` - Ana diagnose endpoint
+- `/diagnose/stream` - Streaming endpoint  
+- `/diagnose/feedback` - Feedback endpoint
+- Startup event - RAG engine initialization
+
+**Test Results:**
+| Request | Before (Blocking) | After (Async) |
+|---------|-------------------|---------------|
+| Health check | 30+ seconds | **40ms** |
+| Products list | 30+ seconds | **45ms** |
+
+**Files Modified:**
+- `src/api/main.py` - Added asyncio import, wrapped blocking calls
+
+---
+
+### 🆕 Desoutter Connection Architecture ✅ **YENİ**
+
+**Problem:** LLM yanlış "ethernet bağlantısını kontrol et" önerileri veriyordu. Desoutter tool'ları doğrudan ethernet ile bağlanmıyor.
+
+**Solution:** System prompt'larına Desoutter bağlantı mimarisi eklendi:
+```
+- WiFi özellikli aletler: WiFi üzerinden Connect Unit veya AP ile bağlanır
+- WiFi özelliği olmayan aletler: CVI3 kontrol ünitesine TOOL KABLOSU ile bağlanır
+- CVI3 kontrol ünitesi fabrika ağına Ethernet ile bağlanır
+```
+
+**Files Modified:**
+- `src/llm/prompts.py` - SYSTEM_PROMPT_EN ve SYSTEM_PROMPT_TR güncellendi
+- `documents/manuals/Desoutter_Tool_Connection_Guide.md` - Yeni domain knowledge dokümanı
+
+---
+
+### 🆕 Self-Learning System Verified ✅ **YENİ**
+
+**Feedback Learning Status:**
+| Collection | Records | Description |
+|------------|---------|-------------|
+| diagnosis_history | 51 | Tüm diagnose geçmişi |
+| diagnosis_feedback | 15 | 6 pozitif, 9 negatif feedback |
+| learned_mappings | 4 | Öğrenilen kalıplar (aktif kullanımda) |
+
+**Learned Mappings:**
+1. "motor çalışmıyor" → Confidence: 1.00, 5 boosted sources
+2. "wifi corrupted" → Confidence: 1.00, 5 boosted sources
+3. "not finish screwing" → Confidence: 0.58
+4. "fault" → Confidence: 0.39
+
+**Verification:** Similar queries now automatically boost learned sources.
+
+---
+
 ### 🆕 Phase 4.1: Metadata-Based Filtering and Boosting ✅
 
 **Achievement:** Service bulletins (ESD/ESB) are now prioritized in search results!

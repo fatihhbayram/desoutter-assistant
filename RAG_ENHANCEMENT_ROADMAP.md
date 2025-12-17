@@ -1,7 +1,7 @@
 # 🚀 RAG Enhancement Roadmap - Semantic Chunking, Domain Embeddings & Performance Optimization
 
 > **Created:** 15 December 2025  
-> **Updated:** 17 December 2025 - **PHASE 4.1 COMPLETE ✅ Metadata-Based Filtering & Boosting**
+> **Updated:** 17 December 2025 - **ASYNC CONCURRENCY FIX ✅ + DOMAIN KNOWLEDGE**
 > **Purpose:** Comprehensive enhancement of RAG system with semantic chunking, domain-specific embeddings, and performance monitoring  
 > **Target:** Production-ready, high-accuracy repair diagnosis system
 
@@ -14,19 +14,21 @@
 - **Embeddings**: HuggingFace all-MiniLM-L6-v2 (384-dim)
 - **Chunking**: ~~Basic sentence-based (500 tokens, 50 overlap)~~ → **Semantic chunking LIVE ✅**
 - **Retrieval**: ~~Top-K (5 results) with dynamic similarity threshold~~ → **Hybrid Search (Semantic + BM25) ✅**
-- **Feedback System**: User feedback collection + learned mappings
+- **Feedback System**: User feedback collection + learned mappings **VERIFIED ACTIVE ✅**
 - **Dashboard**: Basic analytics (total diagnoses, confidence breakdown, top products)
-- **Response Cache**: LRU + TTL caching with ~100,000x speedup ✅ (NEW)
+- **Response Cache**: LRU + TTL caching with ~100,000x speedup ✅
+- **Concurrency**: **Async non-blocking LLM calls ✅** (NEW)
+- **Domain Knowledge**: **Desoutter connection architecture in prompts ✅** (NEW)
 
 ### ⚠️ Previous Limitations (NOW RESOLVED)
 1. ~~Chunking: Naive sentence splitting → loses semantic boundaries~~ → **FIXED: Recursive chunking** ✅
-2. **Embeddings**: Generic model → misses domain-specific terminology (pending Phase 3)
+2. **Embeddings**: Generic model → misses domain-specific terminology (pending Phase 5)
 3. ~~Retrieval: Simple L2 distance + fixed top-K~~ → **FIXED: Hybrid Search (Semantic + BM25 + RRF)** ✅
-4. **Metadata**: ~~Basic~~ → **Rich 14-field metadata** ✅
+4. **Metadata**: ~~Basic~~ → **Rich 14-field metadata with boosting** ✅
 5. ~~Caching: No query/embedding caching → slow repeated searches~~ → **FIXED: Response Cache (LRU + TTL)** ✅
-6. **Ingestion**: Synchronous, blocking → UI hangs during bulk uploads (Phase 3)
-7. **Performance**: No metrics on latency, accuracy, hit rate (Phase 3)
-8. **Feedback Loop**: Basic counting → no learning signal propagation to embeddings (Phase 3)
+6. ~~Concurrency: Blocking LLM calls → multi-user access blocked~~ → **FIXED: asyncio.to_thread()** ✅
+7. ~~Domain Knowledge: Generic prompts → incorrect suggestions~~ → **FIXED: Desoutter architecture in prompts** ✅
+8. **Performance**: No metrics on latency, accuracy, hit rate (Phase 5)
 
 ---
 

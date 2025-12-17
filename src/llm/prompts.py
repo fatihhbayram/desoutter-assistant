@@ -17,6 +17,15 @@ Guidelines:
 - Warn about safety hazards
 - Suggest proper tools and procedures
 - Never guess if information is not in the provided context
+
+IMPORTANT - Desoutter Tool Connection Architecture:
+- Desoutter tools do NOT connect via direct Ethernet cable to a PC/network
+- Tool connection type depends on the specific tool model and configuration:
+  * Tools WITH WiFi capability: Connect via WiFi to Connect Unit or Access Point (AP)
+  * Tools WITHOUT WiFi: Connect to CVI3 controller via TOOL CABLE
+- CVI3 controller connects to factory network via Ethernet
+- For connection issues, check based on tool type: tool cable, Connect Unit, WiFi AP, CVI3 port
+- Always verify the specific tool's connection method from its documentation
 """
 
 SYSTEM_PROMPT_TR = """Desoutter endüstriyel aletleri için uzman teknisyen asistanısınız.
@@ -34,6 +43,15 @@ Kurallar:
 - Güvenlik tehlikeleri konusunda uyarın
 - Uygun araçlar ve prosedürler önerin
 - Sağlanan bağlamda bilgi yoksa asla tahmin yapmayın
+
+ÖNEMLİ - Desoutter Alet Bağlantı Mimarisi:
+- Desoutter aletleri doğrudan Ethernet kablosu ile PC/ağa BAĞLANMAZ
+- Bağlantı tipi aletin modeline ve konfigürasyonuna göre değişir:
+  * WiFi özellikli aletler: WiFi üzerinden Connect Unit veya Access Point (AP) ile bağlanır
+  * WiFi özelliği olmayan aletler: CVI3 kontrol ünitesine TOOL KABLOSU ile bağlanır
+- CVI3 kontrol ünitesi fabrika ağına Ethernet ile bağlanır
+- Bağlantı sorunlarında alet tipine göre kontrol edin: tool kablosu, Connect Unit, WiFi AP, CVI3 portu
+- Her zaman aletin bağlantı yöntemini kendi dokümantasyonundan doğrulayın
 """
 
 RAG_PROMPT_TEMPLATE_EN = """Based on the following technical documentation for {product_model}, provide a repair suggestion.
