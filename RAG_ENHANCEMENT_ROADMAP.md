@@ -1,7 +1,7 @@
 # 🚀 RAG Enhancement Roadmap - Semantic Chunking, Domain Embeddings & Performance Optimization
 
 > **Created:** 15 December 2025  
-> **Updated:** 16 December 2025 - **PHASE 2.3 COMPLETE ✅**
+> **Updated:** 17 December 2025 - **PHASE 3.4 COMPLETE ✅ Context Window Optimization**
 > **Purpose:** Comprehensive enhancement of RAG system with semantic chunking, domain-specific embeddings, and performance monitoring  
 > **Target:** Production-ready, high-accuracy repair diagnosis system
 
@@ -451,17 +451,135 @@ EMBEDDING_DIMENSION = 384
 - 15-25% improvement in semantic relevance
 - Reduced false positives on generic terms
 
-### 3.3 Source Relevance Feedback ⏳
-**Goal:** Allow users to mark retrieved sources as relevant/irrelevant
+### 3.3 Source Relevance Feedback ✅
+**Status:** COMPLETE  
+**Date:** 17 December 2025
 
-**Planned Features:**
-- Per-source relevance buttons (✓ Relevant / ✗ Not Relevant)
-- "None of these are relevant" option
-- Feedback stored in MongoDB for learning
-- Irrelevant sources get lower priority in future searches
+**Implementation:**
 
-### 3.4 Context Window Optimization ⏳
-**Goal:** Optimize prompt construction for better LLM responses
+**Backend API (`src/api/main.py`):**
+```python
+class SourceRelevanceFeedback(BaseModel):
+    source: str          # Document name/path
+    relevant: bool       # True if relevant, False if not
+
+class FeedbackRequest(BaseModel):
+    # ... existing fields ...
+    source_relevance: Optional[List[SourceRelevanceFeedback]] = None
+```
+
+**Feedback Models (`src/database/feedback_models.py`):**
+```python
+class SourceRelevance(BaseModel):
+    source: str
+    relevant: bool
+
+class DiagnosisFeedback(BaseModel):
+    # ... existing fields ...
+    source_relevance: Optional[List[SourceRelevance]] = None
+```
+
+**Feedback Engine (`src/llm/feedback_engine.py`):**
+```python
+def _process_source_relevance(self, keywords, relevant_sources, irrelevant_sources):
+    # Store relevance scores in MongoDB collection: source_relevance_scores
+    # Relevant sources get +1 relevant_count
+    # Irrelevant sources get +1 irrelevant_count
+    # Keywords linked to sources for contextual learning
+```
+
+**Frontend UI (`frontend/src/App.jsx`):**
+- Per-source ✓/✗ relevance buttons on each document card
+- Visual feedback (green border for relevant, red for irrelevant)
+- Source relevance summary before feedback submission
+- State management with `sourceRelevance` object
+
+**CSS Styles (`frontend/src/App.css`):**
+- `.relevance-btn.relevant` / `.irrelevant` button styles
+- `.source-card.relevant` / `.irrelevant` card states
+- `.source-relevance-summary` summary display
+
+**Features:**
+- ✅ Per-source relevance buttons (✓ Relevant / ✗ Not Relevant)
+- ✅ Visual feedback on source cards (color-coded borders)
+- ✅ Relevance summary before feedback submission
+- ✅ Feedback stored in MongoDB `source_relevance_scores` collection
+- ✅ Keywords linked to relevant/irrelevant sources for learning
+- ✅ Works with both positive and negative feedback flows
+
+---
+
+### 3.4 Context Window Optimization ✅
+**Status:** COMPLETE  
+**Date:** 17 December 2025
+**File:** `src/llm/context_optimizer.py` (400+ lines)
+
+**Implementation:**
+```python
+class ContextOptimizer:
+    """
+    Optimizes retrieved chunks for better context window usage
+    
+    Strategies:
+    1. Prioritize by importance score + similarity
+    2. Deduplicate similar content (Jaccard similarity)
+    3. Group by source document
+    4. Respect token budget (8000 default)
+    5. Preserve critical content (warnings, procedures)
+    """
+    
+    def optimize(self, retrieved_docs, query, max_chunks=10):
+        # 1. Convert to OptimizedChunk objects
+        # 2. Deduplicate similar content (85% threshold)
+        # 3. Score and sort by multiple factors
+        # 4. Apply token budget
+        return optimized_chunks, stats
+
+@dataclass
+class OptimizedChunk:
+    text: str
+    source: str
+    similarity: float
+    importance_score: float
+    section_type: str
+    heading_text: str
+    is_procedure: bool
+    is_warning: bool
+    token_estimate: int
+```
+
+**Scoring Factors:**
+- Similarity score (from retrieval): 40%
+- Importance score (from semantic chunking): 30%
+- Warning bonus (critical safety): 15%
+- Procedure bonus (actionable steps): 10%
+- Query term overlap: 5%
+
+**Key Features:**
+- ✅ Deduplication with Jaccard similarity (85% threshold)
+- ✅ Token budget enforcement (8000 tokens default)
+- ✅ Warning prioritization (safety-first)
+- ✅ Procedure prioritization (actionable content)
+- ✅ Smart truncation at sentence boundaries
+- ✅ Metadata-enriched context formatting
+- ✅ Grouped or sequential output options
+
+**Test Results:** 5/5 PASS
+```
+Test 1: Context Optimizer Basic    ✅ PASS (duplicates removed)
+Test 2: Warning Prioritization     ✅ PASS (warnings at top)
+Test 3: Context Formatting         ✅ PASS (3 format options)
+Test 4: Token Budget               ✅ PASS (budget enforced)
+Test 5: Convenience Function       ✅ PASS
+```
+
+**Performance Impact:**
+| Metric | Before | After |
+|--------|--------|-------|
+| Duplicate chunks | Included | Removed |
+| Token usage | Uncontrolled | Budgeted (8K) |
+| Warning priority | By similarity | Boosted to top |
+| Context quality | Raw chunks | Optimized+formatted |
 
 ### 3.5 Multi-turn Conversation ⏳
 **Goal:** Support follow-up questions with conversation history
@@ -542,7 +660,9 @@ EMBEDDING_DIMENSION = 384
 | Phase | Component | Status | Expected Impact |
 |-------|-----------|--------|-----------------|
 | 3.1 | Domain Embeddings | ⏳ | +15-25% relevance |
-| 3.3 | Source Relevance Feedback | ⏳ | Better learning |
+| 3.3 | Source Relevance Feedback | ✅ | Better learning |
+| 3.4 | Context Window Optimization | ✅ | Better prompts |
+| 3.5 | Multi-turn Conversation | ⏳ | Follow-up support |
 | 4.1 | Metadata Filtering | ⏳ | +15% precision |
 | 5.1 | Performance Metrics | ⏳ | Data-driven optimization |
 | 6.1 | Feedback Propagation | ⏳ | Continuous improvement |

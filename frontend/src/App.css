@@ -1947,6 +1947,145 @@ main {
   color: white;
 }
 
+/* =============================================================================
+   SOURCE RELEVANCE FEEDBACK - Per-document relevance rating
+   ============================================================================= */
+
+.source-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.relevance-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.relevance-btn {
+  width: 32px;
+  height: 32px;
+  border: 2px solid #e2e8f0;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.relevance-btn.relevant {
+  color: #16a34a;
+}
+
+.relevance-btn.relevant:hover,
+.relevance-btn.relevant.active {
+  background: #dcfce7;
+  border-color: #16a34a;
+}
+
+.relevance-btn.irrelevant {
+  color: #dc2626;
+}
+
+.relevance-btn.irrelevant:hover,
+.relevance-btn.irrelevant.active {
+  background: #fee2e2;
+  border-color: #dc2626;
+}
+
+/* Source card states based on relevance */
+.source-card.relevant {
+  border-color: #16a34a;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+.source-card.irrelevant {
+  border-color: #dc2626;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  opacity: 0.8;
+}
+
+/* Small relevance buttons for extra sources */
+.source-actions-small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.relevance-buttons-small {
+  display: flex;
+  gap: 2px;
+}
+
+.relevance-btn-small {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.relevance-btn-small.relevant {
+  color: #16a34a;
+}
+
+.relevance-btn-small.relevant:hover,
+.relevance-btn-small.relevant.active {
+  background: #dcfce7;
+  border-color: #16a34a;
+}
+
+.relevance-btn-small.irrelevant {
+  color: #dc2626;
+}
+
+.relevance-btn-small.irrelevant:hover,
+.relevance-btn-small.irrelevant.active {
+  background: #fee2e2;
+  border-color: #dc2626;
+}
+
+/* More sources list item states */
+.more-sources .sources-list li.relevant {
+  background: #f0fdf4;
+  border-radius: 6px;
+}
+
+.more-sources .sources-list li.irrelevant {
+  background: #fef2f2;
+  border-radius: 6px;
+  opacity: 0.8;
+}
+
+/* Source relevance summary */
+.source-relevance-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #0369a1;
+  margin-bottom: 12px;
+}
+
+.source-relevance-summary .relevance-icon {
+  font-size: 16px;
+}
+
 /* Responsive for source cards */
 @media (max-width: 600px) {
   .source-card {

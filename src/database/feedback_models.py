@@ -22,6 +22,12 @@ class NegativeFeedbackReason(str, Enum):
     OTHER = "other"                            # Diğer
 
 
+class SourceRelevance(BaseModel):
+    """Relevance feedback for a single source document"""
+    source: str = Field(..., description="Document name/path")
+    relevant: bool = Field(..., description="Whether the source was relevant")
+
+
 class DiagnosisFeedback(BaseModel):
     """Feedback model for diagnosis results"""
     
@@ -39,6 +45,12 @@ class DiagnosisFeedback(BaseModel):
     negative_reason: Optional[NegativeFeedbackReason] = Field(default=None)
     user_comment: Optional[str] = Field(default=None, description="Additional user comment")
     correct_solution: Optional[str] = Field(default=None, description="User provided correct solution")
+    
+    # Source relevance feedback (per-document relevance ratings)
+    source_relevance: Optional[List[SourceRelevance]] = Field(
+        default=None, 
+        description="Per-source relevance feedback from user"
+    )
     
     # User info
     username: str = Field(..., description="User who gave feedback")

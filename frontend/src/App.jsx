@@ -104,6 +104,7 @@ function App() {
   const [feedbackReason, setFeedbackReason] = useState('');
   const [feedbackComment, setFeedbackComment] = useState('');
   const [retryLoading, setRetryLoading] = useState(false);
+  const [sourceRelevance, setSourceRelevance] = useState({});  // { source_name: true/false }
   
   // Toast notifications
   const [toast, setToast] = useState(null);
@@ -581,12 +582,22 @@ function App() {
       return;
     }
     
-    // Positive feedback - submit directly
+    // Positive feedback - submit with source relevance if provided
     try {
-      await api.post('/diagnose/feedback', {
+      const feedbackData = {
         diagnosis_id: result.diagnosis_id,
         feedback_type: 'positive'
-      });
+      };
+      
+      // Include source relevance feedback if user rated any sources
+      if (Object.keys(sourceRelevance).length > 0) {
+        feedbackData.source_relevance = Object.entries(sourceRelevance).map(([source, relevant]) => ({
+          source,
+          relevant
+        }));
+      }
+      
+      await api.post('/diagnose/feedback', feedbackData);
       
       setFeedbackSubmitted(true);
       setToast({ type: 'info', message: language === 'tr' ? 'Geri bildiriminiz için teşekkürler! 👍' : 'Thanks for your feedback! 👍' });
@@ -603,17 +614,28 @@ function App() {
     if (!result?.diagnosis_id) return;
     
     try {
-      await api.post('/diagnose/feedback', {
+      const feedbackData = {
         diagnosis_id: result.diagnosis_id,
         feedback_type: 'negative',
         negative_reason: feedbackReason || 'other',
         user_comment: feedbackComment
-      });
+      };
+      
+      // Include source relevance feedback if user rated any sources
+      if (Object.keys(sourceRelevance).length > 0) {
+        feedbackData.source_relevance = Object.entries(sourceRelevance).map(([source, relevant]) => ({
+          source,
+          relevant
+        }));
+      }
+      
+      await api.post('/diagnose/feedback', feedbackData);
       
       setFeedbackSubmitted(true);
       setShowFeedbackModal(false);
       setFeedbackReason('');
       setFeedbackComment('');
+      setSourceRelevance({});  // Reset source relevance
       
       if (requestRetry) {
         // Get alternative suggestion
@@ -1474,20 +1496,45 @@ function App() {
                 {result.sources && result.sources.length > 0 && (
                   <div className="sources-section">
                     <h4>📚 {result.language === 'tr' ? 'İlgili Dokümanlar' : 'Related Documents'} ({result.sources.length})</h4>
-                    <p className="sources-hint">{result.language === 'tr' ? 'Detaylı bilgi için dokümanı açabilirsiniz:' : 'Open documents for detailed information:'}</p>
+                    <p className="sources-hint">
+                      {result.language === 'tr' 
+                        ? 'Dokümanları değerlendirin ve faydalı olanları işaretleyin:' 
+                        : 'Rate documents and mark helpful ones:'}
+                    </p>
                     <div className="sources-cards">
                       {result.sources.slice(0, 5).map((source, idx) => (
-                        <div key={idx} className="source-card">
+                        <div key={idx} className={`source-card ${sourceRelevance[source.source] === true ? 'relevant' : sourceRelevance[source.source] === false ? 'irrelevant' : ''}`}>
                           <div className="source-info">
                             <span className="source-name">{source.source}</span>
                             <span className="source-similarity">{result.language === 'tr' ? 'Benzerlik' : 'Similarity'}: {source.similarity}</span>
                           </div>
-                          <button 
-                            className="open-doc-btn"
-                            onClick={() => window.open(`${API_BASE}/documents/download/${encodeURIComponent(source.source)}`, '_blank')}
-                          >
-                            📄 {result.language === 'tr' ? 'Dokümanı Aç' : 'Open Document'}
-                          </button>
+                          <div className="source-actions">
+                            {/* Relevance feedback buttons */}
+                            {!feedbackSubmitted && (
+                              <div className="relevance-buttons">
+                                <button 
+                                  className={`relevance-btn relevant ${sourceRelevance[source.source] === true ? 'active' : ''}`}
+                                  onClick={() => setSourceRelevance(prev => ({...prev, [source.source]: true}))}
+                                  title={result.language === 'tr' ? 'Alakalı' : 'Relevant'}
+                                >
+                                  ✓
+                                </button>
+                                <button 
+                                  className={`relevance-btn irrelevant ${sourceRelevance[source.source] === false ? 'active' : ''}`}
+                                  onClick={() => setSourceRelevance(prev => ({...prev, [source.source]: false}))}
+                                  title={result.language === 'tr' ? 'Alakasız' : 'Not Relevant'}
+                                >
+                                  ✗
+                                </button>
+                              </div>
+                            )}
+                            <button 
+                              className="open-doc-btn"
+                              onClick={() => window.open(`${API_BASE}/documents/download/${encodeURIComponent(source.source)}`, '_blank')}
+                            >
+                              📄 {result.language === 'tr' ? 'Aç' : 'Open'}
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1496,14 +1543,32 @@ function App() {
                         <summary>+{result.sources.length - 5} {result.language === 'tr' ? 'daha fazla kaynak' : 'more sources'}</summary>
                         <ul className="sources-list">
                           {result.sources.slice(5).map((source, idx) => (
-                            <li key={idx}>
+                            <li key={idx} className={sourceRelevance[source.source] === true ? 'relevant' : sourceRelevance[source.source] === false ? 'irrelevant' : ''}>
                               <span>{source.source}</span>
-                              <button 
-                                className="open-doc-btn-small"
-                                onClick={() => window.open(`${API_BASE}/documents/download/${encodeURIComponent(source.source)}`, '_blank')}
-                              >
-                                {result.language === 'tr' ? 'Aç' : 'Open'}
-                              </button>
+                              <div className="source-actions-small">
+                                {!feedbackSubmitted && (
+                                  <div className="relevance-buttons-small">
+                                    <button 
+                                      className={`relevance-btn-small relevant ${sourceRelevance[source.source] === true ? 'active' : ''}`}
+                                      onClick={() => setSourceRelevance(prev => ({...prev, [source.source]: true}))}
+                                    >
+                                      ✓
+                                    </button>
+                                    <button 
+                                      className={`relevance-btn-small irrelevant ${sourceRelevance[source.source] === false ? 'active' : ''}`}
+                                      onClick={() => setSourceRelevance(prev => ({...prev, [source.source]: false}))}
+                                    >
+                                      ✗
+                                    </button>
+                                  </div>
+                                )}
+                                <button 
+                                  className="open-doc-btn-small"
+                                  onClick={() => window.open(`${API_BASE}/documents/download/${encodeURIComponent(source.source)}`, '_blank')}
+                                >
+                                  {result.language === 'tr' ? 'Aç' : 'Open'}
+                                </button>
+                              </div>
                             </li>
                           ))}
                         </ul>
@@ -1517,6 +1582,16 @@ function App() {
                   <h4>
                     {result.language === 'tr' ? 'Bu öneri işinize yaradı mı?' : 'Was this suggestion helpful?'}
                   </h4>
+                  
+                  {/* Source relevance summary */}
+                  {!feedbackSubmitted && Object.keys(sourceRelevance).length > 0 && (
+                    <div className="source-relevance-summary">
+                      <span className="relevance-icon">📊</span>
+                      {result.language === 'tr' 
+                        ? `${Object.values(sourceRelevance).filter(v => v === true).length} alakalı, ${Object.values(sourceRelevance).filter(v => v === false).length} alakasız kaynak işaretlendi`
+                        : `${Object.values(sourceRelevance).filter(v => v === true).length} relevant, ${Object.values(sourceRelevance).filter(v => v === false).length} irrelevant sources marked`}
+                    </div>
+                  )}
                   
                   {retryLoading ? (
                     <div className="retry-loading">

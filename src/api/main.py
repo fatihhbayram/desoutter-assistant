@@ -199,6 +199,12 @@ class DiagnoseResponse(BaseModel):
     response_time_ms: Optional[int] = None  # Response time in milliseconds
 
 
+class SourceRelevanceFeedback(BaseModel):
+    """Feedback for a single source document."""
+    source: str          # Document name/path
+    relevant: bool       # True if relevant, False if not
+
+
 class FeedbackRequest(BaseModel):
     """Request body for submitting feedback on a diagnosis."""
     diagnosis_id: str              # ID of the diagnosis to give feedback on
@@ -206,6 +212,7 @@ class FeedbackRequest(BaseModel):
     negative_reason: Optional[str] = None  # Reason if negative
     user_comment: Optional[str] = None     # Additional comment
     correct_solution: Optional[str] = None # User's correct solution (if known)
+    source_relevance: Optional[List[SourceRelevanceFeedback]] = None  # Per-source relevance feedback
 
 
 class LoginRequest(BaseModel):
@@ -431,13 +438,22 @@ async def submit_feedback(
             except:
                 negative_reason = NegativeFeedbackReason.OTHER
         
+        # Process source relevance feedback if provided
+        source_relevance_data = None
+        if request.source_relevance:
+            source_relevance_data = [
+                {"source": sr.source, "relevant": sr.relevant}
+                for sr in request.source_relevance
+            ]
+        
         result = feedback_engine.submit_feedback(
             diagnosis_id=request.diagnosis_id,
             feedback_type=feedback_type,
             username=username,
             negative_reason=negative_reason,
             user_comment=request.user_comment,
-            correct_solution=request.correct_solution
+            correct_solution=request.correct_solution,
+            source_relevance=source_relevance_data
         )
         
         return result

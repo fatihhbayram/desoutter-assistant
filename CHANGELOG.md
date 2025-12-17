@@ -14,21 +14,114 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - [x] **RAG Ingest**: 1080 chunks ChromaDB'ye ✅ (15 Ara)
 - [x] **RAG Quality**: Similarity threshold optimization ✅ (15 Ara)
 - [x] **Phase 1 Semantic Chunking**: Complete semantic chunking pipeline ✅ (15 Ara)
-- [x] **Phase 2.1 Re-ingestion**: 276 docs → 1229 semantic chunks ✅ (16 Ara)
+- [x] **Phase 2.1 Re-ingestion**: 276 docs → 2318 semantic chunks ✅ (16 Ara)
 - [x] **Phase 2.2 Hybrid Search**: BM25 + Semantic + RRF Fusion ✅ (16 Ara)
+- [x] **Phase 2.3 Response Caching**: LRU + TTL cache ~100,000x speedup ✅ (16 Ara)
+- [x] **Phase 3.3 Source Relevance Feedback**: Per-document relevance UI ✅ (17 Ara)
+- [x] **Phase 3.4 Context Window Optimization**: Token budget, dedup, prioritization ✅ (17 Ara)
+- [x] **Ollama GPU Activation**: NVIDIA RTX A2000 GPU inference ✅ (17 Ara)
 
 ### 🟡 Orta Öncelik (Next Sprint)
-- [ ] **Phase 2.3 Response Caching**: LRU cache for faster responses
+- [ ] **Phase 4.1 Metadata Filtering**: ChromaDB filter by document type, importance
+- [ ] **Phase 5.1 Performance Metrics**: Admin dashboard metrics
+- [ ] **Phase 3.1 Domain Embeddings**: Fine-tune embeddings for repair domain
 - [ ] **TechWizard Entegrasyonu**: App.jsx'e entegre et
 - [ ] **Admin Page Redesign**: Layout basitleştir, UX iyileştir
 - [ ] **Servis Talepleri Modülü**: Service request management
-- [ ] **Vision AI**: Fotoğraftan arıza tespiti
-- [ ] **Mobil PWA**: Progressive Web App
 
 ### 🟢 Uzun Vadeli (Future Phases)
+- [ ] **Vision AI**: Fotoğraftan arıza tespiti
+- [ ] **Mobil PWA**: Progressive Web App
 - [ ] **SAP Entegrasyonu**: Otomatik yedek parça siparişi
 - [ ] **Sesli Asistan**: Hands-free arıza bildirimi
 - [ ] **Predictive Maintenance**: Arıza öncesi uyarı sistemi
+
+---
+
+## 📆 17 Aralık 2025 (Salı)
+
+### 🆕 Phase 3.3: Source Relevance Feedback UI ✅
+
+**Achievement:** Users can now rate each source document as relevant or not!
+
+**Backend Changes:**
+- `SourceRelevanceFeedback` model added to `src/api/main.py`
+- `FeedbackRequest` extended with `source_relevance` field
+- `DiagnosisFeedback` model updated in `src/database/feedback_models.py`
+- `_process_source_relevance()` method in `feedback_engine.py`
+- New MongoDB collection: `source_relevance_scores`
+
+**Frontend Changes:**
+- Per-source ✓/✗ relevance buttons on document cards
+- Visual feedback (green/red borders based on selection)
+- Source relevance summary before feedback submission
+- Works with both positive and negative feedback flows
+
+**Files Modified:**
+- `src/api/main.py` - API models and endpoint
+- `src/database/feedback_models.py` - SourceRelevance model
+- `src/llm/feedback_engine.py` - Learning from source feedback
+- `frontend/src/App.jsx` - UI components and state
+- `frontend/src/App.css` - Relevance button styles
+
+---
+
+### 🆕 Ollama GPU Activation ✅
+
+**Achievement:** Ollama now uses NVIDIA RTX A2000 GPU for inference!
+
+**Problem:** Container had `runtime: nvidia` but GPU wasn't accessible inside.
+
+**Solution:** Updated `ai-stack.yml` to use `deploy.resources.reservations.devices`:
+```yaml
+ollama:
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+```
+
+**Results:**
+- GPU Memory: 4MiB → 4832MiB (model loaded to GPU)
+- GPU Utilization: Active (P2 mode)
+- LLM inference now GPU-accelerated
+
+---
+
+### 🆕 Phase 3.4: Context Window Optimization ✅
+
+**Achievement:** Intelligent context window management for better LLM responses!
+
+**New Module:** `src/llm/context_optimizer.py` (400+ lines)
+
+**ContextOptimizer Features:**
+- **Deduplication:** Jaccard similarity (85% threshold) removes duplicate chunks
+- **Token Budget:** 8000 token limit with smart truncation
+- **Warning Prioritization:** Safety warnings boosted to top
+- **Procedure Prioritization:** Actionable steps get higher priority
+- **Scoring Formula:**
+  - Similarity: 40%
+  - Importance: 30%
+  - Warning bonus: 15%
+  - Procedure bonus: 10%
+  - Query overlap: 5%
+
+**Test Results:** 5/5 PASS
+```
+Test 1: Context Optimizer Basic    ✅ PASS (duplicates removed)
+Test 2: Warning Prioritization     ✅ PASS (warnings at top)
+Test 3: Context Formatting         ✅ PASS (3 format options)
+Test 4: Token Budget               ✅ PASS (budget enforced)
+Test 5: Convenience Function       ✅ PASS
+```
+
+**Integration:**
+- RAGEngine now uses ContextOptimizer
+- Sources include `section_type`, `is_warning`, `is_procedure`
+- Logs show optimization stats: "5→4 chunks, 2316 tokens, 1 duplicates removed"
 
 ---
 

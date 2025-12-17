@@ -13,7 +13,8 @@ from src.database.feedback_models import (
     FeedbackType, 
     NegativeFeedbackReason,
     LearnedMapping,
-    DiagnosisHistory
+    DiagnosisHistory,
+    SourceRelevance
 )
 from src.utils.logger import setup_logger
 
@@ -151,10 +152,14 @@ class FeedbackLearningEngine:
         username: str,
         negative_reason: Optional[NegativeFeedbackReason] = None,
         user_comment: Optional[str] = None,
-        correct_solution: Optional[str] = None
+        correct_solution: Optional[str] = None,
+        source_relevance: Optional[List[Dict]] = None
     ) -> Dict:
         """
         Submit feedback for a diagnosis
+        
+        Args:
+            source_relevance: List of {"source": str, "relevant": bool} for each document
         
         Returns:
             feedback_id and whether retry is available
@@ -165,6 +170,14 @@ class FeedbackLearningEngine:
         diagnosis = self.mongodb.db.diagnosis_history.find_one({"diagnosis_id": diagnosis_id})
         if not diagnosis:
             return {"error": "Diagnosis not found"}
+        
+        # Convert source_relevance dicts to SourceRelevance models
+        source_relevance_models = None
+        if source_relevance:
+            source_relevance_models = [
+                SourceRelevance(source=sr["source"], relevant=sr["relevant"])
+                for sr in source_relevance
+            ]
         
         # Create feedback record
         feedback = DiagnosisFeedback(
@@ -177,6 +190,7 @@ class FeedbackLearningEngine:
             negative_reason=negative_reason,
             user_comment=user_comment,
             correct_solution=correct_solution,
+            source_relevance=source_relevance_models,
             username=username
         )
         
@@ -205,10 +219,29 @@ class FeedbackLearningEngine:
     def _process_feedback_for_learning(self, feedback: DiagnosisFeedback):
         """
         Process feedback to update learned mappings
+        Also processes per-source relevance feedback for fine-grained learning
         """
         try:
             # Extract keywords from fault description
             keywords = self._extract_keywords(feedback.fault_description)
+            
+            # Process per-source relevance feedback if available
+            if feedback.source_relevance:
+                relevant_sources = []
+                irrelevant_sources = []
+                for sr in feedback.source_relevance:
+                    if sr.relevant:
+                        relevant_sources.append(sr.source)
+                    else:
+                        irrelevant_sources.append(sr.source)
+                
+                # Store source relevance in dedicated collection for learning
+                self._process_source_relevance(
+                    keywords=keywords,
+                    relevant_sources=relevant_sources,
+                    irrelevant_sources=irrelevant_sources,
+                    fault_description=feedback.fault_description
+                )
             
             if feedback.feedback_type == FeedbackType.POSITIVE:
                 # Positive: reinforce or create mapping
@@ -263,6 +296,53 @@ class FeedbackLearningEngine:
         # Return most common (up to 10)
         counter = Counter(keywords)
         return [word for word, _ in counter.most_common(10)]
+    
+    def _process_source_relevance(
+        self,
+        keywords: List[str],
+        relevant_sources: List[str],
+        irrelevant_sources: List[str],
+        fault_description: str
+    ):
+        """
+        Process per-source relevance feedback for fine-grained learning.
+        Updates source_relevance_scores collection for future retrieval weighting.
+        """
+        if not keywords:
+            return
+        
+        try:
+            # Store relevance scores per source
+            for source in relevant_sources:
+                if not source:
+                    continue
+                self.mongodb.db.source_relevance_scores.update_one(
+                    {"source": source},
+                    {
+                        "$inc": {"relevant_count": 1, "total_count": 1},
+                        "$addToSet": {"relevant_keywords": {"$each": keywords[:5]}},
+                        "$set": {"updated_at": datetime.now().isoformat()}
+                    },
+                    upsert=True
+                )
+            
+            for source in irrelevant_sources:
+                if not source:
+                    continue
+                self.mongodb.db.source_relevance_scores.update_one(
+                    {"source": source},
+                    {
+                        "$inc": {"irrelevant_count": 1, "total_count": 1},
+                        "$addToSet": {"irrelevant_keywords": {"$each": keywords[:5]}},
+                        "$set": {"updated_at": datetime.now().isoformat()}
+                    },
+                    upsert=True
+                )
+            
+            logger.info(f"Processed source relevance: {len(relevant_sources)} relevant, {len(irrelevant_sources)} irrelevant")
+            
+        except Exception as e:
+            logger.error(f"Error processing source relevance: {e}")
     
     def _reinforce_mapping(
         self,

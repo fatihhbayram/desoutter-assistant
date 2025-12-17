@@ -4,6 +4,7 @@ Combines vector search with LLM generation
 Now with self-learning capabilities from user feedback
 Phase 2.2: Hybrid Search (Semantic + BM25) integration
 Phase 2.3: Response Caching for improved performance
+Phase 3.4: Context Window Optimization
 """
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -13,6 +14,7 @@ from src.documents.embeddings import EmbeddingsGenerator
 from src.vectordb.chroma_client import ChromaDBClient
 from src.llm.ollama_client import OllamaClient
 from src.llm.prompts import get_system_prompt, build_rag_prompt, build_fallback_response
+from src.llm.context_optimizer import ContextOptimizer, optimize_context_for_rag
 from src.database import MongoDBClient
 from config.ai_settings import (
     RAG_TOP_K, RAG_SIMILARITY_THRESHOLD, DEFAULT_LANGUAGE,
@@ -39,6 +41,7 @@ class RAGEngine:
         self.feedback_engine = None
         self.hybrid_searcher = None
         self.response_cache = None
+        self.context_optimizer = ContextOptimizer(token_budget=8000)  # Phase 3.4
         
         # Initialize hybrid search if enabled
         if USE_HYBRID_SEARCH:
@@ -340,12 +343,44 @@ class RAGEngine:
             retrieved_docs = sorted(retrieved_docs, key=sort_key)
             logger.info(f"Boosted {len(boost_sources)} learned sources")
         
-        # Build context string from retrieved documents
+        # Phase 3.4: Optimize context window
         if retrieved_docs:
-            context_str = "\n\n".join([
-                f"[Source: {doc['metadata'].get('source', 'Unknown')}]\n{doc['text']}"
-                for doc in retrieved_docs
-            ])
+            # Use context optimizer for better chunk selection and formatting
+            optimized_chunks, opt_stats = self.context_optimizer.optimize(
+                retrieved_docs=retrieved_docs,
+                query=fault_description,
+                max_chunks=RAG_TOP_K * 2  # Allow more chunks, optimizer will filter
+            )
+            
+            if optimized_chunks:
+                context_str = self.context_optimizer.build_context_string(
+                    optimized_chunks,
+                    include_metadata=True,
+                    group_by_source=False
+                )
+                
+                # Build sources list from optimized chunks
+                optimized_sources = [
+                    {
+                        "source": chunk.source,
+                        "similarity": chunk.similarity,
+                        "section_type": chunk.section_type,
+                        "is_warning": chunk.is_warning,
+                        "is_procedure": chunk.is_procedure,
+                        "excerpt": chunk.text[:200] + "..." if len(chunk.text) > 200 else chunk.text
+                    }
+                    for chunk in optimized_chunks
+                ]
+                
+                logger.info(f"Context optimized: {opt_stats['chunks_in']}→{opt_stats['chunks_out']} chunks, "
+                           f"{opt_stats['tokens_used']} tokens, {opt_stats['duplicates_removed']} duplicates removed")
+            else:
+                # Fallback to simple formatting if optimization returns empty
+                context_str = "\n\n".join([
+                    f"[Source: {doc['metadata'].get('source', 'Unknown')}]\n{doc['text']}"
+                    for doc in retrieved_docs
+                ])
+                optimized_sources = None
             
             # Build RAG prompt
             prompt = build_rag_prompt(
@@ -356,13 +391,14 @@ class RAGEngine:
                 language=language
             )
             
-            confidence = "high" if len(retrieved_docs) >= 3 else "medium"
+            confidence = "high" if len(optimized_chunks) >= 3 else "medium" if optimized_chunks else "low"
         else:
             # No relevant context found - use fallback
             logger.warning("No relevant context found in manuals")
             context_str = build_fallback_response(product_model, language)
             prompt = f"{fault_description}\n\n{context_str}"
             confidence = "low"
+            optimized_sources = None
         
         # Get system prompt
         system_prompt = get_system_prompt(language)
@@ -378,20 +414,35 @@ class RAGEngine:
             suggestion = "Error: Unable to generate suggestion. Please try again."
             confidence = "low"
         
-        # Prepare response
+        # Prepare response with optimized sources if available
+        if optimized_sources:
+            sources_list = [
+                {
+                    "source": src["source"],
+                    "similarity": f"{src['similarity']:.2f}" if isinstance(src['similarity'], float) else src['similarity'],
+                    "section_type": src.get("section_type", ""),
+                    "is_warning": src.get("is_warning", False),
+                    "is_procedure": src.get("is_procedure", False),
+                    "excerpt": src["excerpt"]
+                }
+                for src in optimized_sources
+            ]
+        else:
+            sources_list = [
+                {
+                    "source": doc["metadata"].get("source", "Unknown"),
+                    "similarity": f"{doc['similarity']:.2f}" if isinstance(doc['similarity'], float) else str(doc['similarity']),
+                    "excerpt": doc["text"][:200] + "..." if len(doc["text"]) > 200 else doc["text"]
+                }
+                for doc in retrieved_docs
+            ] if retrieved_docs else []
+        
         response = {
             "suggestion": suggestion.strip(),
             "confidence": confidence,
             "product_model": product_model,
             "part_number": actual_part_number,
-            "sources": [
-                {
-                    "source": doc["metadata"].get("source", "Unknown"),
-                    "similarity": f"{doc['similarity']:.2f}",
-                    "excerpt": doc["text"][:200] + "..."
-                }
-                for doc in retrieved_docs
-            ],
+            "sources": sources_list,
             "language": language
         }
         

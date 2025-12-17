@@ -7,12 +7,16 @@ AI-powered repair assistant for Desoutter industrial tools. Uses RAG (Retrieval 
 ## 🎯 Key Features
 
 - **🧠 Self-Learning RAG**: System learns from user feedback to improve future suggestions
+- **� Hybrid Search**: BM25 keyword + Semantic vector search with RRF fusion
+- **⚡ Response Caching**: LRU + TTL cache with ~100,000x speedup for repeated queries
 - **📊 Admin Dashboard**: Comprehensive analytics with trends, top products, and feedback stats
+- **🎯 Context Optimization**: Token budget management, deduplication, warning prioritization
+- **💾 GPU Acceleration**: NVIDIA GPU inference for fast LLM responses
 - **Smart Product Scraping**: Handles Next.js rendered pages with advanced image extraction from DatoCMS assets
 - **MongoDB Integration**: Stores 237+ products, users, and learning data
-- **RAG Engine**: Vector search with ChromaDB + Ollama for intelligent repair suggestions
-- **Multi-Format Documents**: Support for PDF, Word (DOCX), and PowerPoint (PPTX)
+- **Multi-Format Documents**: Support for PDF, Word (DOCX), PowerPoint (PPTX), Excel (XLSX)
 - **Document Viewer**: Open source documents directly from diagnosis results
+- **Source Relevance Feedback**: Rate each retrieved document as relevant/irrelevant
 - **Multi-Language UI**: Turkish and English interface support
 - **Responsive Design**: Works on desktop, tablet, and mobile
 - **JWT Authentication**: Role-based access control (Admin / Technician)
@@ -171,15 +175,27 @@ desoutter-assistant/
 
 ## 📝 Recent Updates
 
-### 2025-12-16: Phase 2.2 Hybrid Search ✨ **NEW**
+### 2025-12-17: Phase 3.3 & 3.4 Complete ✨ **NEW**
+- ✅ **Source Relevance Feedback**: Users can rate each source as relevant/irrelevant
+- ✅ **Context Window Optimization**: Token budget, deduplication, warning prioritization
+- ✅ **Ollama GPU Activation**: NVIDIA RTX A2000 GPU inference enabled
+- ✅ **Test Suites**: 5/5 context optimizer tests passing
+
+**Context Optimizer Features:**
+- Deduplication: Removes similar chunks (85% Jaccard threshold)
+- Token Budget: 8000 token limit with smart truncation
+- Priority Scoring: Warnings +15%, Procedures +10%, Similarity 40%, Importance 30%
+- Metadata-enriched formatting
+
+### 2025-12-16: Phase 2.2 & 2.3 Complete
 - ✅ **Hybrid Search**: BM25 keyword search + Semantic search combined
 - ✅ **RRF Fusion**: Reciprocal Rank Fusion for score combination
 - ✅ **Query Expansion**: Domain-specific synonym expansion (9 categories)
-- ✅ **BM25 Index**: 13026 unique terms indexed for keyword search
-- ✅ **Document Re-ingestion**: 276 docs → 1229 semantic chunks → 2309 total vectors
-- ✅ **Test Suite**: 5/5 hybrid search tests passing
+- ✅ **Response Caching**: LRU + TTL cache with ~100,000x speedup
+- ✅ **Document Re-ingestion**: 276 docs → 2318 vectors with semantic chunks
+- ✅ **Test Suites**: 5/5 hybrid search + 4/4 cache tests passing
 
-**Details**: See [CHANGELOG.md](CHANGELOG.md#-16-aralık-2025-pazartesi) for implementation
+**Details**: See [CHANGELOG.md](CHANGELOG.md) and [RAG_ENHANCEMENT_ROADMAP.md](RAG_ENHANCEMENT_ROADMAP.md)
 
 ### 2025-12-15: RAG Retrieval Quality Optimization
 - ✅ **Similarity Threshold Optimization**: Dynamic filtering based on RAG_SIMILARITY_THRESHOLD config
