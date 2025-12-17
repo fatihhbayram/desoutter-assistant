@@ -20,9 +20,9 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - [x] **Phase 3.3 Source Relevance Feedback**: Per-document relevance UI ✅ (17 Ara)
 - [x] **Phase 3.4 Context Window Optimization**: Token budget, dedup, prioritization ✅ (17 Ara)
 - [x] **Ollama GPU Activation**: NVIDIA RTX A2000 GPU inference ✅ (17 Ara)
+- [x] **Phase 4.1 Metadata Filtering**: Service bulletin boost, importance scoring ✅ (17 Ara)
 
 ### 🟡 Orta Öncelik (Next Sprint)
-- [ ] **Phase 4.1 Metadata Filtering**: ChromaDB filter by document type, importance
 - [ ] **Phase 5.1 Performance Metrics**: Admin dashboard metrics
 - [ ] **Phase 3.1 Domain Embeddings**: Fine-tune embeddings for repair domain
 - [ ] **TechWizard Entegrasyonu**: App.jsx'e entegre et
@@ -38,7 +38,50 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 
 ---
 
-## 📆 17 Aralık 2025 (Salı)
+## 📆 17 Aralık 2025 (Salı) - Güncellemeler
+
+### 🆕 Phase 4.1: Metadata-Based Filtering and Boosting ✅
+
+**Achievement:** Service bulletins (ESD/ESB) are now prioritized in search results!
+
+**Problem Identified:**
+- Rich metadata from semantic chunker was not being used in retrieval
+- Service bulletins (containing specific fixes) were not prioritized over general manuals
+
+**Solution Implemented:**
+
+**New Config Settings in `config/ai_settings.py`:**
+```python
+ENABLE_METADATA_BOOST = True
+SERVICE_BULLETIN_BOOST = 1.5   # ESD/ESB documents get 1.5x score
+PROCEDURE_BOOST = 1.3          # Step-by-step procedures get 1.3x
+WARNING_BOOST = 1.2            # Warning/caution sections get 1.2x
+IMPORTANCE_BOOST_FACTOR = 0.3  # Score based on importance_score metadata
+```
+
+**RAG Engine Updates (`src/llm/rag_engine.py`):**
+- Added `_apply_metadata_boost()` method
+- Service bulletins (ESD/ESB prefixed) get 1.5x score boost
+- Procedure sections get 1.3x boost
+- Warning sections get 1.2x boost
+- Importance score from semantic chunking applied
+- Results re-sorted by boosted score
+
+**Data Re-ingestion:**
+- ChromaDB collection cleared and rebuilt
+- 1514 semantic chunks with full metadata
+- All 117 ESD service bulletins indexed with rich metadata:
+  - `doc_type`: service_bulletin, technical_manual, etc.
+  - `section_type`: procedure, warning, paragraph, etc.
+  - `importance_score`: 0.0-1.0 based on document structure
+  - `contains_warning`: boolean for safety-critical content
+
+**Test Results:**
+- Query "CVI3 memory full hatası" → **ESDE15006** now ranks #1
+- Query "wifi bağlantı problemi" → **ESDE21017** included in top results
+- Service bulletins achieve 2.54x boost ratio (1.5x bulletin × 1.3x procedure × 1.3x importance)
+
+---
 
 ### 🆕 Phase 3.3: Source Relevance Feedback UI ✅
 

@@ -200,6 +200,28 @@ ENABLE_QUERY_EXPANSION = os.getenv("ENABLE_QUERY_EXPANSION", "true").lower() == 
 MAX_QUERY_EXPANSIONS = int(os.getenv("MAX_QUERY_EXPANSIONS", "3"))
 
 # =============================================================================
+# METADATA-BASED FILTERING AND BOOSTING (Phase 4.1)
+# =============================================================================
+# Boost certain document types and metadata fields for better relevance
+
+# Enable metadata-based score boosting
+ENABLE_METADATA_BOOST = os.getenv("ENABLE_METADATA_BOOST", "true").lower() == "true"
+
+# Boost factor for service bulletins (ESD/ESB documents)
+# Applied: score *= SERVICE_BULLETIN_BOOST
+SERVICE_BULLETIN_BOOST = float(os.getenv("SERVICE_BULLETIN_BOOST", "1.5"))
+
+# Boost factor for procedure sections (step-by-step instructions)
+PROCEDURE_BOOST = float(os.getenv("PROCEDURE_BOOST", "1.3"))
+
+# Boost factor for warning/caution sections
+WARNING_BOOST = float(os.getenv("WARNING_BOOST", "1.2"))
+
+# Boost factor based on importance_score metadata (0-1)
+# Applied: score *= (1 + importance_score * IMPORTANCE_BOOST_FACTOR)
+IMPORTANCE_BOOST_FACTOR = float(os.getenv("IMPORTANCE_BOOST_FACTOR", "0.3"))
+
+# =============================================================================
 # API SERVER CONFIGURATION
 # =============================================================================
 # FastAPI server settings for the repair assistant API

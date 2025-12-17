@@ -5,10 +5,12 @@ Now with self-learning capabilities from user feedback
 Phase 2.2: Hybrid Search (Semantic + BM25) integration
 Phase 2.3: Response Caching for improved performance
 Phase 3.4: Context Window Optimization
+Phase 4.1: Metadata-based Filtering and Boosting
 """
 from typing import Dict, List, Optional
 from datetime import datetime
 import time
+import re
 
 from src.documents.embeddings import EmbeddingsGenerator
 from src.vectordb.chroma_client import ChromaDBClient
@@ -20,7 +22,9 @@ from config.ai_settings import (
     RAG_TOP_K, RAG_SIMILARITY_THRESHOLD, DEFAULT_LANGUAGE,
     USE_HYBRID_SEARCH, HYBRID_SEMANTIC_WEIGHT, HYBRID_BM25_WEIGHT,
     HYBRID_RRF_K, ENABLE_QUERY_EXPANSION,
-    USE_CACHE, CACHE_TTL
+    USE_CACHE, CACHE_TTL,
+    ENABLE_METADATA_BOOST, SERVICE_BULLETIN_BOOST, PROCEDURE_BOOST,
+    WARNING_BOOST, IMPORTANCE_BOOST_FACTOR
 )
 from src.utils.logger import setup_logger
 
@@ -80,6 +84,76 @@ class RAGEngine:
         except Exception as e:
             logger.warning(f"Failed to initialize response cache: {e}")
             self.response_cache = None
+    
+    def _apply_metadata_boost(self, base_score: float, metadata: Dict) -> float:
+        """
+        Apply metadata-based score boosting (Phase 4.1)
+        
+        Boosts documents based on:
+        - Service bulletins (ESD/ESB) get priority
+        - Procedure sections (step-by-step)
+        - Warning/caution content
+        - Importance score from semantic chunking
+        
+        Args:
+            base_score: Original similarity/relevance score
+            metadata: Document metadata dictionary
+            
+        Returns:
+            Boosted score
+        """
+        if not ENABLE_METADATA_BOOST or not metadata:
+            return base_score
+        
+        boost = 1.0
+        boost_reasons = []
+        
+        # 1. Service bulletin boost (ESD/ESB documents)
+        source = metadata.get("source", "")
+        doc_type = metadata.get("doc_type", "")
+        
+        is_service_bulletin = (
+            "ESD" in source.upper() or 
+            "ESB" in source.upper() or
+            doc_type == "service_bulletin"
+        )
+        
+        if is_service_bulletin:
+            boost *= SERVICE_BULLETIN_BOOST
+            boost_reasons.append(f"service_bulletin({SERVICE_BULLETIN_BOOST}x)")
+        
+        # 2. Procedure section boost
+        section_type = metadata.get("section_type", "")
+        is_procedure = metadata.get("is_procedure", False)
+        
+        if section_type == "procedure" or is_procedure:
+            boost *= PROCEDURE_BOOST
+            boost_reasons.append(f"procedure({PROCEDURE_BOOST}x)")
+        
+        # 3. Warning/caution boost
+        contains_warning = metadata.get("contains_warning", False)
+        
+        if contains_warning:
+            boost *= WARNING_BOOST
+            boost_reasons.append(f"warning({WARNING_BOOST}x)")
+        
+        # 4. Importance score boost
+        importance = metadata.get("importance_score")
+        if importance is not None:
+            try:
+                importance_float = float(importance)
+                importance_boost = 1 + (importance_float * IMPORTANCE_BOOST_FACTOR)
+                boost *= importance_boost
+                boost_reasons.append(f"importance({importance_boost:.2f}x)")
+            except (ValueError, TypeError):
+                pass
+        
+        boosted_score = base_score * boost
+        
+        if boost > 1.0:
+            logger.debug(f"Metadata boost applied: {base_score:.3f} → {boosted_score:.3f} ({', '.join(boost_reasons)})")
+        
+        return boosted_score
     
     def _get_feedback_engine(self):
         """Lazy load feedback engine"""
@@ -155,10 +229,10 @@ class RAGEngine:
         return self._retrieve_with_semantic_search(query, part_number, top_k)
     
     def _retrieve_with_hybrid_search(self, query: str, top_k: int) -> Dict:
-        """Retrieve using hybrid search (semantic + BM25)"""
+        """Retrieve using hybrid search (semantic + BM25) with metadata boosting"""
         results = self.hybrid_searcher.search(
             query=query,
-            top_k=top_k,
+            top_k=top_k * 2,  # Get more candidates for boosting/reranking
             expand_query=ENABLE_QUERY_EXPANSION,
             use_hybrid=True,
             min_similarity=RAG_SIMILARITY_THRESHOLD
@@ -166,15 +240,25 @@ class RAGEngine:
         
         filtered_docs = []
         for result in results:
+            base_score = result.similarity if result.similarity > 0 else result.score
+            
+            # Apply metadata-based boosting (Phase 4.1)
+            boosted_score = self._apply_metadata_boost(base_score, result.metadata)
+            
             filtered_docs.append({
                 "text": result.content,
                 "metadata": result.metadata,
-                "similarity": result.similarity if result.similarity > 0 else result.score,
+                "similarity": base_score,
+                "boosted_score": boosted_score,
                 "search_type": result.source,  # 'semantic', 'bm25', or 'hybrid'
                 "bm25_score": result.bm25_score
             })
         
-        logger.info(f"Hybrid search retrieved {len(filtered_docs)} documents")
+        # Re-sort by boosted score and limit to top_k
+        filtered_docs.sort(key=lambda x: x.get("boosted_score", x.get("similarity", 0)), reverse=True)
+        filtered_docs = filtered_docs[:top_k]
+        
+        logger.info(f"Hybrid search retrieved {len(filtered_docs)} documents (with metadata boost)")
         return {
             "documents": filtered_docs,
             "query": query,
@@ -235,13 +319,22 @@ class RAGEngine:
             # The LLM will determine relevance based on the context.
 
             similarity_score = max(0, 1 - dist/2)
+            
+            # Apply metadata-based boosting (Phase 4.1)
+            boosted_score = self._apply_metadata_boost(similarity_score, meta)
+            
             filtered_docs.append({
                 "text": doc,
                 "metadata": meta,
-                "similarity": similarity_score
+                "similarity": similarity_score,
+                "boosted_score": boosted_score
             })
         
-        logger.info(f"Retrieved {len(filtered_docs)} relevant documents (similarity threshold: {similarity_threshold:.2f}, distance threshold: {distance_threshold:.2f})")
+        # Re-sort by boosted score and limit to top_k
+        filtered_docs.sort(key=lambda x: x.get("boosted_score", x.get("similarity", 0)), reverse=True)
+        filtered_docs = filtered_docs[:top_k]
+        
+        logger.info(f"Retrieved {len(filtered_docs)} relevant documents (similarity threshold: {similarity_threshold:.2f}, with metadata boost)")
         
         return {
             "documents": filtered_docs,

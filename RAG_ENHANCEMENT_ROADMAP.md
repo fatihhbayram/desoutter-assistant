@@ -1,7 +1,7 @@
 # 🚀 RAG Enhancement Roadmap - Semantic Chunking, Domain Embeddings & Performance Optimization
 
 > **Created:** 15 December 2025  
-> **Updated:** 17 December 2025 - **PHASE 3.4 COMPLETE ✅ Context Window Optimization**
+> **Updated:** 17 December 2025 - **PHASE 4.1 COMPLETE ✅ Metadata-Based Filtering & Boosting**
 > **Purpose:** Comprehensive enhancement of RAG system with semantic chunking, domain-specific embeddings, and performance monitoring  
 > **Target:** Production-ready, high-accuracy repair diagnosis system
 
@@ -586,19 +586,43 @@ Test 5: Convenience Function       ✅ PASS
 
 ---
 
-## 🔍 Phase 4: Advanced ChromaDB Retrieval (Planned)
+## ✅ 🔍 Phase 4: Advanced ChromaDB Retrieval - COMPLETE (17 December 2025)
 
-### 4.1 Metadata Filtering & ANN Search ⏳
-**Goal:** Use rich metadata to improve retrieval precision
+### 4.1 Metadata Filtering & Score Boosting ✅
+**Status:** COMPLETE  
+**Date:** 17 December 2025
 
-**Filter Dimensions:**
-- By document type (5 options)
-- By importance score (0.0-1.0)
-- By section type (8 options)
-- By fault keywords (9 categories)
-- By document source
-- By heading level
-- By presence of procedures/warnings/tables
+**Goal:** Use rich metadata to improve retrieval precision and prioritize service bulletins
+
+**Implementation:**
+
+**New Config Settings (`config/ai_settings.py`):**
+```python
+ENABLE_METADATA_BOOST = True
+SERVICE_BULLETIN_BOOST = 1.5   # ESD/ESB documents get 1.5x score
+PROCEDURE_BOOST = 1.3          # Step-by-step procedures get 1.3x
+WARNING_BOOST = 1.2            # Warning/caution sections get 1.2x
+IMPORTANCE_BOOST_FACTOR = 0.3  # Based on importance_score metadata
+```
+
+**RAG Engine Changes (`src/llm/rag_engine.py`):**
+- Added `_apply_metadata_boost()` method (65+ lines)
+- Boosting logic:
+  1. Service bulletins (ESD/ESB in source OR doc_type=service_bulletin) → 1.5x
+  2. Procedure sections (section_type=procedure OR is_procedure=True) → 1.3x
+  3. Warning content (contains_warning=True) → 1.2x
+  4. Importance score (from semantic chunking) → dynamic multiplier
+- Results re-sorted by boosted score before returning top-k
+
+**Data Re-ingestion:**
+- ChromaDB collection cleared and rebuilt
+- 1514 semantic chunks with full 14-field metadata
+- 117 ESD service bulletins indexed
+
+**Test Results:**
+- Query "CVI3 memory full hatası" → **ESDE15006** ranks #1 (was not prioritized before)
+- Query "wifi bağlantı problemi" → **ESDE21017** included in results
+- Service bulletins achieve 2.54x boost (1.5 × 1.3 × 1.3)
 
 ---
 
