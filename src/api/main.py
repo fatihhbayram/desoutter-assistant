@@ -41,6 +41,10 @@ from datetime import datetime, timedelta
 import jwt
 from passlib.context import CryptContext
 
+# Async support for blocking operations
+import asyncio
+from functools import partial
+
 # Internal modules
 from src.llm.rag_engine import RAGEngine  # RAG engine for AI responses
 from src.database import MongoDBClient     # MongoDB client wrapper
@@ -348,6 +352,9 @@ async def diagnose(
     """
     Generate repair suggestion based on fault description.
     Now with self-learning capabilities from user feedback.
+    
+    Uses asyncio.to_thread() to run blocking LLM calls in a thread pool,
+    preventing the event loop from blocking during long-running operations.
     """
     try:
         # Get username from token if available
@@ -362,7 +369,10 @@ async def diagnose(
         
         rag = get_rag_engine()
         
-        result = rag.generate_repair_suggestion(
+        # Run blocking LLM call in thread pool to avoid blocking event loop
+        # This allows other requests to be processed while waiting for LLM response
+        result = await asyncio.to_thread(
+            rag.generate_repair_suggestion,
             part_number=request.part_number,
             fault_description=request.fault_description,
             language=request.language,
@@ -381,17 +391,30 @@ async def diagnose(
 @app.post("/diagnose/stream")
 async def diagnose_stream(request: DiagnoseRequest):
     """
-    Stream repair suggestion in real-time
+    Stream repair suggestion in real-time.
+    
+    Uses run_in_executor to run blocking generator in thread pool,
+    preventing event loop blocking during streaming.
     """
     try:
         rag = get_rag_engine()
         
         async def generate():
-            for chunk in rag.stream_repair_suggestion(
-                part_number=request.part_number,
-                fault_description=request.fault_description,
-                language=request.language
-            ):
+            # Run sync generator in thread pool
+            loop = asyncio.get_event_loop()
+            
+            # Create sync iterator
+            def get_chunks():
+                return list(rag.stream_repair_suggestion(
+                    part_number=request.part_number,
+                    fault_description=request.fault_description,
+                    language=request.language
+                ))
+            
+            # Get all chunks in thread pool to avoid blocking
+            chunks = await loop.run_in_executor(None, get_chunks)
+            
+            for chunk in chunks:
                 yield f"data: {json.dumps(chunk)}\n\n"
         
         return StreamingResponse(generate(), media_type="text/event-stream")
@@ -412,6 +435,8 @@ async def submit_feedback(
     """
     Submit feedback for a diagnosis.
     Positive feedback reinforces the solution, negative feedback triggers learning.
+    
+    Uses asyncio.to_thread() for database operations to avoid blocking.
     """
     try:
         # Get username from token
@@ -446,7 +471,9 @@ async def submit_feedback(
                 for sr in request.source_relevance
             ]
         
-        result = feedback_engine.submit_feedback(
+        # Run feedback processing in thread pool to avoid blocking
+        result = await asyncio.to_thread(
+            feedback_engine.submit_feedback,
             diagnosis_id=request.diagnosis_id,
             feedback_type=feedback_type,
             username=username,
@@ -775,9 +802,13 @@ async def ui():
 
 @app.on_event("startup")
 async def startup_event():
-    """Startup event - initialize RAG engine"""
+    """Startup event - initialize RAG engine in background thread"""
     logger.info("🚀 Starting Desoutter Repair Assistant API")
-    get_rag_engine()
+    
+    # Initialize RAG engine in thread pool to avoid blocking startup
+    # This pre-loads embedding model and BM25 index
+    await asyncio.to_thread(get_rag_engine)
+    
     # Seed default users if missing
     try:
         with MongoDBClient() as db:
