@@ -680,24 +680,35 @@ function App() {
   const getImages = (p) => {
     if (!p) return [];
     
+    // Filter out placeholder images
+    const isValidImage = (url) => {
+      if (!url || typeof url !== 'string') return false;
+      const lower = url.toLowerCase();
+      // Skip placeholder, default, and missing images
+      if (lower.includes('placeholder') || lower.includes('default') || lower === '-') return false;
+      return true;
+    };
+    
     // Handle array fields
-    if (Array.isArray(p.image_url)) return p.image_url.filter(Boolean);
-    if (Array.isArray(p.images)) return p.images.filter(Boolean);
+    if (Array.isArray(p.image_url)) return p.image_url.filter(isValidImage);
+    if (Array.isArray(p.images)) return p.images.filter(isValidImage);
     
     // Handle image_urls field (comma-separated string or array)
     if (p.image_urls) {
-      if (Array.isArray(p.image_urls)) return p.image_urls.filter(Boolean);
+      if (Array.isArray(p.image_urls)) return p.image_urls.filter(isValidImage);
       if (typeof p.image_urls === 'string') {
-        return p.image_urls.split(',').map(s => s.trim()).filter(Boolean);
+        return p.image_urls.split(',').map(s => s.trim()).filter(isValidImage);
       }
     }
     
     // Handle single image_url string
     if (p.image_url && typeof p.image_url === 'string') {
       if (p.image_url.includes(',')) {
-        return p.image_url.split(',').map(s => s.trim()).filter(Boolean);
+        return p.image_url.split(',').map(s => s.trim()).filter(isValidImage);
       }
-      return [p.image_url];
+      if (isValidImage(p.image_url)) {
+        return [p.image_url];
+      }
     }
     
     return [];

@@ -1,12 +1,13 @@
 """
-Main Desoutter scraper implementation
+Main Desoutter scraper implementation - Schema v2 Support
 """
 import asyncio
 from datetime import datetime
 from typing import List, Optional
 from config import BASE_URL
-from src.database.models import ProductModel
+from src.database.models import ProductModel, WirelessInfo, PlatformConnection, ModularSystem
 from src.scraper.parsers import ProductParser
+from src.scraper.product_categorizer import categorize_product, detect_tool_category
 from src.utils.http_client import AsyncHTTPClient
 from src.utils.logger import setup_logger
 
@@ -36,23 +37,29 @@ class DesoutterScraper:
     async def scrape_series(
         self,
         series_url: str,
-        category: str = ""
+        category: str = "",
+        category_url: str = ""
     ) -> List[ProductModel]:
         """
-        Scrape all products from a series page
+        Scrape all products from a series page with Schema v2 categorization.
         
         Args:
             series_url: URL of the series page
-            category: Category name
+            category: Category name (legacy)
+            category_url: Category page URL for tool_category detection
             
         Returns:
-            List of ProductModel objects
+            List of ProductModel objects (Schema v2)
         """
         logger.info("=" * 80)
         logger.info(f"Starting scrape for series: {series_url}")
         logger.info("=" * 80)
         
         start_time = datetime.now()
+        
+        # Detect tool category from URL
+        tool_category = detect_tool_category(category_url, category)
+        logger.info(f"Tool category: {tool_category}")
         
         # Step 1: Fetch series page
         logger.info("Step 1/4: Fetching series page...")
@@ -82,8 +89,8 @@ class DesoutterScraper:
         ]
         product_htmls = await self.http_client.fetch_all(product_urls)
         
-        # Step 4: Parse product data
-        logger.info("Step 4/4: Parsing product data...")
+        # Step 4: Parse product data with Schema v2 categorization
+        logger.info("Step 4/4: Parsing product data (Schema v2)...")
         products = []
         
         for i, (part_number, product_html, product_url) in enumerate(
@@ -94,21 +101,64 @@ class DesoutterScraper:
                 continue
             
             try:
-                # Parse HTML details
+                # Parse HTML details (legacy)
                 details = self.parser.parse_product_details(product_html, part_number)
                 
-                # Create product model
+                # Apply Schema v2 categorization
+                categorization = categorize_product(
+                    model_name=details.get("model_name", part_number),
+                    part_number=part_number,
+                    series_name=series_name,
+                    category_url=category_url,
+                    legacy_category=category,
+                    description=details.get("description", ""),
+                    html_content=product_html,
+                    legacy_wireless=details.get("wireless_communication", "No")
+                )
+                
+                # Build sub-models if applicable
+                wireless = None
+                platform_connection = None
+                modular_system = None
+                
+                if categorization.get("wireless"):
+                    wireless = WirelessInfo(**categorization["wireless"])
+                
+                if categorization.get("platform_connection"):
+                    platform_connection = PlatformConnection(**categorization["platform_connection"])
+                
+                if categorization.get("modular_system"):
+                    modular_system = ModularSystem(**categorization["modular_system"])
+                
+                # Create product model (Schema v2)
                 product = ProductModel(
                     product_id=part_number,
                     part_number=part_number,
                     series_name=series_name,
                     category=category,
                     product_url=product_url,
+                    # Schema v2 fields
+                    tool_category=categorization["tool_category"],
+                    tool_type=categorization.get("tool_type"),
+                    product_family=categorization["product_family"],
+                    wireless=wireless,
+                    platform_connection=platform_connection,
+                    modular_system=modular_system,
+                    schema_version=2,
+                    # Legacy fields from parser
                     **details
                 )
                 
                 products.append(product)
-                logger.info(f"[{i}/{len(part_numbers)}] ✓ {product.model_name}")
+                
+                # Log with category-specific info
+                wifi_status = ""
+                if wireless and wireless.capable:
+                    wifi_status = " 📶"
+                elif platform_connection:
+                    wifi_status = f" 🔌 [{','.join(platform_connection.compatible_platforms[:2])}]"
+                
+                logger.info(f"[{i}/{len(part_numbers)}] ✓ {product.model_name} ({categorization['tool_category']}){wifi_status}")
                 
             except Exception as e:
                 logger.error(f"[{i}/{len(part_numbers)}] ✗ Error parsing {part_number}: {e}")
@@ -128,14 +178,16 @@ class DesoutterScraper:
     async def scrape_multiple_series(
         self,
         series_urls: List[str],
-        category: str = ""
+        category: str = "",
+        category_url: str = ""
     ) -> List[ProductModel]:
         """
-        Scrape multiple series
+        Scrape multiple series with Schema v2 support.
         
         Args:
             series_urls: List of series URLs
-            category: Category name
+            category: Category name (legacy)
+            category_url: Category page URL for tool_category detection
             
         Returns:
             Combined list of ProductModel objects
@@ -145,7 +197,7 @@ class DesoutterScraper:
         all_products = []
         for i, url in enumerate(series_urls, 1):
             logger.info(f"\n[Series {i}/{len(series_urls)}]")
-            products = await self.scrape_series(url, category)
+            products = await self.scrape_series(url, category, category_url)
             all_products.extend(products)
         
         logger.info(f"\n✅ Total products from all series: {len(all_products)}")
@@ -153,7 +205,7 @@ class DesoutterScraper:
     
     async def scrape_category(self, category_config: dict) -> List[ProductModel]:
         """
-        Scrape entire category
+        Scrape entire category with Schema v2 support.
         
         Args:
             category_config: Category configuration dictionary
@@ -164,14 +216,16 @@ class DesoutterScraper:
                 }
                 
         Returns:
-            List of ProductModel objects
+            List of ProductModel objects (Schema v2)
         """
         category_name = category_config.get('name', '')
+        category_url = category_config.get('url', '')
         series_urls = category_config.get('series', [])
         
         logger.info(f"\n{'=' * 80}")
         logger.info(f"Scraping category: {category_name}")
+        logger.info(f"Category URL: {category_url}")
         logger.info(f"Series count: {len(series_urls)}")
         logger.info(f"{'=' * 80}\n")
         
-        return await self.scrape_multiple_series(series_urls, category_name)
+        return await self.scrape_multiple_series(series_urls, category_name, category_url)

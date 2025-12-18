@@ -21,6 +21,12 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - [x] **Phase 3.4 Context Window Optimization**: Token budget, dedup, prioritization ✅ (17 Ara)
 - [x] **Ollama GPU Activation**: NVIDIA RTX A2000 GPU inference ✅ (17 Ara)
 - [x] **Phase 4.1 Metadata Filtering**: Service bulletin boost, importance scoring ✅ (17 Ara)
+- [x] **Phase 4.2 ProductModel Schema v2**: Kategorilendirme sistemi ✅ (18 Ara)
+- [x] **Phase 4.3 Smart Scraper**: Schema v2 entegrasyonu ✅ (18 Ara)
+
+### 🟠 Devam Eden (19 Aralık)
+- [ ] **Scrape Missing Series**: Rate limit nedeniyle atlanan 13 seri
+- [ ] **Görsel Güncelleme**: Placeholder görselleri gerçek görsellerle değiştir
 
 ### 🟡 Orta Öncelik (Next Sprint)
 - [ ] **Phase 5.1 Performance Metrics**: Admin dashboard metrics
@@ -35,6 +41,137 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - [ ] **SAP Entegrasyonu**: Otomatik yedek parça siparişi
 - [ ] **Sesli Asistan**: Hands-free arıza bildirimi
 - [ ] **Predictive Maintenance**: Arıza öncesi uyarı sistemi
+
+---
+
+## 📆 18 Aralık 2025 (Çarşamba) - ProductModel Schema v2 & Smart Scraper
+
+### 🆕 ProductModel Schema v2 ✅ **YENİ**
+
+**Amaç:** Ürünleri daha iyi kategorize etmek için kapsamlı schema güncellemesi.
+
+**Yeni Alanlar:**
+```python
+# Tool Category (URL'den otomatik tespit)
+tool_category: str  # battery_tightening, cable_tightening, electric_drilling
+
+# Wireless Info (Model adından otomatik tespit)
+wireless_info: WirelessInfo
+  - is_wifi_capable: bool      # True if model has "C" (EPBC, EABC, etc.)
+  - detection_method: str      # model_name_C, description_wireless, standalone_battery
+  - wifi_generation: str       # wifi_5, wifi_6, unknown
+
+# Platform Connection (Cable tools için)
+platform_connection: PlatformConnection
+  - is_cable_tool: bool
+  - compatible_platforms: List[str]  # CVI3, CVI3LT, CVIR II, ESP-C
+
+# Modular System (XPB tools için)
+modular_system: ModularSystem
+  - is_modular: bool
+  - is_base_tool: bool
+  - is_attachment: bool
+  - compatible_bases: List[str]
+
+# Product Family & Type
+product_family: str   # EPB, EAB, EABS, EAD, EID, XPB, etc.
+tool_type: str        # pistol, angle_head, inline, straight, fixtured, etc.
+```
+
+**Files Created:**
+- `src/scraper/product_categorizer.py` - Tüm detection helper fonksiyonları
+
+---
+
+### 🆕 Smart Upsert Logic ✅ **YENİ**
+
+**Problem:** Yeni scrape mevcut verileri (özellikle görselleri) placeholder ile üzerine yazıyordu.
+
+**Solution:** `smart_upsert_product()` fonksiyonu:
+- Mevcut değerleri korur (boş olmayan alanlar)
+- Sadece yeni veya daha iyi verileri günceller
+- Placeholder değerleri kabul etmez
+
+```python
+# mongo_client.py
+async def smart_upsert_product(self, product: ProductModel) -> str:
+    existing = await self.collection.find_one({"part_number": product.part_number})
+    if existing:
+        # Merge: keep existing non-empty values, update with new non-empty values
+        update_doc = self._build_smart_update(existing, product.model_dump())
+    else:
+        # Insert new
+        update_doc = product.model_dump()
+```
+
+---
+
+### 🆕 WiFi Detection Logic ✅ **YENİ**
+
+**3 iterasyon sonrası final mantık:**
+
+| Öncelik | Kural | Sonuç |
+|---------|-------|-------|
+| 1 | Model "C" ile başlıyor (EPBC, EABC, EABSC, EIBSC, EPBCH, EPBACH, EABCH) | ✅ WiFi capable |
+| 2 | Description'da "wireless", "wifi", "wi-fi", "smart connected" | ✅ WiFi capable |
+| 3 | Text'te "standalone battery", "standalone" | ❌ NOT wireless |
+| 4 | Default | ❌ NOT wireless |
+
+**Önemli:** Legacy `wireless` field güvenilir DEĞİL (kaldırıldı).
+
+---
+
+### 🆕 Scrape Results ✅ **YENİ**
+
+**Başarılı:**
+| Kategori | Ürün | Durum |
+|----------|------|-------|
+| Battery Tightening | 151 | ✅ Tamamlandı |
+| Cable Tightening | 126 | ⚠️ Kısmi (9 seri atlandı) |
+| Electric Drilling | 0 | ⏳ Bekliyor (4 seri atlandı) |
+| **Toplam** | **277** | MongoDB'de |
+
+**Rate Limit Nedeniyle Atlanan (13 seri):**
+- Cable: SLBN, E-Pulse, EFD, EFM, ERF, EFMA, EFBCI, EFBCIT, EFBCA
+- Drilling: XPB Modular, XPB One, Tightening Head, Drilling Head
+
+**Yarın Çalıştırılacak Script:**
+```bash
+sudo docker exec -it desoutter-api python3 /app/scripts/scrape_missing.py
+```
+
+---
+
+### 🆕 Frontend Placeholder Filter ✅ **YENİ**
+
+**Problem:** 110 üründe placeholder görsel gösteriliyordu.
+
+**Solution:** `getImages()` fonksiyonuna placeholder filter eklendi:
+```javascript
+const isValidImage = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  const lower = url.toLowerCase();
+  if (lower.includes('placeholder') || lower.includes('default') || lower === '-') return false;
+  return true;
+};
+```
+
+**Sonuç:** Placeholder olan ürünler artık 📷 ikonu gösteriyor.
+
+---
+
+### 📁 Files Modified/Created
+
+| Dosya | Değişiklik |
+|-------|------------|
+| `src/database/models.py` | Schema v2 - WirelessInfo, PlatformConnection, ModularSystem |
+| `src/scraper/product_categorizer.py` | **YENİ** - Tüm detection fonksiyonları |
+| `src/scraper/desoutter_scraper.py` | Schema v2 entegrasyonu |
+| `src/database/mongo_client.py` | smart_upsert_product(), bulk_smart_upsert() |
+| `scripts/scrape_all.py` | bulk_smart_upsert kullanımı |
+| `scripts/scrape_missing.py` | **YENİ** - Atlanan seriler için script |
+| `frontend/src/App.jsx` | Placeholder filter |
+| `TODO_NEXT_SESSION.md` | **YENİ** - Yarın yapılacaklar |
 
 ---
 
