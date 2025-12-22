@@ -1,413 +1,554 @@
-# System Instructions for Desoutter RAG Assistant Development
+# Desoutter Product Schema Update - Specific Implementation
 
-You are a senior AI Architect, Backend Engineer, and MLOps specialist working on the **Desoutter Repair Assistant** - an AI-powered, self-learning RAG system built with FastAPI, MongoDB, ChromaDB, Ollama, BM25 hybrid search, and React.
+@workspace I need to update the existing `ProductModel` in `src/database/models.py` to add proper categorization and platform relationships.
 
-## Core Principles
+## 📊 CURRENT SCHEMA (ProductModel)
 
-**NEVER** rewrite or break existing working functionality. Prefer incremental, backward-compatible improvements following SOLID principles. Use async where applicable. Every change must be scalable, explainable, and maintainable. This is an enterprise internal tool used by technicians - avoid overengineering unless it provides clear measurable benefit.
-
-## Current System Stack
-
-**Architecture:**
-- Hybrid Search: BM25 (keyword) + Semantic (vector) with RRF fusion
-- Vector Store: ChromaDB (2309 chunks, 384-dim embeddings)
-- LLM: Ollama (qwen2.5:7b-instruct / llama3:latest)
-- Database: MongoDB (products, users, feedback, learned_mappings)
-- Self-Learning: Feedback loop (👍/👎) with confidence scoring
-- Documents: Multi-format (PDF, DOCX, PPTX, XLSX) ingestion
-- Infrastructure: Docker Compose + GPU (NVIDIA RTX A2000, 6GB VRAM)
-
-**Critical Context:**
-- Documents are shared across multiple model families and tools
-- Metadata is source of truth (14 fields per chunk: type, model_family, tool_ids, fault_category, severity, etc.)
-- Physical folder structure ≠ document type
-- Bulletins (ESDE) may contain HowTo or Maintenance sections
-
-## Production Constraints (HARD LIMITS)
-
-**Never exceed:**
-- GPU Memory: 6GB max (RTX A2000)
-- Chunk size: 400 characters
-- API timeout: 30s per request
-- MongoDB: Single instance (no sharding)
-- Ollama: Local only (no cloud LLM calls)
-
-**Performance targets:**
-- Retrieval latency: <2s
-- Full diagnosis: <10s
-- Document ingestion: <5min for 100 docs
-
-## Decision Framework
-
-Before proposing ANY change, analyze:
-
-**1. Impact Analysis:**
-- What breaks? (Breaking changes: YES/NO)
-- What improves? (Metrics: accuracy +X%, latency -Y%)
-- Risk level: LOW / MEDIUM / HIGH
-
-**2. Trade-offs:**
-- Performance vs Complexity
-- Accuracy vs Latency
-- Flexibility vs Simplicity
-
-**3. Implementation:**
-- Can it be phased? (Phase 1 → 2 → 3)
-- Rollback strategy? (How to undo?)
-- Testing approach? (Unit/Integration/E2E)
-
-**4. Evidence:**
-- Link to similar patterns in codebase
-- Cite research/benchmarks
-- Show before/after metrics
-
-Always answer: "Why is this better than the status quo?"
-
-## Example Decision Making
-
-**Scenario: User reports "Retrieval returns irrelevant docs"**
-
-❌ BAD: "Let's rewrite the entire RAG pipeline"
-
-✅ GOOD:
-```
-1. Analyze current similarity threshold (0.30)
-2. Check metadata filtering logic
-3. Add debug logging for retrieval scores
-4. Test with 3 sample queries
-5. Adjust threshold incrementally if needed (0.30 → 0.35)
-6. Document in CHANGELOG.md
-```
-
-**Scenario: New document type needs support**
-
-❌ BAD: "Create new class and refactor everything"
-
-✅ GOOD:
-```
-1. Check if existing type detection covers it
-2. Add new type to enum (backward compatible)
-3. Update metadata schema (additive only)
-4. Test with 1 sample doc
-5. Verify ChromaDB indexing
-6. Update docs and UI
-```
-
-## Observability Requirements
-
-**Logging standards:**
 ```python
-# RAG Retrievals
-logger.info(f"Retrieval: query='{query}', top_k={k}, avg_score={avg_score:.3f}")
-
-# LLM Calls
-logger.info(f"LLM: prompt_length={len(prompt)}, model={model}, tokens={tokens}")
-
-# Feedback
-logger.info(f"Feedback: id={id}, type={feedback}, confidence: {before:.2f}→{after:.2f}")
-```
-
-**Key metrics to track:**
-- Retrieval: precision@k (k=3,5,10), avg similarity
-- Feedback: positive/negative ratio, learned mappings growth
-- Performance: p50/p95 latency, GPU memory
-- Coverage: docs per model_family, tools with <3 docs
-
-## Self-Learning Protocol
-
-**Positive Feedback (👍):**
-```python
-confidence_boost = 0.1 * min(positive_count / 10, 1.0)
-chunk.weight *= 1.1  # Boost contributing chunks by 10%
-```
-
-**Negative Feedback (👎):**
-```python
-# Need 3+ negative before penalizing
-if negative_count >= 3:
-    chunk.weight *= 0.9  # Reduce by 10%
-# NEVER auto-delete chunks
-```
-
-**Confidence Formula:**
-```python
-confidence = (positive / (positive + negative)) * min(samples / 10, 1.0)
-```
-
-**Learning windows:**
-- Daily: Update confidence scores
-- Weekly: Review feedback trends
-- Monthly: Reindex with updated weights
-- Quarterly: Consider model retraining
-
-## Error Handling
-
-**Graceful degradation:**
-```python
-try:
-    results = chromadb.query(...)
-except ChromaDBError:
-    logger.error("ChromaDB failed, falling back to BM25")
-    results = bm25_search(query)
-```
-
-**User-facing messages:**
-
-❌ NEVER: "I don't know", "Error 500", "Contact admin"
-
-✅ ALWAYS: Technical reason + actionable steps + fallback
-
-Example:
-```
-"No matching documents found for part 6151659770. Try:
-1. Check part number spelling
-2. Search by series (e.g., 'CP series motor fault')
-3. Use general terms ('motor not starting' vs specific details)"
-```
-
-## Coding Standards
-
-**Python 3.11+ with explicit typing:**
-```python
-from typing import Optional, List
-from pydantic import BaseModel
-
-async def process_document(
-    doc_path: str,
-    doc_type: DocumentType,
-    model_families: List[str]
-) -> ProcessedDocument:
-    """
-    Process document and extract metadata.
+class ProductModel(BaseModel):
+    # === EXISTING FIELDS (KEEP AS-IS) ===
+    product_id: str                    # Unique ID (part number)
+    model_name: str                    # Product model name
+    part_number: str                   # Manufacturer part number
+    series_name: str = ""              # Product series
+    category: str = ""                 # Product category (currently generic)
+    product_url: str                   # Product page URL
+    image_url: str = "-"               # Product image URL
+    description: str = "-"             # Product description
     
-    Args:
-        doc_path: Path to document file
-        doc_type: Type of document
-        model_families: Applicable model families
-        
-    Returns:
-        ProcessedDocument with chunks and metadata
-    """
+    # Technical specs
+    min_torque: str = "-"
+    max_torque: str = "-"
+    speed: str = "-"
+    output_drive: str = "-"
+    wireless_communication: str = "No"  # Currently just "Yes"/"No"
+    weight: str = "-"
+    
+    # Metadata
+    scraped_date: str = datetime.now().strftime("%Y-%m-%d")
+    updated_at: str = datetime.now().isoformat()
+    status: str = "active"
 ```
 
-**Async for I/O:**
-```python
-async def ingest_documents(files: List[str]) -> None:
-    tasks = [process_document_async(f) for f in files]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-```
-
-**Centralized prompts:**
-```python
-PROMPTS = {
-    "diagnosis_v2.0": """
-You are a Desoutter tool repair assistant.
-Product: {product_name}
-Fault: {fault_description}
-Documents: {documents}
-Provide step-by-step solution...
-""",
+**Current example:**
+```json
+{
+  "product_id": "6151659030",
+  "model_name": "EPB 8-1800-10S",
+  "part_number": "6151659030",
+  "series_name": "EPB - Transducerized Pistol Battery Tool",
+  "category": "Battery Tightening Tools",
+  "wireless_communication": "Yes"
 }
 ```
 
-## Change Management
+---
 
-**Version everything:**
-- Models: v1.0, v1.1, v1.2
-- Prompts: prompt_diagnosis_v2.0
-- Schemas: metadata_v3 (with migration script)
+## 🎯 REQUIRED UPDATES
 
-**Always provide rollback:**
+### Problem 1: Generic Category
+- ❌ Current: `category: "Battery Tightening Tools"` (just a string)
+- ✅ Needed: Structured categorization with tool type
+
+### Problem 2: Wireless Field Too Simple
+- ❌ Current: `wireless_communication: "Yes"/"No"`
+- ✅ Needed: Wireless capability + platform compatibility
+
+### Problem 3: No Platform Relationships
+- ❌ Current: No link to tool_units
+- ✅ Needed: Compatible platforms (CVI3, Connect, ESP, etc.)
+
+### Problem 4: No Product Family Extraction
+- ❌ Current: `series_name` is full text
+- ✅ Needed: Extract family code (EPB, EAD, XPB, etc.)
+
+---
+
+## 🗄️ UPDATED SCHEMA (Backward Compatible)
+
+```python
+from typing import Optional, List
+from pydantic import BaseModel, Field
+from datetime import datetime
+
+class WirelessInfo(BaseModel):
+    """Wireless capability information (battery tools only)"""
+    capable: bool = False
+    detection_method: str = "not_applicable"  # "model_name_C" | "no_standalone_text" | "standalone_text_found" | "not_applicable"
+    compatible_platforms: List[str] = []       # ["CVI3", "Connect"]
+    compatible_platform_ids: List[str] = []    # MongoDB ObjectId references (as strings)
+
+class PlatformConnection(BaseModel):
+    """Platform connection info (cable tools only)"""
+    required: bool = True
+    compatible_platforms: List[str] = []       # ["CVI3", "CVIR II", "ESP-C"]
+    compatible_platform_ids: List[str] = []    # MongoDB ObjectId references
+
+class ModularSystem(BaseModel):
+    """Modular system info (drilling tools only)"""
+    is_base_tool: bool = False                 # XPB-Modular, XPB-One
+    is_attachment: bool = False                # Tightening Head, Drilling Head
+    attachment_type: Optional[str] = None      # "tightening" | "drilling"
+    compatible_base_tools: List[str] = []      # ["XPB-Modular", "XPB-One"]
+
+class ProductModel(BaseModel):
+    """Enhanced Product data model"""
+    
+    # === EXISTING FIELDS (NO CHANGES) ===
+    product_id: str
+    model_name: str
+    part_number: str
+    series_name: str = ""
+    category: str = ""                         # Keep for backward compatibility
+    product_url: str
+    image_url: str = "-"
+    description: str = "-"
+    min_torque: str = "-"
+    max_torque: str = "-"
+    speed: str = "-"
+    output_drive: str = "-"
+    wireless_communication: str = "No"         # Keep for backward compatibility
+    weight: str = "-"
+    scraped_date: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    status: str = "active"
+    
+    # === NEW FIELDS (ADDED) ===
+    
+    # Enhanced categorization
+    tool_category: str = "unknown"             # "battery_tightening" | "cable_tightening" | "electric_drilling" | "platform"
+    tool_type: Optional[str] = None            # "pistol" | "angle_head" | "inline" | "screwdriver" | "drill"
+    product_family: str = ""                   # "EPB" | "EAD" | "XPB" (extracted from part_number)
+    
+    # Connection/compatibility info (conditional based on tool_category)
+    wireless: Optional[WirelessInfo] = None    # Only for battery_tightening
+    platform_connection: Optional[PlatformConnection] = None  # Only for cable_tightening
+    modular_system: Optional[ModularSystem] = None  # Only for electric_drilling
+    
+    # Schema version tracking
+    schema_version: int = 2                    # Track migrations
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "product_id": "6151659030",
+                "model_name": "EPBC14-T4000-S6S4-T",
+                "part_number": "6151659030",
+                "series_name": "EPB - Transducerized Pistol Battery Tool",
+                "category": "Battery Tightening Tools",
+                "wireless_communication": "Yes",
+                "tool_category": "battery_tightening",
+                "tool_type": "pistol",
+                "product_family": "EPB",
+                "wireless": {
+                    "capable": True,
+                    "detection_method": "model_name_C",
+                    "compatible_platforms": ["CVI3", "Connect"],
+                    "compatible_platform_ids": []
+                },
+                "schema_version": 2
+            }
+        }
+    
+    def to_dict(self) -> dict:
+        """Convert model to dictionary"""
+        return self.model_dump(exclude_none=True)
+```
+
+---
+
+## 🛠️ IMPLEMENTATION PLAN
+
+### Phase 1: Update Models (IMMEDIATE)
+
+**File:** `src/database/models.py`
+
+**Changes:**
+1. ✅ Add three new sub-models: `WirelessInfo`, `PlatformConnection`, `ModularSystem`
+2. ✅ Add new fields to `ProductModel`
+3. ✅ Keep ALL existing fields (backward compatible)
+4. ✅ Update `json_schema_extra` example
+
+**Risk:** LOW - Only adding fields, not removing
+
+---
+
+### Phase 2: Create Migration Script
+
+**File:** `scripts/migrate_products_v2.py`
+
+```python
+import asyncio
+import re
+from motor.motor_asyncio import AsyncIOMotorClient
+from datetime import datetime
+
+# Platform mapping based on product family
+CABLE_TOOL_PLATFORMS = {
+    "EPD": ["CVI3"],
+    "EAD": ["CVI3"],
+    "EID": ["CVI3"],
+    "ERP": ["CVIR II", "ESP"],
+    "ERS": ["CVIR II", "CVIXS", "ESP-C"],
+    "ECS": ["ESP-C"],
+    "ERXS": ["CVIXS"],
+    "SLC": ["ESP-C"],
+    "SLBN": ["ESP-C"],
+    "E-PULSE": ["CVI3", "ESP"],
+    "EFD": ["CVI3"],
+    "EFM": ["CVI3"],
+    "ERF": ["CVI3"],
+    "EFBCIT": ["CVI3"],
+    "EFBCA": ["CVI3"]
+}
+
+def extract_product_family(part_number: str) -> str:
+    """Extract family from part number (e.g., EPBC14 → EPB)"""
+    # Remove digits and trailing characters
+    match = re.match(r'^([A-Z]+)', part_number)
+    if match:
+        family = match.group(1)
+        # If ends with C and longer than 2 chars, it's wireless indicator
+        if family.endswith('C') and len(family) > 2:
+            return family[:-1]  # EPBC → EPB
+        return family
+    return "Unknown"
+
+def detect_tool_category(product: dict) -> str:
+    """Detect category from URL or existing category field"""
+    url = product.get('product_url', '')
+    category = product.get('category', '').lower()
+    
+    # From URL
+    if '/battery-tightening-tools' in url:
+        return 'battery_tightening'
+    elif '/cable-tightening-tools' in url:
+        return 'cable_tightening'
+    elif '/electric-drilling-tools' in url:
+        return 'electric_drilling'
+    elif '/corded-platforms' in url:
+        return 'platform'
+    
+    # From category text
+    if 'battery' in category:
+        return 'battery_tightening'
+    elif 'cable' in category or 'corded' in category:
+        return 'cable_tightening'
+    elif 'drill' in category:
+        return 'electric_drilling'
+    elif 'platform' in category:
+        return 'platform'
+    
+    return 'unknown'
+
+def detect_tool_type(series_name: str, model_name: str) -> str:
+    """Detect tool type from series/model name"""
+    text = (series_name + " " + model_name).lower()
+    
+    if 'pistol' in text:
+        return 'pistol'
+    elif 'angle' in text:
+        return 'angle_head'
+    elif 'inline' in text or 'in-line' in text:
+        return 'inline'
+    elif 'screwdriver' in text:
+        return 'screwdriver'
+    elif 'drill' in text:
+        return 'drill'
+    elif 'fixtured' in text:
+        return 'fixtured'
+    
+    return None
+
+def detect_wireless_info(product: dict, family: str) -> dict:
+    """Detect wireless capability for battery tools"""
+    part_number = product['part_number']
+    wireless_comm = product.get('wireless_communication', 'No')
+    description = product.get('description', '').lower()
+    
+    # Method 1: Existing wireless_communication field
+    if wireless_comm == "Yes":
+        # Check if model has "C" indicator (e.g., EPBC14)
+        if re.search(r'[A-Z]+C\d+', part_number):
+            method = "model_name_C"
+        else:
+            method = "existing_field"
+        
+        return {
+            "capable": True,
+            "detection_method": method,
+            "compatible_platforms": ["CVI3", "Connect"],
+            "compatible_platform_ids": []
+        }
+    
+    # Method 2: Check for "standalone" in description
+    if 'standalone' in description:
+        return {
+            "capable": False,
+            "detection_method": "standalone_text_found",
+            "compatible_platforms": [],
+            "compatible_platform_ids": []
+        }
+    
+    # Default: No wireless
+    return {
+        "capable": False,
+        "detection_method": "no_wireless_field",
+        "compatible_platforms": [],
+        "compatible_platform_ids": []
+    }
+
+def detect_platform_connection(family: str) -> dict:
+    """Detect compatible platforms for cable tools"""
+    platforms = CABLE_TOOL_PLATFORMS.get(family, [])
+    
+    return {
+        "required": True,
+        "compatible_platforms": platforms,
+        "compatible_platform_ids": []
+    }
+
+def detect_modular_system(product: dict, family: str) -> dict:
+    """Detect modular system info for drilling tools"""
+    model_name = product.get('model_name', '').lower()
+    series = product.get('series_name', '').lower()
+    
+    # Base tools
+    if 'xpb' in model_name or 'xpb' in series:
+        return {
+            "is_base_tool": True,
+            "is_attachment": False,
+            "attachment_type": None,
+            "compatible_base_tools": []
+        }
+    
+    # Attachments
+    if 'tightening head' in series or 'drilling head' in series:
+        attachment_type = 'tightening' if 'tightening' in series else 'drilling'
+        return {
+            "is_base_tool": False,
+            "is_attachment": True,
+            "attachment_type": attachment_type,
+            "compatible_base_tools": ["XPB-Modular", "XPB-One"]
+        }
+    
+    return {
+        "is_base_tool": False,
+        "is_attachment": False,
+        "attachment_type": None,
+        "compatible_base_tools": []
+    }
+
+async def migrate_products():
+    """Migrate all products to new schema"""
+    client = AsyncIOMotorClient("mongodb://192.168.1.125:27017")
+    db = client.desoutter
+    
+    total = await db.products.count_documents({})
+    print(f"🔄 Migrating {total} products...")
+    
+    migrated = 0
+    skipped = 0
+    errors = 0
+    
+    async for product in db.products.find({}):
+        try:
+            # Skip if already migrated
+            if product.get('schema_version') == 2:
+                skipped += 1
+                continue
+            
+            # Extract data
+            family = extract_product_family(product['part_number'])
+            category = detect_tool_category(product)
+            tool_type = detect_tool_type(
+                product.get('series_name', ''),
+                product.get('model_name', '')
+            )
+            
+            # Prepare updates
+            updates = {
+                'tool_category': category,
+                'tool_type': tool_type,
+                'product_family': family,
+                'schema_version': 2,
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            # Add category-specific fields
+            if category == 'battery_tightening':
+                updates['wireless'] = detect_wireless_info(product, family)
+            
+            elif category == 'cable_tightening':
+                updates['platform_connection'] = detect_platform_connection(family)
+            
+            elif category == 'electric_drilling':
+                updates['modular_system'] = detect_modular_system(product, family)
+            
+            # Update document
+            result = await db.products.update_one(
+                {'_id': product['_id']},
+                {'$set': updates}
+            )
+            
+            if result.modified_count > 0:
+                migrated += 1
+                print(f"✅ {product['part_number']} → {category} ({family})")
+            
+        except Exception as e:
+            errors += 1
+            print(f"❌ Error migrating {product.get('part_number', 'unknown')}: {e}")
+    
+    print(f"\n📊 MIGRATION SUMMARY:")
+    print(f"   Total: {total}")
+    print(f"   Migrated: {migrated}")
+    print(f"   Skipped (already v2): {skipped}")
+    print(f"   Errors: {errors}")
+    
+    # Create indexes
+    print(f"\n📇 Creating indexes...")
+    await db.products.create_index('tool_category')
+    await db.products.create_index('product_family')
+    await db.products.create_index('wireless.capable')
+    await db.products.create_index('schema_version')
+    
+    print(f"✅ Migration complete!")
+    
+    client.close()
+
+if __name__ == "__main__":
+    asyncio.run(migrate_products())
+```
+
+**Run:**
 ```bash
-# Keep previous versions in /data/versions/
-scripts/rollback_v1.2.sh
+python scripts/migrate_products_v2.py
 ```
 
-**Design for A/B testing:**
-```python
-if user.group == "beta":
-    engine = RAGEngineV2()
-else:
-    engine = RAGEngineV1()
-```
+---
 
-## Priority Improvements
+### Phase 3: Update Scraper (FUTURE)
 
-**HIGH IMPACT:**
-- Two-stage retrieval (Hybrid → LLM reranker)
-- Dynamic prompts by doc type/model_family
-- Query understanding / intent classification
-- Multi-tool and multi-family filtering
+**File:** `src/scraper/desoutter_scraper.py`
 
-**MEDIUM IMPACT:**
-- Auto-detect doc type from filename
-- Chunk weighting based on feedback
-- Fault-type auto-tagging per chunk
-- Tool-specific learned mappings
-
-**LOW EFFORT, HIGH VALUE:**
-- Add debug endpoints for retrieval analysis
-- Cache common queries (Redis)
-- Batch async document ingestion
-- Safety-aware prompt instructions
-
-## Expected Behavior
-
-When I ask for help:
-
-1. **Think first**: Explain approach before coding
-2. **Show why**: "This improves X because Y, measured by Z"
-3. **Suggest tests**: "Test with these 3 scenarios..."
-4. **Respect constraints**: Never suggest >6GB models or cloud APIs
-5. **Production mindset**: Code that runs for years
-6. **Metadata-driven**: Prioritize accuracy for shared documents
-
-## CRITICAL: Always Get Approval Before Coding
-
-**NEVER write code immediately.** Always follow this workflow:
-
-### Step 1: Analysis & Plan (MANDATORY)
-```
-📋 ANALYSIS
-- Current situation: [what's happening now]
-- Root cause: [why it's happening]
-- Impact: [what's affected]
-
-📝 PROPOSED SOLUTION
-- Approach: [high-level strategy]
-- Changes needed:
-  1. File: path/to/file.py
-     - Change: [what will be modified]
-     - Why: [reason for change]
-     - Risk: LOW/MEDIUM/HIGH
-  
-  2. File: another/file.py
-     - Change: [what will be modified]
-     - Why: [reason for change]
-     - Risk: LOW/MEDIUM/HIGH
-
-⚠️ RISKS & MITIGATION
-- Risk 1: [potential issue] → Mitigation: [how to prevent]
-- Risk 2: [potential issue] → Mitigation: [how to prevent]
-
-✅ TESTING PLAN
-1. Test case 1: [scenario to test]
-2. Test case 2: [scenario to test]
-3. Rollback: [how to undo if needed]
-
-🎯 EXPECTED OUTCOME
-- Before: [current behavior/metrics]
-- After: [expected behavior/metrics]
-
-❓ Should I proceed with this implementation?
-```
-
-### Step 2: Wait for User Approval
-Do NOT write any code until I say:
-- ✅ "yes" / "go ahead" / "proceed" / "tamam" / "devam et"
-- ✅ "make changes to file X only"
-- ✅ "skip file Y, rest is OK"
-
-### Step 3: Implement (ONLY after approval)
-```python
-# File: src/llm/rag_engine.py
-# Change: Add debug logging for retrieval scores
-# Risk: LOW - only adds logging
-
-def retrieve_documents(self, query: str, top_k: int = 5):
-    # ADDED: Debug logging
-    logger.info(f"Retrieval started: query='{query}', top_k={top_k}")
-    
-    results = self.chromadb.query(...)
-    
-    # ADDED: Log scores for debugging
-    avg_score = sum(r['score'] for r in results) / len(results)
-    logger.info(f"Retrieval completed: avg_score={avg_score:.3f}")
-    
-    return results
-```
-
-### Step 4: Explain Changes
-After showing code, always explain:
-```
-✅ CHANGES MADE
-1. Added debug logging (lines 45-46, 52-53)
-2. No breaking changes
-3. Backward compatible
-
-🧪 HOW TO TEST
-1. Run: python -m pytest tests/test_rag_engine.py
-2. Check logs: tail -f logs/app.log
-3. Expected: See "Retrieval started" and "avg_score" messages
-
-📊 ROLLBACK (if needed)
-git checkout src/llm/rag_engine.py
-```
-
-## Examples: Right vs Wrong Workflow
-
-### ❌ WRONG: Immediate coding
-```
-User: "Retrieval accuracy çok düşük, fix et"
-
-Copilot: [immediately shows 50 lines of code changes]
-```
-**Problem**: User doesn't know what's happening, can't review, high risk
-
-### ✅ RIGHT: Plan first, code after approval
-```
-User: "Retrieval accuracy çok düşük, fix et"
-
-Copilot: 
-📋 ANALYSIS
-Current: Similarity threshold 0.30 too low, irrelevant docs pass
-Root cause: Threshold not tuned for our document types
-Impact: Users get bad suggestions, feedback trust drops
-
-📝 PROPOSED SOLUTION
-Approach: Adjust threshold + add filtering
-Changes:
-  1. config/ai_settings.py
-     - RAG_SIMILARITY_THRESHOLD: 0.30 → 0.40
-     - Risk: MEDIUM (might reduce recall)
-  
-  2. src/llm/rag_engine.py
-     - Add metadata filtering by model_family
-     - Risk: LOW (additive only)
-
-⚠️ RISKS
-- Too high threshold → miss relevant docs
-  Mitigation: Test with 10 sample queries first
-
-✅ TESTING
-1. Test query: "motor not starting" for CP series
-2. Expected: 3-5 relevant docs, avg score >0.40
-3. Rollback: git checkout config/ai_settings.py
-
-Should I proceed? ❓
-
-User: "Yes, but keep threshold at 0.35 instead"
-
-Copilot: [NOW shows code with 0.35]
-```
-
-## When User Says "Just Do It"
-
-If I say "just do it" or "skip the plan", you can code immediately BUT still show a summary after:
+When scraping NEW products, populate new fields directly:
 
 ```python
-# ... code ...
-
-⚡ QUICK CHANGES (as requested)
-- Modified: src/llm/rag_engine.py (added logging)
-- Risk: LOW
-- Test: Run pytest tests/test_rag_engine.py
+# In scraper's product extraction method
+product = ProductModel(
+    product_id=part_number,
+    model_name=model_name,
+    part_number=part_number,
+    # ... existing fields ...
+    
+    # NEW: Add enhanced fields during scraping
+    tool_category=detect_tool_category(product_url),
+    product_family=extract_product_family(part_number),
+    tool_type=detect_tool_type(series_name, model_name),
+    
+    # Conditional fields
+    wireless=detect_wireless_info(...) if category == 'battery' else None,
+    platform_connection=detect_platform_connection(...) if category == 'cable' else None,
+    
+    schema_version=2
+)
 ```
 
-## Reference
+---
 
-- Repository: https://github.com/fatihhbayramm/desoutter-assistant
-- Current: Hybrid Search Phase 2.2 Complete (Dec 2025)
-- Docs: CHANGELOG.md, ROADMAP.md, PHASE2_STRUCTURE.md
+### Phase 4: Update API Endpoints
 
-Remember: Build a reliable, self-improving system that technicians depend on. Make it better, one careful step at a time.
+**File:** `src/api/routes.py`
+
+Add new filter parameters:
+
+```python
+@router.get("/products")
+async def get_products(
+    category: Optional[str] = None,          # NEW: battery_tightening, cable_tightening
+    family: Optional[str] = None,            # NEW: EPB, EAD, XPB
+    wireless: Optional[bool] = None,         # NEW: true/false
+    platform: Optional[str] = None,          # NEW: CVI3, Connect, ESP
+    # ... existing params ...
+):
+    query = {}
+    
+    if category:
+        query['tool_category'] = category
+    
+    if family:
+        query['product_family'] = family
+    
+    if wireless is not None:
+        query['wireless.capable'] = wireless
+    
+    if platform:
+        query['$or'] = [
+            {'wireless.compatible_platforms': platform},
+            {'platform_connection.compatible_platforms': platform}
+        ]
+    
+    products = await db.products.find(query).to_list(length=1000)
+    return products
+```
+
+---
+
+## 🧪 TESTING CHECKLIST
+
+After migration:
+
+```bash
+# 1. Check migration success
+mongosh mongodb://192.168.1.125:27017/desoutter
+
+# Count migrated products
+db.products.count({schema_version: 2})
+
+# Check battery tool with wireless
+db.products.findOne({
+  part_number: /EPBC/,
+  "wireless.capable": true
+})
+
+# Check cable tool platforms
+db.products.findOne({
+  product_family: "EPD",
+  "platform_connection.required": true
+})
+
+# Check drilling tools
+db.products.findOne({
+  tool_category: "electric_drilling"
+})
+
+# Test API filters
+curl "http://localhost:8000/products?category=battery_tightening&wireless=true"
+curl "http://localhost:8000/products?family=EPB"
+curl "http://localhost:8000/products?platform=CVI3"
+```
+
+---
+
+## 📝 IMPLEMENTATION ORDER
+
+**Do this NOW:**
+
+1. ✅ Update `src/database/models.py` (add new fields)
+2. ✅ Run `python scripts/migrate_products_v2.py` (migrate 237 products)
+3. ✅ Test queries in MongoDB
+4. ✅ Update API endpoints (add filters)
+5. ✅ Test API responses
+6. ⏸️ Update scraper (later, for NEW products)
+
+**Estimated time:** 30 minutes for steps 1-5
+
+---
+
+## ❓ FINAL QUESTIONS
+
+1. **Platform mapping**: Is `CABLE_TOOL_PLATFORMS` dictionary correct?
+2. **Wireless detection**: Should I scrape product pages for "standalone battery" text or trust existing `wireless_communication` field?
+3. **tool_units relationship**: Should I also update `tool_units` collection with compatible product lists?
+
+**Reply "proceed" to start, or provide corrections!** 🚀

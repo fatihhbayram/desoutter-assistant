@@ -4,7 +4,7 @@ Async HTTP client utilities
 import asyncio
 from typing import Optional, List
 import aiohttp
-from config import USER_AGENT, REQUEST_TIMEOUT, MAX_CONCURRENT_REQUESTS
+from config import USER_AGENT, REQUEST_TIMEOUT, MAX_CONCURRENT_REQUESTS, DELAY_BETWEEN_REQUESTS
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -72,20 +72,21 @@ class AsyncHTTPClient:
                             self.stats['success'] += 1
                             return await response.text()
                         elif response.status == 429:
-                            # Rate limited - wait longer
-                            wait_time = 5 * (attempt + 1)
+                            # Rate limited - wait much longer
+                            wait_time = 60 * (attempt + 1)  # 60, 120, 180 saniye
                             logger.warning(f"HTTP 429 (Rate Limited) for {url}, waiting {wait_time}s...")
                             await asyncio.sleep(wait_time)
                         else:
                             logger.warning(f"HTTP {response.status} for {url}")
+                            await asyncio.sleep(10)
                 except asyncio.TimeoutError:
                     logger.warning(f"Timeout fetching {url} (attempt {attempt + 1}/{retry})")
                     if attempt < retry - 1:
-                        await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                        await asyncio.sleep(30)
                 except Exception as e:
                     logger.error(f"Error fetching {url}: {e}")
                     if attempt < retry - 1:
-                        await asyncio.sleep(2 ** attempt)
+                        await asyncio.sleep(30)
             
             self.stats['failed'] += 1
             logger.error(f"Failed to fetch {url} after {retry} attempts")
@@ -93,7 +94,7 @@ class AsyncHTTPClient:
     
     async def fetch_all(self, urls: List[str]) -> List[str]:
         """
-        Fetch multiple URLs concurrently
+        Fetch multiple URLs SEQUENTIALLY with delay between requests
         
         Args:
             urls: List of URLs to fetch
@@ -101,17 +102,17 @@ class AsyncHTTPClient:
         Returns:
             List of HTML contents
         """
-        logger.info(f"Fetching {len(urls)} URLs in parallel...")
-        tasks = [self.fetch(url) for url in urls]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Handle exceptions
+        logger.info(f"Fetching {len(urls)} URLs sequentially (delay: {DELAY_BETWEEN_REQUESTS}s)...")
         html_results = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                logger.error(f"Exception for {urls[i]}: {result}")
-                html_results.append("")
-            else:
-                html_results.append(result)
+        
+        for i, url in enumerate(urls):
+            if i > 0:
+                await asyncio.sleep(DELAY_BETWEEN_REQUESTS)
+            
+            result = await self.fetch(url)
+            html_results.append(result)
+            
+            if (i + 1) % 10 == 0:
+                logger.info(f"  Progress: {i + 1}/{len(urls)}")
         
         return html_results

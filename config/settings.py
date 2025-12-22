@@ -20,8 +20,9 @@ MONGO_URI = os.getenv("MONGO_URI", f"mongodb://{MONGO_HOST}:{MONGO_PORT}/")
 # Scraper Settings
 BASE_URL = os.getenv("BASE_URL", "https://www.desouttertools.com")
 USER_AGENT = os.getenv("USER_AGENT", "Mozilla/5.0 (compatible; DesoutterScraper/1.0)")
-REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
-MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", "10"))  # Reduced from 50 to avoid rate limiting
+REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "60"))
+MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", "1"))  # Tek tek çek - rate limit önleme
+DELAY_BETWEEN_REQUESTS = float(os.getenv("DELAY_BETWEEN_REQUESTS", "5"))  # Her istek arası 5 saniye
 
 # Logging Settings
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

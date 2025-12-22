@@ -1,7 +1,7 @@
 # 🗺️ Desoutter Servis Yönetim Sistemi - Geliştirme Yol Haritası
 
-> **Son Güncelleme:** 16 Aralık 2025  
-> **Durum:** Phase 2.2 Hybrid Search Complete ✅ | ChromaDB 2309 vectors ✅ | BM25 13026 terms ✅
+> **Son Güncelleme:** 22 Aralık 2025  
+> **Durum:** 🎉 TÜM RAG FAZLARI TAMAMLANDI ✅ | ChromaDB 3151 vectors ✅ | BM25 19032 terms ✅ | Domain 351 terms ✅
 
 ---
 
@@ -12,6 +12,18 @@ Bu belge, Desoutter Repair Assistant'a eklenecek **Servis Yönetim Sistemi** ve 
 ---
 
 ## ✅ Tamamlanan Özellikler
+
+### RAG Enhancement Roadmap - TÜM FAZLAR TAMAMLANDI (22 Aralık 2025)
+- [x] Phase 1: Semantic Chunking (15 Ara)
+- [x] Phase 2: Hybrid Search + Response Cache (16 Ara)
+- [x] Phase 3.3-3.4: Source Relevance + Context Optimization (17 Ara)
+- [x] Phase 4.1: Metadata Filtering & Boosting (17 Ara)
+- [x] Phase 5.1: Performance Metrics (22 Ara)
+- [x] Phase 3.5: Multi-turn Conversation (22 Ara)
+- [x] Phase 6: Self-Learning Feedback Loop (22 Ara)
+- [x] **Phase 3.1: Domain Embeddings** (22 Ara) - 351 Desoutter terms, query enhancement
+
+**Detaylar:** [RAG_ENHANCEMENT_ROADMAP.md](RAG_ENHANCEMENT_ROADMAP.md)
 
 ### Tech Page UI Redesign - Wizard Flow (14 Aralık 2025)
 - [x] TechWizard component oluşturma (4-step flow)
@@ -68,6 +80,31 @@ Bu belge, Desoutter Repair Assistant'a eklenecek **Servis Yönetim Sistemi** ve 
 
 ## 🔄 Devam Edilecek İşler (Next Steps)
 
+### Scraping - Rate Limit Sonrası (Bekliyor)
+- [ ] 11 kalan seri scrape et (Cable Tightening + Electric Drilling)
+
+### TechWizard Entegrasyonu - Planlanan
+- [ ] TechWizard componentini App.jsx'e entegre et
+- [ ] Eski renderTechnicianPanel kodunu comment'e al
+- [ ] Wizard flow'unu production'da test et
+- [ ] Mobile responsiveness doğrula
+
+### Embedding Fine-tuning - Opsiyonel (100+ pair gerekli)
+- [ ] Contrastive pair toplama (şu an: 0 pair)
+- [ ] Domain-specific embedding modeli eğit
+
+---
+
+## ✅ Tamamlanan RAG Fazları (Chronological)
+
+### Phase 1: Semantic Chunking - TAMAMLANDI ✅ (15 Aralık 2025)
+- [x] SemanticChunker module (400+ lines) - Recursive chunking with structure preservation
+- [x] DocumentTypeDetector - 5 document type classifications
+- [x] FaultKeywordExtractor - 9 repair domain categories
+- [x] ChunkMetadata - 14-field metadata per chunk
+- [x] DocumentProcessor integration - Full semantic chunking pipeline
+- [x] Test suite - 4/4 tests PASSED
+
 ### Phase 2.1: Document Re-ingestion - TAMAMLANDI ✅ (16 Aralık 2025)
 - [x] Path configuration fix (DOCUMENTS_DIR)
 - [x] 276 documents re-processed with semantic chunking
@@ -78,39 +115,55 @@ Bu belge, Desoutter Repair Assistant'a eklenecek **Servis Yönetim Sistemi** ve 
 - [x] HybridSearcher class (700+ lines)
 - [x] BM25Index - Keyword search (13026 unique terms)
 - [x] QueryExpander - Domain synonym expansion (9 categories)
-- [x] MetadataFilter - Document type and importance filtering
 - [x] RRF Fusion - Reciprocal Rank Fusion algorithm
-- [x] RAGEngine integration - USE_HYBRID_SEARCH toggle
 - [x] Test suite - 5/5 tests PASSED
 
-**Technical Details:**
-- Semantic weight: 0.7, BM25 weight: 0.3
-- RRF k parameter: 60
-- Query expansion: Max 3 synonyms per query
-- Similarity threshold: 0.30
+### Phase 2.3: Response Caching - TAMAMLANDI ✅ (16 Aralık 2025)
+- [x] LRU cache for repeated queries
+- [x] TTL-based expiration
+- [x] ~100,000x speedup for cache hits
 
-**Detaylar:** [CHANGELOG.md](CHANGELOG.md#-16-aralık-2025-pazartesi)
+### Phase 3.3-3.4: Source Relevance + Context - TAMAMLANDI ✅ (17 Aralık 2025)
+- [x] Per-document relevance feedback UI
+- [x] Context window optimization (8K token budget)
+- [x] Deduplication and warning prioritization
 
-### Phase 2.3: Response Caching - Planlanan
-- [ ] LRU cache for repeated queries
-- [ ] Cache invalidation on document update
-- [ ] Cache statistics and monitoring
+### Phase 4.1: Metadata Boosting - TAMAMLANDI ✅ (17 Aralık 2025)
+- [x] Service bulletin boost (1.5x)
+- [x] Procedure boost (1.3x)
+- [x] Warning boost (1.2x)
 
-### Phase 1: Semantic Chunking - TAMAMLANDI ✅ (15 Aralık 2025)
-- [x] SemanticChunker module (400+ lines) - Recursive chunking with structure preservation
-- [x] DocumentTypeDetector - 5 document type classifications
-- [x] FaultKeywordExtractor - 9 repair domain categories
-- [x] ChunkMetadata - 14-field metadata per chunk
-- [x] DocumentProcessor integration - Full semantic chunking pipeline
-- [x] Test suite - 4/4 tests PASSED (unit + integration)
-- [x] Config updates - Domain embeddings config for Phase 2
+### Phase 5.1: Performance Metrics - TAMAMLANDI ✅ (22 Aralık 2025)
+- [x] Query latency tracking (retrieval, LLM, total)
+- [x] Cache hit/miss rate monitoring
+- [x] P95/P99 latency percentiles
+- [x] Health status monitoring
+- [x] New endpoints: /admin/metrics/*
 
-**Technical Details:**
-- Chunk size: 400 characters with 100 char overlap
-- Document types: Manual, Bulletin, Guide, Catalog, Safety
-- Fault keywords: Motor, noise, mechanical, electrical, calibration, leakage, corrosion, wear, connection, torque
-- Structure preservation: Headings, procedures, warnings, tables, lists
-- Importance scoring: 0.0-1.0 based on content type
+### Phase 3.5: Multi-turn Conversation - TAMAMLANDI ✅ (22 Aralık 2025)
+- [x] Session management (30 min timeout)
+- [x] Context preservation
+- [x] Reference resolution
+- [x] New endpoints: /conversation/*
+
+### Phase 6: Self-Learning Feedback Loop - TAMAMLANDI ✅ (22 Aralık 2025)
+- [x] Feedback signal propagation
+- [x] Wilson score source ranking
+- [x] Keyword-to-source mapping
+- [x] Training data collection
+- [x] New endpoints: /admin/learning/*
+
+### Phase 3.1: Domain Embeddings - TAMAMLANDI ✅ (22 Aralık 2025)
+- [x] DomainVocabulary (351 terms)
+- [x] 27 product series, 29 error codes
+- [x] Query enhancement with synonyms
+- [x] Entity extraction
+- [x] Term weight learning
+- [x] New endpoints: /admin/domain/*
+
+**Detaylar:** [RAG_ENHANCEMENT_ROADMAP.md](RAG_ENHANCEMENT_ROADMAP.md)
+
+---
 
 ### Documentation & RAG Enhancement - Tamamlandı ✅ (15 Aralık 2025)
 - [x] CVI3 ünitelere bağlanabilen toollar için veri taşı

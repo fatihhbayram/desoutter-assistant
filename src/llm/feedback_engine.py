@@ -208,6 +208,9 @@ class FeedbackLearningEngine:
         # Process feedback for learning
         self._process_feedback_for_learning(feedback)
         
+        # Phase 6: Process with self-learning engine
+        self._process_with_self_learning(feedback, diagnosis)
+        
         logger.info(f"Feedback {feedback_type.value} submitted for diagnosis {diagnosis_id}")
         
         return {
@@ -215,6 +218,39 @@ class FeedbackLearningEngine:
             "can_retry": feedback_type == FeedbackType.NEGATIVE,
             "message": "Feedback saved successfully"
         }
+    
+    def _process_with_self_learning(self, feedback: DiagnosisFeedback, diagnosis: Dict):
+        """
+        Phase 6: Process feedback with self-learning engine.
+        Updates source rankings and keyword mappings.
+        """
+        try:
+            from src.llm.self_learning import get_self_learning_engine
+            engine = get_self_learning_engine()
+            
+            # Prepare source relevance list
+            source_relevance = None
+            if feedback.source_relevance:
+                source_relevance = [
+                    {"source": sr.source, "relevant": sr.relevant}
+                    for sr in feedback.source_relevance
+                ]
+            
+            # Learn from feedback
+            engine.learn_from_feedback(
+                feedback_type=feedback.feedback_type.value,
+                sources=feedback.sources_used,
+                keywords=self._extract_keywords(feedback.fault_description),
+                source_relevance=source_relevance,
+                solution=feedback.suggestion if feedback.feedback_type == FeedbackType.POSITIVE else None,
+                is_retry=diagnosis.get("is_retry", False),
+                query=feedback.fault_description
+            )
+            
+            logger.debug("Feedback processed by self-learning engine")
+        except Exception as e:
+            # Don't fail the main feedback submission if self-learning fails
+            logger.warning(f"Self-learning processing failed (non-critical): {e}")
     
     def _process_feedback_for_learning(self, feedback: DiagnosisFeedback):
         """

@@ -1,5 +1,7 @@
 # 🚀 Quick Start Guide
 
+> **Last Updated:** 22 December 2025
+
 ## ⚡ 5-Minute Setup (Proxmox ai.server)
 
 ### 1. Transfer Files
@@ -11,7 +13,7 @@
 # On ai.server VM
 cd ~/
 git clone <your-repo>  # or upload via SCP
-cd desoutter-scraper
+cd desoutter-assistant
 ```
 
 ### 2. One-Command Setup
@@ -37,67 +39,97 @@ nano .env
 # OLLAMA_BASE_URL=http://localhost:11434  # ✓ Same VM
 # MONGO_HOST=172.18.0.5                  # ✓ Already correct
 ```
-````markdown
-# Quickstart — minimal, tested
 
-These steps assume you have cloned the repository on the target VM (ai.server) and will run the service locally. See `PROXMOX_DEPLOYMENT.md` for Proxmox-specific notes.
+---
 
-1) Create Python venv and install
+## 🐳 Docker Quick Start (Recommended)
 
 ```bash
+# Start API (connect to existing ai-net network)
+cd /home/adentechio/desoutter-assistant
+sudo docker cp config/settings.py desoutter-api:/app/config/
+sudo docker cp src/llm/. desoutter-api:/app/src/llm/
+sudo docker cp src/api/main.py desoutter-api:/app/src/api/
+sudo docker restart desoutter-api
+```
+
+### Access Points
+- **Frontend**: http://localhost:3001
+- **API Docs**: http://localhost:8000/docs
+- **Simple UI**: http://localhost:8000/ui
+
+### Default Users
+| Username | Password | Role |
+|----------|----------|------|
+| admin | admin123 | Admin |
+| tech | tech123 | Technician |
+
+---
+
+## 📊 New Features (22 Dec 2025)
+
+### Performance Metrics API
+```bash
+# Check system health
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/admin/metrics/health
+
+# Get statistics (last hour)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/admin/metrics/stats?hours=1
+
+# View slow queries
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/admin/metrics/slow
+```
+
+### Multi-turn Conversation API
+```bash
+# Start a conversation
+curl -X POST http://localhost:8000/conversation/start \
+  -H "Content-Type: application/json" \
+  -d '{"message": "My EPB tool is not starting", "part_number": "6151659030"}'
+
+# Continue conversation (use session_id from response)
+curl -X POST http://localhost:8000/conversation/start \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "abc12345", "message": "What about the battery?"}'
+
+# Get conversation history
+curl http://localhost:8000/conversation/abc12345
+```
+
+---
+
+## 🔧 Manual Setup (Development)
+
+```bash
+# Create venv
 python3 -m venv venv
 source venv/bin/activate
-pip install --upgrade pip
 pip install -r requirements.txt
-pip install -r requirements-phase2.txt || true  # phase2 deps optional
-```
 
-2) Create .env (copy example) and data dirs
-
-```bash
-cp .env.proxmox .env  # or cp .env.example .env
-mkdir -p data/logs data/exports data/documents/manuals data/documents/bulletins
-```
-
-3) Run initial scrape (non-destructive)
-
-```bash
-python3 scripts/scrape_single.py   # sample
-# or: python3 scripts/scrape_all.py
-```
-
-4) (Optional) Ingest PDFs to vector DB
-
-```bash
-python3 scripts/ingest_documents.py
-```
-
-5) Start the API (development)
-
-```bash
+# Run API
 python3 scripts/run_api.py
-# or: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-6) Open UI in browser (if frontend served by API)
-
-```
-http://<ai.server.ip>:8000/ui
-```
-
-7) Test Diagnose endpoint
+## 🧪 Test Endpoints
 
 ```bash
-curl -s -X POST http://127.0.0.1:8000/diagnose \
-	-H 'Content-Type: application/json' \
-	-d '{"part_number":"6151659770","fault_description":"does not start","language":"en"}' | jq
+# Health check
+curl http://localhost:8000/health
+
+# Diagnose
+curl -X POST http://localhost:8000/diagnose \
+  -H "Content-Type: application/json" \
+  -d '{"part_number":"6151659770","fault_description":"does not start","language":"en"}'
 ```
 
-Notes
-- Defaults in `.env.proxmox` assume Ollama runs locally on ai.server at port 11434 and MongoDB is reachable at the address listed there.
-- This guide avoids destructive steps (no automatic drops). If you want to wipe and re-scrape, tell me and I'll prepare a helper with explicit confirmation.
+---
 
-Troubleshooting quick checks
+## 📚 Documentation
+
+- [README.md](README.md) - Full documentation
+- [CHANGELOG.md](CHANGELOG.md) - Development log
+- [RAG_ENHANCEMENT_ROADMAP.md](RAG_ENHANCEMENT_ROADMAP.md) - Technical roadmap
+- [PROXMOX_DEPLOYMENT.md](PROXMOX_DEPLOYMENT.md) - Deployment guide
 - Ollama: `curl http://localhost:11434/api/tags`
 - Mongo: `mongosh --host <mongo_host> --port 27017 --eval "db.version()"`
 

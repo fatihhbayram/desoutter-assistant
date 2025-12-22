@@ -10,7 +10,7 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - [x] **Feedback Sistemi**: Kullanıcı geri bildirimi ile self-learning RAG ✅ (9 Ara)
 - [x] **Dashboard**: Arıza istatistikleri ve trend analizi ✅ (9 Ara)
 - [x] **Tech Page Wizard**: 4-step wizard-style UI ✅ (14 Ara)
-- [x] **Tool Dokumentasyon**: 276 dokument (bulletins + manuals) ✅ (15 Ara)
+- [x] **Tool Dokumentasyon**: 276+ dokument (bulletins + manuals) ✅ (15 Ara)
 - [x] **RAG Ingest**: 1080 chunks ChromaDB'ye ✅ (15 Ara)
 - [x] **RAG Quality**: Similarity threshold optimization ✅ (15 Ara)
 - [x] **Phase 1 Semantic Chunking**: Complete semantic chunking pipeline ✅ (15 Ara)
@@ -23,17 +23,19 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - [x] **Phase 4.1 Metadata Filtering**: Service bulletin boost, importance scoring ✅ (17 Ara)
 - [x] **Phase 4.2 ProductModel Schema v2**: Kategorilendirme sistemi ✅ (18 Ara)
 - [x] **Phase 4.3 Smart Scraper**: Schema v2 entegrasyonu ✅ (18 Ara)
+- [x] **Phase 5.1 Performance Metrics**: Query latency, cache hit rate, health monitoring ✅ (22 Ara)
+- [x] **Phase 3.5 Multi-turn Conversation**: Follow-up questions, session management ✅ (22 Ara)
+- [x] **Phase 6 Self-Learning Feedback Loop**: Source ranking, keyword mappings, training data ✅ (22 Ara)
+- [x] **Phase 3.1 Domain Embeddings**: Domain vocabulary, term weighting, query enhancement ✅ (22 Ara)
 
-### 🟠 Devam Eden (19 Aralık)
-- [ ] **Scrape Missing Series**: Rate limit nedeniyle atlanan 13 seri
-- [ ] **Görsel Güncelleme**: Placeholder görselleri gerçek görsellerle değiştir
+### 🟠 Devam Eden (22 Aralık)
+- [ ] **Scrape Missing Series**: Rate limit nedeniyle atlanan 11 seri
+- [ ] **Document Re-ingest**: 487 döküman (484 bulletin + 3 manual) ChromaDB'ye
 
 ### 🟡 Orta Öncelik (Next Sprint)
-- [ ] **Phase 5.1 Performance Metrics**: Admin dashboard metrics
-- [ ] **Phase 3.1 Domain Embeddings**: Fine-tune embeddings for repair domain
+- [ ] **Embedding Fine-tuning**: Domain modeli eğit (100+ contrastive pair gerekli)
 - [ ] **TechWizard Entegrasyonu**: App.jsx'e entegre et
 - [ ] **Admin Page Redesign**: Layout basitleştir, UX iyileştir
-- [ ] **Servis Talepleri Modülü**: Service request management
 
 ### 🟢 Uzun Vadeli (Future Phases)
 - [ ] **Vision AI**: Fotoğraftan arıza tespiti
@@ -41,6 +43,130 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - [ ] **SAP Entegrasyonu**: Otomatik yedek parça siparişi
 - [ ] **Sesli Asistan**: Hands-free arıza bildirimi
 - [ ] **Predictive Maintenance**: Arıza öncesi uyarı sistemi
+
+---
+
+## 📆 22 Aralık 2025 (Pazar) - Phase 5 & Phase 3.5 & Phase 6 & Phase 3.1 Complete
+
+### 🆕 Phase 3.1: Domain Embeddings ✅
+**Dosya:** `src/llm/domain_embeddings.py` (800+ satır)
+
+**Bileşenler:**
+1. **DomainVocabulary**: Desoutter teknik terminolojisi
+   - 8 tool tipi, 25+ ürün serisi
+   - 30+ hata kodu (E01-E99)
+   - 13 bileşen kategorisi
+   - 10 semptom kategorisi
+   - 10 prosedür kategorisi
+
+2. **DomainEmbeddingAdapter**: Embedding ağırlıklandırma
+   - Product series: 2.0x boost
+   - Error codes: 2.0x boost
+   - Components: 1.5x boost
+   - Symptoms: 1.7x boost
+
+3. **DomainQueryEnhancer**: Sorgu zenginleştirme
+   - Synonym expansion
+   - Entity extraction
+   - Context keyword addition
+
+4. **ContrastiveLearningManager**: Eğitim verisi toplama
+   - Anchor-positive-negative triplets
+   - Feedback'ten otomatik toplama
+
+**Yeni API Endpoint'leri:**
+- `GET /admin/domain/stats` - Domain istatistikleri
+- `GET /admin/domain/vocabulary` - Vocabulary bilgisi
+- `POST /admin/domain/enhance-query` - Sorgu zenginleştirme test
+- `GET /admin/domain/error-codes` - Hata kodları listesi
+- `GET /admin/domain/product-series` - Ürün serileri listesi
+
+---
+
+### 🆕 Phase 6: Self-Learning Feedback Loop ✅
+**Dosya:** `src/llm/self_learning.py` (600+ satır)
+
+**Bileşenler:**
+1. **FeedbackSignalProcessor**: Feedback sinyallerini işler
+   - Explicit signals (positive/negative click)
+   - Implicit signals (retry = dissatisfaction)
+   - Per-source relevance signals
+
+2. **SourceRankingLearner**: Kaynak sıralamayı öğrenir
+   - Wilson score interval (istatistiksel olarak güvenilir)
+   - Keyword-based recommendations
+   - Source boost/demote factors
+
+3. **EmbeddingRetrainer**: Embedding yeniden eğitimi
+   - Contrastive learning data collection
+   - Training job scheduling
+   - Retraining history tracking
+
+4. **SelfLearningEngine**: Ana orkestratör (Singleton)
+   - Tüm bileşenleri koordine eder
+   - RAG engine ile entegre
+
+**Yeni MongoDB Koleksiyonları:**
+- `source_learning_scores`: Kaynak bazlı öğrenme skorları
+- `keyword_mappings`: Keyword → kaynak eşlemeleri
+- `learning_events`: Öğrenme olayları (90 gün TTL)
+- `retraining_data`: Embedding eğitim verileri
+- `retraining_history`: Eğitim geçmişi
+
+**Yeni API Endpoint'leri:**
+- `GET /admin/learning/stats` - Öğrenme istatistikleri
+- `GET /admin/learning/top-sources` - En iyi kaynaklar
+- `POST /admin/learning/recommendations` - Keyword önerileri
+- `GET /admin/learning/training-status` - Eğitim durumu
+- `POST /admin/learning/schedule-retraining` - Eğitim planla
+- `POST /admin/learning/reset` - Öğrenmeyi sıfırla
+
+**RAG Engine Entegrasyonu:**
+- Hybrid search'te learned boost uygulanıyor
+- Keyword-based source recommendations
+- Automatic feedback processing
+
+---
+
+### 🆕 Phase 5.1: Performance Metrics ✅
+
+**Yeni Dosya:** `src/llm/performance_metrics.py` (400+ satır)
+
+**Özellikler:**
+- Query latency tracking (retrieval, LLM, total)
+- Cache hit/miss rate monitoring
+- P95 and P99 latency percentiles
+- Confidence distribution analysis
+- User feedback accuracy tracking
+- Health status monitoring
+
+**Yeni API Endpoint'leri:**
+```
+GET  /admin/metrics/health   - System health status
+GET  /admin/metrics/stats    - Aggregated statistics (1h, 24h)
+GET  /admin/metrics/queries  - Recent queries for debugging
+GET  /admin/metrics/slow     - Slow queries list (>10s)
+POST /admin/metrics/reset    - Reset metrics
+```
+
+### 🆕 Phase 3.5: Multi-turn Conversation ✅
+
+**Yeni Dosya:** `src/llm/conversation.py` (350+ satır)
+
+**Özellikler:**
+- Conversation session management
+- Context preservation across turns
+- Reference resolution (it, this, that → actual product/error)
+- Automatic session timeout (30 min)
+- History-aware prompts
+
+**Yeni API Endpoint'leri:**
+```
+POST   /conversation/start       - Start/continue conversation
+GET    /conversation/{id}        - Get conversation history
+DELETE /conversation/{id}        - End conversation
+GET    /admin/conversations/stats - Conversation statistics
+```
 
 ---
 

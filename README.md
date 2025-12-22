@@ -7,7 +7,10 @@ AI-powered repair assistant for Desoutter industrial tools. Uses RAG (Retrieval 
 ## 🎯 Key Features
 
 - **🧠 Self-Learning RAG**: System learns from user feedback to improve future suggestions
-- **� Hybrid Search**: BM25 keyword + Semantic vector search with RRF fusion
+- **� Domain Embeddings**: 351 Desoutter-specific terms with query enhancement (Phase 3.1)
+- **�🔄 Multi-turn Conversation**: Follow-up questions with context preservation (Phase 3.5)
+- **📊 Performance Monitoring**: Query latency, cache hit rates, health status (Phase 5)
+- **🔍 Hybrid Search**: BM25 keyword + Semantic vector search with RRF fusion
 - **⚡ Response Caching**: LRU + TTL cache with ~100,000x speedup for repeated queries
 - **📊 Admin Dashboard**: Comprehensive analytics with trends, top products, and feedback stats
 - **🎯 Context Optimization**: Token budget management, deduplication, warning prioritization
@@ -175,7 +178,33 @@ desoutter-assistant/
 
 ## 📝 Recent Updates
 
-### 2025-12-17: Async Concurrency & Domain Knowledge ✨ **NEW**
+### 2025-12-22: ALL RAG PHASES COMPLETE ✨ **NEW**
+- ✅ **Phase 3.1 Domain Embeddings**
+  - 351 Desoutter-specific terms (27 product series, 29 error codes)
+  - Query enhancement with synonym expansion
+  - Domain-aware similarity boosting
+  - Entity extraction (products, error codes, components)
+  - New admin endpoints: `/admin/domain/*`
+- ✅ **Phase 6 Self-Learning Feedback Loop**
+  - Wilson score interval for source ranking
+  - Keyword-to-source mapping
+  - Training data collection for future fine-tuning
+  - New admin endpoints: `/admin/learning/*`
+- ✅ **Phase 5.1 Performance Metrics**
+  - Query latency tracking (retrieval, LLM, total time)
+  - Cache hit/miss rate monitoring
+  - P95/P99 latency percentiles
+  - Health status monitoring with issue detection
+  - New admin endpoints: `/admin/metrics/*`
+- ✅ **Phase 3.5 Multi-turn Conversation**
+  - Conversation session management (30 min timeout)
+  - Context preservation across follow-up questions
+  - Reference resolution ("it", "this tool" → actual product)
+  - History-aware prompts for better context
+  - New endpoints: `/conversation/*`
+- ✅ **Document Update**: 487 documents (484 bulletins + 3 manuals)
+
+### 2025-12-17: Async Concurrency & Domain Knowledge
 - ✅ **Async Concurrency Fix**: Wrapped blocking LLM calls with `asyncio.to_thread()` 
   - Multiple users can now access the system simultaneously
   - Health/products endpoints respond in ~40ms even during diagnose operations

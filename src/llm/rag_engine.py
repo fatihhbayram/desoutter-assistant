@@ -6,6 +6,8 @@ Phase 2.2: Hybrid Search (Semantic + BM25) integration
 Phase 2.3: Response Caching for improved performance
 Phase 3.4: Context Window Optimization
 Phase 4.1: Metadata-based Filtering and Boosting
+Phase 5.1: Performance Metrics and Monitoring
+Phase 6: Self-Learning Feedback Loop
 """
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -17,6 +19,7 @@ from src.vectordb.chroma_client import ChromaDBClient
 from src.llm.ollama_client import OllamaClient
 from src.llm.prompts import get_system_prompt, build_rag_prompt, build_fallback_response
 from src.llm.context_optimizer import ContextOptimizer, optimize_context_for_rag
+from src.llm.performance_metrics import get_performance_monitor, QueryTimer, QueryMetrics
 from src.database import MongoDBClient
 from config.ai_settings import (
     RAG_TOP_K, RAG_SIMILARITY_THRESHOLD, DEFAULT_LANGUAGE,
@@ -45,7 +48,10 @@ class RAGEngine:
         self.feedback_engine = None
         self.hybrid_searcher = None
         self.response_cache = None
+        self.self_learning_engine = None  # Phase 6
+        self.domain_embeddings = None  # Phase 3.1
         self.context_optimizer = ContextOptimizer(token_budget=8000)  # Phase 3.4
+        self.performance_monitor = get_performance_monitor()  # Phase 5.1
         
         # Initialize hybrid search if enabled
         if USE_HYBRID_SEARCH:
@@ -54,6 +60,12 @@ class RAGEngine:
         # Initialize response cache if enabled (Phase 2.3)
         if USE_CACHE:
             self._init_response_cache()
+        
+        # Initialize self-learning engine (Phase 6)
+        self._init_self_learning()
+        
+        # Initialize domain embeddings (Phase 3.1)
+        self._init_domain_embeddings()
         
         logger.info("✅ RAG Engine initialized")
     
@@ -84,6 +96,26 @@ class RAGEngine:
         except Exception as e:
             logger.warning(f"Failed to initialize response cache: {e}")
             self.response_cache = None
+    
+    def _init_self_learning(self):
+        """Initialize self-learning engine (Phase 6)"""
+        try:
+            from src.llm.self_learning import get_self_learning_engine
+            self.self_learning_engine = get_self_learning_engine()
+            logger.info("✅ Self-learning engine enabled (Phase 6)")
+        except Exception as e:
+            logger.warning(f"Failed to initialize self-learning engine: {e}")
+            self.self_learning_engine = None
+    
+    def _init_domain_embeddings(self):
+        """Initialize domain embeddings engine (Phase 3.1)"""
+        try:
+            from src.llm.domain_embeddings import get_domain_embeddings_engine
+            self.domain_embeddings = get_domain_embeddings_engine()
+            logger.info("✅ Domain embeddings enabled (Phase 3.1)")
+        except Exception as e:
+            logger.warning(f"Failed to initialize domain embeddings: {e}")
+            self.domain_embeddings = None
     
     def _apply_metadata_boost(self, base_score: float, metadata: Dict) -> float:
         """
@@ -221,15 +253,43 @@ class RAGEngine:
         """
         logger.info(f"Retrieving context for query: {query[:50]}...")
         
+        # Phase 3.1: Enhance query with domain knowledge
+        enhanced_query = query
+        if self.domain_embeddings:
+            try:
+                enhancement = self.domain_embeddings.enhance_query(query)
+                enhanced_query = enhancement.get("enhanced", query)
+                if enhanced_query != query:
+                    logger.info(f"Domain-enhanced query: {enhanced_query[:80]}...")
+            except Exception as e:
+                logger.warning(f"Domain enhancement failed: {e}")
+        
         # Use hybrid search if available
         if self.hybrid_searcher:
-            return self._retrieve_with_hybrid_search(query, top_k)
+            return self._retrieve_with_hybrid_search(enhanced_query, top_k, original_query=query)
         
         # Fallback to standard semantic search
-        return self._retrieve_with_semantic_search(query, part_number, top_k)
+        return self._retrieve_with_semantic_search(enhanced_query, part_number, top_k)
     
-    def _retrieve_with_hybrid_search(self, query: str, top_k: int) -> Dict:
-        """Retrieve using hybrid search (semantic + BM25) with metadata boosting"""
+    def _extract_keywords(self, text: str) -> List[str]:
+        """Extract keywords from text for self-learning (Phase 6)"""
+        import re
+        from collections import Counter
+        
+        text = text.lower()
+        stop_words = {
+            'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+            've', 'bir', 'bu', 'su', 'ile', 'için', 'gibi', 'daha', 'çok',
+            'var', 'yok', 'olan', 'olarak', 've', 'veya', 'ama', 'fakat'
+        }
+        words = re.findall(r'\b[a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}\b', text)
+        keywords = [w for w in words if w not in stop_words]
+        counter = Counter(keywords)
+        return [word for word, _ in counter.most_common(10)]
+    
+    def _retrieve_with_hybrid_search(self, query: str, top_k: int, original_query: str = None) -> Dict:
+        """Retrieve using hybrid search (semantic + BM25) with metadata boosting and self-learning"""
         results = self.hybrid_searcher.search(
             query=query,
             top_k=top_k * 2,  # Get more candidates for boosting/reranking
@@ -254,11 +314,38 @@ class RAGEngine:
                 "bm25_score": result.bm25_score
             })
         
+        # Phase 6: Apply self-learning ranking
+        if self.self_learning_engine and filtered_docs:
+            keywords = self._extract_keywords(query)
+            if keywords:
+                # Get learned recommendations
+                recommendations = self.self_learning_engine.get_recommendations_for_query(keywords)
+                boost_sources = set(recommendations.get("boost_sources", []))
+                avoid_sources = set(recommendations.get("avoid_sources", []))
+                
+                # Apply learned boosts
+                for doc in filtered_docs:
+                    source = doc["metadata"].get("source", "")
+                    learned_boost = self.self_learning_engine.ranking_learner.get_source_boost(source)
+                    
+                    # Extra boost for keyword-recommended sources
+                    if source in boost_sources:
+                        learned_boost *= 1.25
+                    elif source in avoid_sources:
+                        learned_boost *= 0.75
+                    
+                    # Apply learned boost to boosted_score
+                    doc["boosted_score"] = doc["boosted_score"] * learned_boost
+                    doc["learned_boost"] = learned_boost
+                
+                if recommendations.get("mappings_found", 0) > 0:
+                    logger.info(f"Applied self-learning: {len(boost_sources)} boost, {len(avoid_sources)} avoid sources")
+        
         # Re-sort by boosted score and limit to top_k
         filtered_docs.sort(key=lambda x: x.get("boosted_score", x.get("similarity", 0)), reverse=True)
         filtered_docs = filtered_docs[:top_k]
         
-        logger.info(f"Hybrid search retrieved {len(filtered_docs)} documents (with metadata boost)")
+        logger.info(f"Hybrid search retrieved {len(filtered_docs)} documents (with metadata + learned boost)")
         return {
             "documents": filtered_docs,
             "query": query,

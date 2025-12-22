@@ -189,6 +189,16 @@ class DiagnoseRequest(BaseModel):
     is_retry: Optional[bool] = False
     retry_of: Optional[str] = None  # Original diagnosis_id to retry
     excluded_sources: Optional[List[str]] = None  # Sources to exclude
+    # Multi-turn conversation (Phase 3.5)
+    session_id: Optional[str] = None  # Conversation session ID for follow-ups
+
+
+class ConversationRequest(BaseModel):
+    """Request for multi-turn conversation."""
+    session_id: Optional[str] = None  # Existing session ID or None for new
+    message: str                       # User message
+    part_number: Optional[str] = None  # Product context
+    language: Optional[str] = "en"
 
 
 class DiagnoseResponse(BaseModel):
@@ -1298,4 +1308,607 @@ async def delete_cache_entry(
             }
     except Exception as e:
         logger.error(f"Error deleting cache entry: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# PHASE 5: PERFORMANCE METRICS ENDPOINTS
+# =============================================================================
+
+@app.get("/admin/metrics/health")
+async def get_system_health(authorization: str = Header(...)):
+    """
+    Get overall system health status and metrics.
+    
+    Returns:
+    - status: healthy, warning, or degraded
+    - issues: list of detected issues
+    - last_hour: metrics for the last hour
+    - last_24h: metrics for the last 24 hours
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.performance_metrics import get_performance_monitor
+        monitor = get_performance_monitor()
+        
+        return monitor.get_health_status()
+    except Exception as e:
+        logger.error(f"Error getting health status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/metrics/stats")
+async def get_performance_stats(
+    hours: int = 1,
+    authorization: str = Header(...)
+):
+    """
+    Get aggregated performance statistics for a time period.
+    
+    Args:
+    - hours: Number of hours to include (default: 1)
+    
+    Returns:
+    - Query counts (total, cache hits/misses)
+    - Latency stats (avg, p95, p99)
+    - Retrieval quality metrics
+    - Confidence distribution
+    - Feedback accuracy
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.performance_metrics import get_performance_monitor
+        monitor = get_performance_monitor()
+        
+        stats = monitor.get_stats(hours=hours)
+        return stats.to_dict()
+    except Exception as e:
+        logger.error(f"Error getting stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/metrics/queries")
+async def get_recent_queries(
+    limit: int = 20,
+    authorization: str = Header(...)
+):
+    """
+    Get recent query details for debugging.
+    
+    Args:
+    - limit: Maximum number of queries to return (default: 20)
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.performance_metrics import get_performance_monitor
+        monitor = get_performance_monitor()
+        
+        return {
+            "queries": monitor.get_recent_queries(limit=limit),
+            "count": limit
+        }
+    except Exception as e:
+        logger.error(f"Error getting recent queries: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/metrics/slow")
+async def get_slow_queries(
+    threshold_ms: float = 10000,
+    limit: int = 10,
+    authorization: str = Header(...)
+):
+    """
+    Get slow queries exceeding a threshold.
+    
+    Args:
+    - threshold_ms: Minimum response time to include (default: 10000ms = 10s)
+    - limit: Maximum number of queries to return (default: 10)
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.performance_metrics import get_performance_monitor
+        monitor = get_performance_monitor()
+        
+        return {
+            "slow_queries": monitor.get_slow_queries(threshold_ms=threshold_ms, limit=limit),
+            "threshold_ms": threshold_ms
+        }
+    except Exception as e:
+        logger.error(f"Error getting slow queries: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/metrics/reset")
+async def reset_metrics(authorization: str = Header(...)):
+    """
+    Reset all performance metrics (for testing).
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.performance_metrics import get_performance_monitor
+        monitor = get_performance_monitor()
+        monitor.reset()
+        
+        return {
+            "status": "ok",
+            "message": "Performance metrics reset successfully"
+        }
+    except Exception as e:
+        logger.error(f"Error resetting metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# PHASE 3.5: MULTI-TURN CONVERSATION ENDPOINTS
+# =============================================================================
+
+@app.post("/conversation/start")
+async def start_conversation(
+    request: ConversationRequest,
+    authorization: str = Header(default=None)
+):
+    """
+    Start a new conversation session or continue existing one.
+    
+    Returns:
+    - session_id: Unique session identifier
+    - response: AI response to the message
+    """
+    try:
+        # Get username from token
+        username = "anonymous"
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                token = authorization.split(" ")[1]
+                payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+                username = payload.get("sub", "anonymous")
+            except:
+                pass
+        
+        from src.llm.conversation import get_conversation_manager
+        manager = get_conversation_manager()
+        
+        # Get or create session
+        session = manager.get_or_create_session(
+            session_id=request.session_id,
+            user_id=username,
+            part_number=request.part_number,
+            language=request.language
+        )
+        
+        # Resolve references in query
+        resolved_query = manager.resolve_references(request.message, session)
+        
+        # Add user message to session
+        session.add_turn("user", request.message)
+        
+        # Generate response using RAG
+        rag = get_rag_engine()
+        
+        # Build context-aware prompt
+        if session.turns and len(session.turns) > 1:
+            # Multi-turn: include conversation context
+            context_prompt = manager.build_conversation_prompt(
+                session=session,
+                current_query=resolved_query
+            )
+            fault_description = context_prompt
+        else:
+            fault_description = resolved_query
+        
+        # Get diagnosis
+        result = await asyncio.to_thread(
+            rag.generate_repair_suggestion,
+            part_number=request.part_number or "general",
+            fault_description=fault_description,
+            language=request.language,
+            username=username
+        )
+        
+        # Add assistant response to session
+        session.add_turn("assistant", result.get("suggestion", ""), {
+            "confidence": result.get("confidence"),
+            "sources": [s.get("source") for s in result.get("sources", [])]
+        })
+        
+        return {
+            "session_id": session.session_id,
+            "response": result.get("suggestion"),
+            "confidence": result.get("confidence"),
+            "sources": result.get("sources", []),
+            "turn_count": len(session.turns),
+            "context_preserved": len(session.turns) > 2
+        }
+    except Exception as e:
+        logger.error(f"Error in conversation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/conversation/{session_id}")
+async def get_conversation(
+    session_id: str,
+    authorization: str = Header(default=None)
+):
+    """
+    Get conversation history for a session.
+    """
+    try:
+        from src.llm.conversation import get_conversation_manager
+        manager = get_conversation_manager()
+        
+        session = manager.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found or expired")
+        
+        return {
+            "session_id": session.session_id,
+            "product_context": session.product_context,
+            "part_number": session.part_number,
+            "turn_count": len(session.turns),
+            "history": session.get_history(max_turns=20),
+            "created_at": session.created_at.isoformat(),
+            "last_activity": session.last_activity.isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting conversation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/conversation/{session_id}")
+async def end_conversation(
+    session_id: str,
+    authorization: str = Header(default=None)
+):
+    """
+    End and delete a conversation session.
+    """
+    try:
+        from src.llm.conversation import get_conversation_manager
+        manager = get_conversation_manager()
+        
+        if manager.delete_session(session_id):
+            return {"status": "ok", "message": "Conversation ended"}
+        else:
+            raise HTTPException(status_code=404, detail="Session not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error ending conversation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/conversations/stats")
+async def get_conversation_stats(authorization: str = Header(...)):
+    """
+    Get conversation manager statistics (admin only).
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.conversation import get_conversation_manager
+        manager = get_conversation_manager()
+        
+        return manager.get_stats()
+    except Exception as e:
+        logger.error(f"Error getting conversation stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# PHASE 6: SELF-LEARNING FEEDBACK LOOP API
+# =============================================================================
+
+@app.get("/admin/learning/stats")
+async def get_learning_stats(authorization: str = Header(...)):
+    """
+    Get self-learning system statistics (admin only).
+    
+    Returns:
+        - Source learning scores (count, confidence)
+        - Keyword mappings (count, success rate)
+        - Activity metrics (events per day)
+        - Embedding training readiness
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.self_learning import get_self_learning_engine
+        engine = get_self_learning_engine()
+        
+        return engine.get_learning_stats()
+    except Exception as e:
+        logger.error(f"Error getting learning stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/learning/top-sources")
+async def get_top_learned_sources(
+    limit: int = 10,
+    authorization: str = Header(...)
+):
+    """
+    Get top-performing document sources based on learned feedback (admin only).
+    
+    Args:
+        limit: Maximum number of sources to return (default: 10)
+        
+    Returns:
+        List of sources with scores and confidence levels
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.self_learning import get_self_learning_engine
+        engine = get_self_learning_engine()
+        
+        return {
+            "top_sources": engine.get_top_learned_sources(limit=limit),
+            "total_sources": engine.get_learning_stats()["source_learning"]["total_sources"]
+        }
+    except Exception as e:
+        logger.error(f"Error getting top sources: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class LearningQueryRequest(BaseModel):
+    """Request model for learning recommendations query"""
+    keywords: List[str]
+
+
+@app.post("/admin/learning/recommendations")
+async def get_learning_recommendations(
+    request: LearningQueryRequest,
+    authorization: str = Header(...)
+):
+    """
+    Get source recommendations based on learned patterns (admin only).
+    
+    Args:
+        keywords: List of fault keywords to query
+        
+    Returns:
+        - boost_sources: Sources to prioritize
+        - avoid_sources: Sources to demote
+        - confidence: Learning confidence score
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.self_learning import get_self_learning_engine
+        engine = get_self_learning_engine()
+        
+        return engine.get_recommendations_for_query(request.keywords)
+    except Exception as e:
+        logger.error(f"Error getting recommendations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/learning/training-status")
+async def get_training_status(authorization: str = Header(...)):
+    """
+    Get embedding retraining status and statistics (admin only).
+    
+    Returns:
+        - Training data availability
+        - Sample counts
+        - Retraining readiness
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.self_learning import get_self_learning_engine
+        engine = get_self_learning_engine()
+        
+        stats = engine.embedding_retrainer.get_training_data_stats()
+        history = engine.embedding_retrainer.get_retraining_history(limit=5)
+        
+        return {
+            "training_data": stats,
+            "recent_jobs": history
+        }
+    except Exception as e:
+        logger.error(f"Error getting training status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/learning/schedule-retraining")
+async def schedule_embedding_retraining(authorization: str = Header(...)):
+    """
+    Schedule an embedding retraining job (admin only).
+    
+    Note: Actual training runs as a separate process.
+    This endpoint marks data and creates a job record.
+    
+    Returns:
+        - Job status and ID
+        - Sample count
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.self_learning import get_self_learning_engine
+        engine = get_self_learning_engine()
+        
+        result = engine.embedding_retrainer.schedule_retraining()
+        return result
+    except Exception as e:
+        logger.error(f"Error scheduling retraining: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ResetLearningRequest(BaseModel):
+    """Request model for learning reset"""
+    confirm: bool = False
+
+
+@app.post("/admin/learning/reset")
+async def reset_learning_data(
+    request: ResetLearningRequest,
+    authorization: str = Header(...)
+):
+    """
+    Reset all learned data (admin only).
+    
+    WARNING: This deletes all accumulated learning data!
+    Requires confirm=true in request body.
+    
+    Returns:
+        - Reset status
+        - Deleted record counts
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.self_learning import get_self_learning_engine
+        engine = get_self_learning_engine()
+        
+        result = engine.reset_learning(confirm=request.confirm)
+        
+        if result.get("status") == "reset_complete":
+            logger.warning(f"Learning data reset by admin: {result['deleted']}")
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error resetting learning: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# PHASE 3.1: DOMAIN EMBEDDINGS API
+# =============================================================================
+
+@app.get("/admin/domain/stats")
+async def get_domain_stats(authorization: str = Header(...)):
+    """
+    Get domain embeddings statistics (admin only).
+    
+    Returns:
+        - Vocabulary size
+        - Term weights count
+        - Product series, error codes, etc.
+        - Contrastive learning stats
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.domain_embeddings import get_domain_embeddings_engine
+        engine = get_domain_embeddings_engine()
+        
+        return engine.get_stats()
+    except Exception as e:
+        logger.error(f"Error getting domain stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/domain/vocabulary")
+async def get_domain_vocabulary(authorization: str = Header(...)):
+    """
+    Get domain vocabulary information (admin only).
+    
+    Returns:
+        - Tool types
+        - Product series
+        - Error codes
+        - Components
+        - Symptoms
+        - Procedures
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.domain_embeddings import get_domain_embeddings_engine
+        engine = get_domain_embeddings_engine()
+        
+        return engine.get_vocabulary_info()
+    except Exception as e:
+        logger.error(f"Error getting vocabulary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class QueryEnhancementRequest(BaseModel):
+    """Request model for query enhancement"""
+    query: str
+
+
+@app.post("/admin/domain/enhance-query")
+async def enhance_query(
+    request: QueryEnhancementRequest,
+    authorization: str = Header(...)
+):
+    """
+    Enhance a query with domain knowledge (admin only).
+    
+    Useful for testing domain enhancement.
+    
+    Args:
+        query: Original query text
+        
+    Returns:
+        - Original query
+        - Enhanced query
+        - Extracted entities
+        - Context keywords
+        - Term weights
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.domain_embeddings import get_domain_embeddings_engine
+        engine = get_domain_embeddings_engine()
+        
+        return engine.enhance_query(request.query)
+    except Exception as e:
+        logger.error(f"Error enhancing query: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/domain/error-codes")
+async def get_error_codes(authorization: str = Header(...)):
+    """
+    Get all Desoutter error codes with descriptions (admin only).
+    
+    Returns:
+        Dict of error codes and their meanings
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.domain_embeddings import DomainVocabulary
+        
+        return {
+            "error_codes": DomainVocabulary.ERROR_CODES,
+            "total": len(DomainVocabulary.ERROR_CODES)
+        }
+    except Exception as e:
+        logger.error(f"Error getting error codes: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/domain/product-series")
+async def get_product_series(authorization: str = Header(...)):
+    """
+    Get all Desoutter product series with descriptions (admin only).
+    
+    Returns:
+        Dict of product series codes and their meanings
+    """
+    verify_admin_token(authorization)
+    
+    try:
+        from src.llm.domain_embeddings import DomainVocabulary
+        
+        return {
+            "product_series": DomainVocabulary.PRODUCT_SERIES,
+            "total": len(DomainVocabulary.PRODUCT_SERIES)
+        }
+    except Exception as e:
+        logger.error(f"Error getting product series: {e}")
         raise HTTPException(status_code=500, detail=str(e))
