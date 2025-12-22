@@ -491,10 +491,15 @@ class RAGEngine:
             product_model = product_info.get("model_name", part_number)
             actual_part_number = product_info.get("part_number", part_number)
         
+        # Build enhanced query with product context
+        # This ensures retrieval finds product-specific documents
+        enhanced_query = f"{product_model} {actual_part_number} {fault_description}"
+        logger.info(f"Enhanced retrieval query: {enhanced_query[:80]}...")
+        
         # Retrieve relevant context (always try RAG even if product not found)
         context_result = self.retrieve_context(
-            query=fault_description,
-            part_number=None  # Don't filter by part_number in RAG
+            query=enhanced_query,
+            part_number=actual_part_number
         )
         
         retrieved_docs = context_result["documents"]
