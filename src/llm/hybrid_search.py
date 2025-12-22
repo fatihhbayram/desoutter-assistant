@@ -627,7 +627,10 @@ class HybridSearcher:
                 results.get('metadatas', [[]])[0],
                 results.get('distances', [[]])[0]
             )):
-                similarity = 1 - distance  # Convert distance to similarity
+                # L2 distance to similarity conversion
+                # L2 distance range: [0, 2] (for normalized vectors)
+                # Similarity range: [0, 1]
+                similarity = max(0, 1 - (distance / 2))
                 
                 if similarity >= min_similarity:
                     search_results.append(SearchResult(

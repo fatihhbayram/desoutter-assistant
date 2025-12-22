@@ -72,6 +72,8 @@ class DomainVocabulary:
         "ENB": "Electric Network Battery nutrunner",
         "eBC": "Electric Battery Crowfoot",
         "eBP": "Electric Battery Pistol (industrial)",
+        "EPBC": "Electric Pistol Battery Crowfoot",  # NEW
+        "EPB": "Electric Pistol Battery",  # NEW
         # Cable Tightening
         "ECP": "Electric Cable Pistol grip nutrunner",
         "ECA": "Electric Cable Angle nutrunner",
@@ -200,7 +202,9 @@ class DomainVocabulary:
         "stuck": ["stuck", "jammed", "blocked", "frozen", "locked"],
         "leak": ["leak", "leaking", "oil", "grease", "lubricant"],
         "display_error": ["display", "screen", "LED", "indicator", "light"],
-        "communication": ["communication", "connection", "wifi", "bluetooth", "network"],
+        "communication": ["communication", "connection", "wifi", "bluetooth", "network", "not connected", "disconnected"],
+        "not_connected": ["not connected", "cannot connect", "connection lost", "offline", "disconnected", "no communication"],
+        "vision_error": ["vision", "vision unit", "cvi vision", "camera", "barcode", "scanner", "socket tray"],
     }
     
     # -------------------------------------------------------------------------
@@ -637,7 +641,7 @@ class DomainQueryEnhancer:
         # If we have product series, add related tool type
         for series in entities.get("product_series", []):
             series_upper = series.upper()
-            if series_upper.startswith("EB"):
+            if series_upper.startswith("EB") or series_upper.startswith("EP"):
                 context.extend(["battery", "cordless", "wireless"])
             elif series_upper.startswith("EC"):
                 context.extend(["cable", "corded", "power"])
@@ -645,6 +649,14 @@ class DomainQueryEnhancer:
                 context.extend(["fixtured", "spindle", "automation"])
             elif series_upper.startswith("CVI"):
                 context.extend(["controller", "interface", "programming"])
+            # EPBC specific - crowfoot tools
+            if "EPBC" in series_upper or "EBC" in series_upper:
+                context.extend(["crowfoot", "reindex", "reindexing", "position"])
+        
+        # If we have symptoms, add related keywords
+        for symptom in entities.get("symptoms", []):
+            if symptom in ["not_connected", "communication", "vision_error"]:
+                context.extend(["cvi3", "controller", "socket tray", "communication", "firmware"])
         
         # If we have error codes, add related content
         for error in entities.get("error_codes", []):
