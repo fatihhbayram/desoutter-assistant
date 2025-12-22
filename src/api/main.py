@@ -50,7 +50,7 @@ from src.llm.rag_engine import RAGEngine  # RAG engine for AI responses
 from src.database import MongoDBClient     # MongoDB client wrapper
 from src.utils.logger import setup_logger  # Logging utility
 from src.documents.document_processor import DocumentProcessor, SUPPORTED_EXTENSIONS  # Document text extraction
-from src.documents.chunker import TextChunker  # Text chunking for RAG
+# from src.documents.chunker import TextChunker  # REMOVED: Now using SemanticChunker via DocumentProcessor
 from src.documents.embeddings import EmbeddingsGenerator  # Embedding generation
 from src.vectordb import ChromaDBClient  # Vector database client
 
@@ -1138,30 +1138,40 @@ async def admin_ingest_documents(authorization: Optional[str] = Header(None)):
         
         # Initialize processors
         doc_processor = DocumentProcessor()
-        chunker = TextChunker()
+        # Note: DocumentProcessor uses SemanticChunker internally (Phase 1-2 enhancement)
         embeddings_gen = EmbeddingsGenerator()
         chroma = ChromaDBClient()
         
         all_documents = []
         
-        # Process manuals (PDF, DOCX, PPTX)
+        # Process manuals (PDF, DOCX, PPTX) with semantic chunking
         if MANUALS_DIR.exists():
-            manuals = doc_processor.process_directory(MANUALS_DIR)
+            manuals = doc_processor.process_directory(
+                MANUALS_DIR, 
+                enable_semantic_chunking=True  # Use semantic chunker (Phase 1)
+            )
             all_documents.extend(manuals)
             logger.info(f"Processed {len(manuals)} manuals")
         
-        # Process bulletins (PDF, DOCX, PPTX)
+        # Process bulletins (PDF, DOCX, PPTX) with semantic chunking
         if BULLETINS_DIR.exists():
-            bulletins = doc_processor.process_directory(BULLETINS_DIR)
+            bulletins = doc_processor.process_directory(
+                BULLETINS_DIR,
+                enable_semantic_chunking=True  # Use semantic chunker (Phase 1)
+            )
             all_documents.extend(bulletins)
             logger.info(f"Processed {len(bulletins)} bulletins")
         
         if not all_documents:
             return {"status": "ok", "message": "No documents to process", "chunks_added": 0}
         
-        # Chunk documents
-        all_chunks = chunker.chunk_documents(all_documents)
-        logger.info(f"Created {len(all_chunks)} chunks")
+        # Extract semantic chunks from processed documents
+        # DocumentProcessor already generated chunks with rich metadata
+        all_chunks = []
+        for doc in all_documents:
+            if doc.get('chunks'):
+                all_chunks.extend(doc['chunks'])
+        logger.info(f"Extracted {len(all_chunks)} semantic chunks")
         
         # Generate embeddings
         texts = [c["text"] for c in all_chunks]

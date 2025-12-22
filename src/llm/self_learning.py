@@ -22,6 +22,13 @@ import threading
 import time
 
 from src.database.mongo_client import MongoDBClient
+from src.database.feedback_models import (
+    DiagnosisHistory,
+    DiagnosisFeedback,
+    FeedbackType,
+    NegativeFeedbackReason,
+    SourceRelevance
+)
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -835,6 +842,376 @@ class SelfLearningEngine:
             "negative": s.get("negative_signals", 0),
             "confidence": round(s.get("confidence", 0), 2)
         } for s in sources]
+    
+    # =========================================================================
+    # USER-FACING API (Phase 2.1 Consolidation)
+    # =========================================================================
+    # These methods provide the same interface as feedback_engine.py
+    # but use the superior Phase 6 learning algorithms
+    
+    def save_diagnosis(
+        self,
+        part_number: str,
+        product_model: str,
+        fault_description: str,
+        suggestion: str,
+        confidence: str,
+        sources: List[dict],
+        username: str,
+        language: str = "en",
+        is_retry: bool = False,
+        retry_of: Optional[str] = None,
+        response_time_ms: Optional[int] = None
+    ) -> str:
+        """
+        Save diagnosis to history.
+        
+        Args:
+            part_number: Product part number
+            product_model: Product model name
+            fault_description: User's fault description
+            suggestion: Generated repair suggestion
+            confidence: Confidence level (low/medium/high)
+            sources: List of source documents used
+            username: User who requested diagnosis
+            language: Language code (en/tr)
+            is_retry: Whether this is a retry
+            retry_of: Original diagnosis_id if retry
+            response_time_ms: Response time in milliseconds
+            
+        Returns:
+            diagnosis_id
+        """
+        history = DiagnosisHistory(
+            part_number=part_number,
+            product_model=product_model,
+            fault_description=fault_description,
+            suggestion=suggestion,
+            confidence=confidence,
+            sources=sources,
+            username=username,
+            language=language,
+            is_retry=is_retry,
+            retry_of=retry_of,
+            response_time_ms=response_time_ms
+        )
+        
+        if is_retry and retry_of:
+            # Get retry count from original
+            original = self.mongodb.db.diagnosis_history.find_one({"diagnosis_id": retry_of})
+            if original:
+                history.retry_count = original.get("retry_count", 0) + 1
+        
+        self.mongodb.db.diagnosis_history.insert_one(history.to_dict())
+        logger.info(f"Saved diagnosis {history.diagnosis_id} for user {username}")
+        
+        return history.diagnosis_id
+    
+    def get_user_history(
+        self,
+        username: str,
+        limit: int = 20,
+        skip: int = 0
+    ) -> List[dict]:
+        """
+        Get diagnosis history for a user.
+        
+        Args:
+            username: Username to get history for
+            limit: Maximum number of records
+            skip: Number of records to skip (pagination)
+            
+        Returns:
+            List of diagnosis records
+        """
+        cursor = self.mongodb.db.diagnosis_history.find(
+            {"username": username}
+        ).sort("created_at", -1).skip(skip).limit(limit)
+        
+        return list(cursor)
+    
+    def submit_feedback(
+        self,
+        diagnosis_id: str,
+        feedback_type: FeedbackType,
+        username: str,
+        negative_reason: Optional[NegativeFeedbackReason] = None,
+        user_comment: Optional[str] = None,
+        correct_solution: Optional[str] = None,
+        source_relevance: Optional[List[Dict]] = None
+    ) -> Dict:
+        """
+        Submit feedback for a diagnosis.
+        
+        Args:
+            diagnosis_id: ID of the diagnosis
+            feedback_type: FeedbackType.POSITIVE or FeedbackType.NEGATIVE
+            username: User submitting feedback
+            negative_reason: Reason for negative feedback
+            user_comment: Optional user comment
+            correct_solution: User's correct solution (if known)
+            source_relevance: List of {"source": str, "relevant": bool}
+            
+        Returns:
+            {
+                "feedback_id": str,
+                "can_retry": bool,
+                "message": str
+            }
+        """
+        # Get original diagnosis
+        diagnosis = self.mongodb.db.diagnosis_history.find_one({"diagnosis_id": diagnosis_id})
+        if not diagnosis:
+            return {"error": "Diagnosis not found"}
+        
+        # Convert source_relevance dicts to SourceRelevance models
+        source_relevance_models = None
+        if source_relevance:
+            source_relevance_models = [
+                SourceRelevance(source=sr["source"], relevant=sr["relevant"])
+                for sr in source_relevance
+            ]
+        
+        # Create feedback record
+        feedback = DiagnosisFeedback(
+            diagnosis_id=diagnosis_id,
+            part_number=diagnosis["part_number"],
+            fault_description=diagnosis["fault_description"],
+            suggestion=diagnosis["suggestion"],
+            sources_used=[s.get("source", "") for s in diagnosis.get("sources", [])],
+            feedback_type=feedback_type,
+            negative_reason=negative_reason,
+            user_comment=user_comment,
+            correct_solution=correct_solution,
+            source_relevance=source_relevance_models,
+            username=username
+        )
+        
+        self.mongodb.db.diagnosis_feedback.insert_one(feedback.to_dict())
+        
+        # Update diagnosis history
+        self.mongodb.db.diagnosis_history.update_one(
+            {"diagnosis_id": diagnosis_id},
+            {"$set": {
+                "feedback_type": feedback_type.value,
+                "feedback_given": True
+            }}
+        )
+        
+        # Extract keywords for learning
+        keywords = self._extract_keywords(diagnosis["fault_description"])
+        
+        # Process feedback with Phase 6 learning
+        self.learn_from_feedback(
+            feedback_type=feedback_type.value,
+            sources=feedback.sources_used,
+            keywords=keywords,
+            source_relevance=source_relevance,
+            solution=diagnosis["suggestion"],
+            is_retry=False,
+            query=diagnosis["fault_description"]
+        )
+        
+        logger.info(f"Feedback {feedback_type.value} submitted for diagnosis {diagnosis_id}")
+        
+        return {
+            "feedback_id": feedback.feedback_id,
+            "can_retry": feedback_type == FeedbackType.NEGATIVE,
+            "message": "Feedback saved successfully"
+        }
+    
+    def get_feedback_stats(self) -> Dict:
+        """
+        Get feedback statistics.
+        
+        Returns:
+            {
+                "total_feedback": int,
+                "positive_count": int,
+                "negative_count": int,
+                "positive_rate": float,
+                "total_diagnoses": int,
+                "feedback_rate": float
+            }
+        """
+        db = self.mongodb.db
+        
+        total_feedback = db.diagnosis_feedback.count_documents({})
+        positive = db.diagnosis_feedback.count_documents({"feedback_type": "positive"})
+        negative = db.diagnosis_feedback.count_documents({"feedback_type": "negative"})
+        
+        total_diagnoses = db.diagnosis_history.count_documents({})
+        
+        return {
+            "total_feedback": total_feedback,
+            "positive_count": positive,
+            "negative_count": negative,
+            "positive_rate": round(positive / total_feedback * 100, 1) if total_feedback > 0 else 0,
+            "total_diagnoses": total_diagnoses,
+            "feedback_rate": round(total_feedback / total_diagnoses * 100, 1) if total_diagnoses > 0 else 0
+        }
+    
+    def get_dashboard_stats(self) -> Dict:
+        """
+        Get comprehensive dashboard statistics.
+        
+        Returns:
+            Comprehensive stats for admin dashboard including:
+            - Feedback stats
+            - Top products
+            - Top faults
+            - Learning stats
+            - Recent activity
+        """
+        db = self.mongodb.db
+        
+        # Basic feedback stats
+        feedback_stats = self.get_feedback_stats()
+        
+        # Top products (by diagnosis count)
+        top_products_pipeline = [
+            {"$group": {
+                "_id": "$part_number",
+                "count": {"$sum": 1},
+                "product_model": {"$first": "$product_model"}
+            }},
+            {"$sort": {"count": -1}},
+            {"$limit": 10}
+        ]
+        top_products = list(db.diagnosis_history.aggregate(top_products_pipeline))
+        
+        # Top fault keywords
+        # Extract from recent diagnoses
+        recent_diagnoses = list(db.diagnosis_history.find({}).sort("created_at", -1).limit(100))
+        fault_keywords = defaultdict(int)
+        for diag in recent_diagnoses:
+            keywords = self._extract_keywords(diag.get("fault_description", ""))
+            for kw in keywords[:3]:  # Top 3 keywords per diagnosis
+                fault_keywords[kw] += 1
+        
+        top_faults = [
+            {"keyword": kw, "count": count}
+            for kw, count in sorted(fault_keywords.items(), key=lambda x: x[1], reverse=True)[:10]
+        ]
+        
+        # Learning stats
+        learning_stats = self.get_learning_stats()
+        
+        # Recent activity (last 7 days)
+        week_ago = (datetime.now() - timedelta(days=7)).isoformat()
+        recent_diagnoses_count = db.diagnosis_history.count_documents({
+            "created_at": {"$gte": week_ago}
+        })
+        recent_feedback_count = db.diagnosis_feedback.count_documents({
+            "created_at": {"$gte": week_ago}
+        })
+        
+        # Top learned sources
+        top_sources = self.get_top_learned_sources(limit=10)
+        
+        return {
+            "feedback": feedback_stats,
+            "top_products": [
+                {
+                    "part_number": p["_id"],
+                    "product_model": p.get("product_model", "Unknown"),
+                    "diagnosis_count": p["count"]
+                }
+                for p in top_products
+            ],
+            "top_faults": top_faults,
+            "learning": learning_stats,
+            "recent_activity": {
+                "diagnoses_last_week": recent_diagnoses_count,
+                "feedback_last_week": recent_feedback_count,
+                "avg_diagnoses_per_day": round(recent_diagnoses_count / 7, 1),
+                "avg_feedback_per_day": round(recent_feedback_count / 7, 1)
+            },
+            "top_sources": top_sources
+        }
+    
+    def get_alternative_sources(
+        self,
+        original_sources: List[str],
+        fault_description: str
+    ) -> List[str]:
+        """
+        Get alternative sources for retry (excluding original sources).
+        
+        Args:
+            original_sources: Sources used in original diagnosis
+            fault_description: Fault description to find alternatives for
+            
+        Returns:
+            List of alternative source names
+        """
+        keywords = self._extract_keywords(fault_description)
+        
+        # Get recommendations from learned mappings
+        recommended, avoided = self.ranking_learner.get_recommended_sources_for_keywords(
+            keywords,
+            limit=10
+        )
+        
+        # Filter out original sources and avoided sources
+        original_set = set(original_sources)
+        avoided_set = set(avoided)
+        
+        alternatives = [
+            s for s in recommended
+            if s not in original_set and s not in avoided_set
+        ]
+        
+        # If not enough alternatives, get high-scoring sources
+        if len(alternatives) < 3:
+            top_sources = self.get_top_learned_sources(limit=20)
+            for source_info in top_sources:
+                source = source_info["source"]
+                if source not in original_set and source not in avoided_set and source not in alternatives:
+                    alternatives.append(source)
+                if len(alternatives) >= 5:
+                    break
+        
+        return alternatives[:5]
+    
+    def _extract_keywords(self, text: str) -> List[str]:
+        """
+        Extract meaningful keywords from text.
+        
+        Same logic as feedback_engine.py for compatibility.
+        """
+        import re
+        from collections import Counter
+        
+        # Lowercase and clean
+        text = text.lower()
+        
+        # Remove common stop words (TR + EN)
+        stop_words = {
+            'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+            'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'dare',
+            'ought', 'used', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by',
+            'from', 'as', 'into', 'through', 'during', 'before', 'after', 'above',
+            'below', 'between', 'under', 'again', 'further', 'then', 'once',
+            've', 'bir', 'bu', 'su', 'ile', 'için', 'gibi', 'daha', 'çok',
+            'var', 'yok', 'olan', 'olarak', 've', 'veya', 'ama', 'fakat',
+            'de', 'da', 'den', 'dan', 'ne', 'ki', 'mi', 'mu', 'mı'
+        }
+        
+        # Extract words
+        words = re.findall(r'\b[a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}\b', text)
+        
+        # Filter and get unique keywords
+        keywords = [w for w in words if w not in stop_words]
+        
+        # Return most common (up to 10)
+        counter = Counter(keywords)
+        return [word for word, _ in counter.most_common(10)]
+    
+    # =========================================================================
+    # END USER-FACING API
+    # =========================================================================
     
     def reset_learning(self, confirm: bool = False) -> Dict:
         """

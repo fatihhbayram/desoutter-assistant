@@ -188,57 +188,14 @@ class QueryExpander:
     Domain-aware query expansion.
     
     Expands user queries with related terms to improve recall.
-    Uses domain-specific synonyms and fault terminology.
+    Uses centralized domain vocabulary (Phase 1.2 refactor).
     """
     
-    # Domain-specific synonym mappings
-    DOMAIN_SYNONYMS = {
-        # Motor/Drive terms
-        "motor": ["spindle", "drive", "actuator", "rotation", "engine"],
-        "spindle": ["motor", "shaft", "axis"],
-        
-        # Noise terms
-        "noise": ["squealing", "grinding", "humming", "clicking", "sound"],
-        "grinding": ["noise", "squealing", "friction"],
-        "vibration": ["shaking", "tremor", "oscillation"],
-        
-        # Heat terms
-        "heat": ["overheating", "temperature", "thermal", "hot"],
-        "overheating": ["heat", "thermal", "temperature rise"],
-        
-        # Mechanical terms
-        "bearing": ["ball bearing", "bushing", "roller"],
-        "gear": ["gearbox", "transmission", "cog"],
-        "leak": ["leakage", "seepage", "drip"],
-        
-        # Electrical terms
-        "battery": ["power", "cell", "charge"],
-        "connection": ["cable", "wire", "connector", "contact"],
-        "voltage": ["power", "electric", "current"],
-        
-        # Error terms
-        "error": ["fault", "failure", "problem", "issue", "defect"],
-        "fault": ["error", "failure", "malfunction"],
-        "failure": ["error", "fault", "breakdown"],
-        
-        # Calibration terms
-        "calibration": ["calibrate", "adjustment", "tuning", "alignment"],
-        "torque": ["tightening", "tension", "nm", "ft-lb"],
-        
-        # Tool-specific
-        "wrench": ["tool", "torque wrench", "nutrunner"],
-        "controller": ["cvi3", "cvi2", "unit", "control box"],
-    }
-    
-    # Error code patterns
-    ERROR_PATTERNS = [
-        (r'e\s*0*(\d{2,3})', r'E\1'),  # e47 -> E47
-        (r'i\s*0*(\d{2,3})', r'I\1'),  # i205 -> I205
-        (r'w\s*0*(\d{2,3})', r'W\1'),  # w201 -> W201
-    ]
-    
     def __init__(self):
-        logger.info("QueryExpander initialized with domain synonyms")
+        # Import centralized vocabulary
+        from src.llm.domain_vocabulary import get_domain_vocabulary
+        self.vocab = get_domain_vocabulary()
+        logger.info("QueryExpander initialized with centralized domain vocabulary")
     
     def expand(self, query: str, max_expansions: int = 5) -> List[str]:
         """
@@ -255,12 +212,12 @@ class QueryExpander:
         query_lower = query.lower()
         
         # 1. Normalize error codes
-        normalized = self._normalize_error_codes(query)
+        normalized = self.vocab.normalize_error_code(query)
         if normalized != query:
             expanded.append(normalized)
         
         # 2. Expand with domain synonyms
-        for term, synonyms in self.DOMAIN_SYNONYMS.items():
+        for term, synonyms in self.vocab.DOMAIN_SYNONYMS.items():
             if term in query_lower:
                 for synonym in synonyms[:2]:  # Top 2 synonyms only
                     variation = re.sub(
@@ -281,40 +238,23 @@ class QueryExpander:
         # Limit and deduplicate
         return list(dict.fromkeys(expanded))[:max_expansions]
     
-    def _normalize_error_codes(self, query: str) -> str:
-        """Normalize error code formats (e47 -> E047)"""
-        result = query
-        for pattern, replacement in self.ERROR_PATTERNS:
-            result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
-        return result
-    
     def _expand_product_terms(self, query: str) -> List[str]:
-        """Expand product-specific abbreviations"""
+        """Expand product-specific abbreviations using centralized vocabulary"""
         expansions = []
         query_lower = query.lower()
         
-        # Product expansions
-        product_map = {
-            "cvi3": ["CVI3 controller", "CVI3 unit"],
-            "cvi2": ["CVI2 controller"],
-            "epb": ["EPB tool", "pistol grip battery tool"],
-            "eab": ["EAB tool", "angle battery tool"],
-            "exb": ["ExB tool", "battery tool"],
-            "exd": ["ExD tool", "direct cable tool"],
-            "eabc": ["EABC tool", "battery clutch tool"],
-        }
-        
-        for abbrev, full_forms in product_map.items():
-            if abbrev in query_lower:
-                for full in full_forms[:1]:  # Just first expansion
-                    variation = re.sub(
-                        rf'\b{re.escape(abbrev)}\b',
-                        full,
-                        query,
-                        flags=re.IGNORECASE
-                    )
-                    if variation != query:
-                        expansions.append(variation)
+        # Use centralized PRODUCT_SERIES
+        for abbrev, full_name in self.vocab.PRODUCT_SERIES.items():
+            if abbrev.lower() in query_lower:
+                # Create expansion with full name
+                variation = re.sub(
+                    rf'\b{re.escape(abbrev)}\b',
+                    f"{abbrev} {full_name}",
+                    query,
+                    flags=re.IGNORECASE
+                )
+                if variation != query:
+                    expansions.append(variation)
         
         return expansions
 
