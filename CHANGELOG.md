@@ -46,6 +46,34 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 
 ---
 
+## 📆 23 Aralık 2025 (Pazartesi) - Product Data Quality Fix
+
+### ✅ Tamamlanan
+- **Torque Parsing Fix**: Model kodlarının (M20, M10) torque olarak algılanması düzeltildi
+  - 3-stratejili yaklaşım: "to" keyword, dash with both Nm, single value with validation
+  - Negative lookbehind pattern ile model kodları exclude edildi
+  - Torque range validation eklendi (0.01-500 Nm)
+  - Örnek: ECSF2 artık doğru 0.45-1.8 Nm gösteriyor (önceden M20'den 20 Nm alıyordu)
+- **Wireless Detection Fix**: Model kod bazlı wireless detection
+  - Connected modeller (EPBC, EABC, ELC 'C' suffix) wireless olarak işaretlendi
+  - Standalone battery modeller (EPB, EPBA, EAB) wireless değil olarak işaretlendi
+  - Generic text search yerine specific model code patterns kullanıldı
+- **Full Product Re-scrape**: 451 ürün yeniden scrape edildi (60 dakika)
+  - Battery Tightening Tools: 151 ürün
+  - Cable Tightening Tools: 272 ürün
+  - Electric Drilling Tools: 28 ürün
+- **MongoDB Update**: 451 ürün güncellendi, 0 hata
+  - Tüm torque değerleri artık doğru
+  - Wireless field'ları model koduna göre düzeltildi
+
+### 📝 Değiştirilen Dosyalar
+- `src/scraper/parsers.py`: Torque extraction ve wireless detection fix
+- `README.md`: Ürün sayısı 237+ → 451 güncellendi
+- `task.md`: Product Data Quality Fix section eklendi
+- `CHANGELOG.md`: Bu entry eklendi
+
+---
+
 ## 📆 22 Aralık 2025 (Pazar) - Phase 5 & Phase 3.5 & Phase 6 & Phase 3.1 Complete
 
 ### 🆕 Phase 3.1: Domain Embeddings ✅

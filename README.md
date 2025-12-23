@@ -16,7 +16,7 @@ AI-powered repair assistant for Desoutter industrial tools. Uses RAG (Retrieval 
 - **🎯 Context Optimization**: Token budget management, deduplication, warning prioritization
 - **💾 GPU Acceleration**: NVIDIA GPU inference for fast LLM responses
 - **Smart Product Scraping**: Handles Next.js rendered pages with advanced image extraction from DatoCMS assets
-- **MongoDB Integration**: Stores 237+ products, users, and learning data
+- **MongoDB Integration**: Stores 451 products, users, and learning data
 - **Multi-Format Documents**: Support for PDF, Word (DOCX), PowerPoint (PPTX), Excel (XLSX)
 - **Document Viewer**: Open source documents directly from diagnosis results
 - **Source Relevance Feedback**: Rate each retrieved document as relevant/irrelevant

@@ -33,6 +33,10 @@ import axios from 'axios';
 import './App.css';
 import TechWizard from './TechWizard';
 import './TechWizard.css';
+import MetricsDashboard from './components/MetricsDashboard';
+import LearningInsights from './components/LearningInsights';
+import DomainManagement from './components/DomainManagement';
+import './components/Dashboard.css';
 
 // =============================================================================
 // API CONFIGURATION
@@ -78,17 +82,17 @@ function App() {
   // ---------------------------------------------------------------------------
   // STATE MANAGEMENT
   // ---------------------------------------------------------------------------
-  
+
   // Products data from API
   const [products, setProducts] = useState([]);
-  
+
   // Authentication state
   const [auth, setAuth] = useState({ loggedIn: false, role: null, username: '' });
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  
+
   // App initialization state - true while checking stored auth on mount
   const [initializing, setInitializing] = useState(true);
-  
+
   // Product selection and diagnosis
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [search, setSearch] = useState('');
@@ -97,7 +101,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);  // AI diagnosis result
   const [stats, setStats] = useState(null);    // System statistics
-  
+
   // Feedback state
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -105,10 +109,10 @@ function App() {
   const [feedbackComment, setFeedbackComment] = useState('');
   const [retryLoading, setRetryLoading] = useState(false);
   const [sourceRelevance, setSourceRelevance] = useState({});  // { source_name: true/false }
-  
+
   // Toast notifications
   const [toast, setToast] = useState(null);
-  
+
   // Product filtering and pagination
   const [filterSeries, setFilterSeries] = useState('');
   const [filterWirelessOnly, setFilterWirelessOnly] = useState(false);
@@ -117,13 +121,13 @@ function App() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
   const [viewMode, setViewMode] = useState('grid');  // 'grid' or 'list'
-  
+
   // Admin panel states - User Management
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminNewUser, setAdminNewUser] = useState({ username: '', password: '', role: 'technician' });
   const [adminLoadingUsers, setAdminLoadingUsers] = useState(false);
   const [adminScraping, setAdminScraping] = useState(false);
-  
+
   // Admin panel states - Document Management (RAG)
   const [adminDocuments, setAdminDocuments] = useState([]);
   const [adminLoadingDocs, setAdminLoadingDocs] = useState(false);
@@ -139,14 +143,14 @@ function App() {
   // ---------------------------------------------------------------------------
   // SIDE EFFECTS - Data Loading
   // ---------------------------------------------------------------------------
-  
+
   // Check authentication on app mount - restore session from localStorage
   useEffect(() => {
     const checkAuthOnMount = async () => {
       const token = localStorage.getItem('auth_token');
       const role = localStorage.getItem('auth_role');
       const username = localStorage.getItem('auth_username');
-      
+
       if (token && role && username) {
         try {
           // Verify token is still valid with backend
@@ -163,17 +167,17 @@ function App() {
       }
       setInitializing(false);
     };
-    
+
     checkAuthOnMount();
   }, []);
-  
+
   // Load data after successful login
   useEffect(() => {
     // Only load data after login
     if (auth.loggedIn) {
       loadProducts();  // Load product catalog
       loadStats();     // Load system statistics
-      
+
       // Load admin-specific data if user is admin
       if (auth.role === 'admin') {
         loadAdminUsers();      // Load user list
@@ -186,7 +190,7 @@ function App() {
   // ---------------------------------------------------------------------------
   // COMPUTED VALUES - Memoized Filters and Facets
   // ---------------------------------------------------------------------------
-  
+
   // Compute filter facets (series, torque range) from products
   // This enables dynamic filter options based on available products
   const facets = React.useMemo(() => {
@@ -254,7 +258,7 @@ function App() {
 
   // Pagination calculations
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
-  
+
   // Get current page of products (sliced from filtered results)
   const pagedProducts = React.useMemo(() => {
     const p = Math.min(page, totalPages);
@@ -409,7 +413,7 @@ function App() {
   const handleAdminUploadDocument = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     // Validate file type - PDF, Word, PowerPoint allowed
     const allowedExtensions = ['.pdf', '.docx', '.doc', '.pptx', '.ppt'];
     const fileExt = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
@@ -417,18 +421,18 @@ function App() {
       setToast({ type: 'error', message: 'Supported formats: PDF, Word (DOCX), PowerPoint (PPTX)' });
       return;
     }
-    
+
     setAdminUploading(true);
     try {
       // Prepare multipart form data
       const formData = new FormData();
       formData.append('file', file);
       formData.append('doc_type', adminUploadType);
-      
+
       await api.post('/admin/documents/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
+
       setToast({ type: 'info', message: `${file.name} uploaded successfully` });
       loadAdminDocuments();  // Refresh document list
       e.target.value = '';   // Reset file input for next upload
@@ -491,12 +495,12 @@ function App() {
       const res = await api.post('/auth/login', { username, password });
       const { access_token, role } = res.data || {};
       if (!access_token) throw new Error('No token received');
-      
+
       // Persist auth data to localStorage for session persistence
       localStorage.setItem('auth_token', access_token);
       localStorage.setItem('auth_role', role || 'technician');
       localStorage.setItem('auth_username', username);
-      
+
       setAuth({ loggedIn: true, role: role || 'technician', username });
       setToast({ type: 'info', message: `Welcome, ${role || 'technician'}` });
     } catch (err) {
@@ -535,7 +539,7 @@ function App() {
     } else {
       setLoading(true);
     }
-    
+
     // Reset feedback state for new diagnosis
     setFeedbackSubmitted(false);
     setShowFeedbackModal(false);
@@ -546,13 +550,13 @@ function App() {
         fault_description: faultDescription,
         language: language
       };
-      
+
       // Add retry parameters if this is a retry
       if (isRetry && result?.diagnosis_id) {
         requestData.is_retry = true;
         requestData.retry_of = result.diagnosis_id;
-        requestData.excluded_sources = excludedSources.length > 0 
-          ? excludedSources 
+        requestData.excluded_sources = excludedSources.length > 0
+          ? excludedSources
           : result.sources?.map(s => s.source) || [];
       }
 
@@ -576,19 +580,19 @@ function App() {
       console.error('No diagnosis ID available');
       return;
     }
-    
+
     if (feedbackType === 'negative') {
       setShowFeedbackModal(true);
       return;
     }
-    
+
     // Positive feedback - submit with source relevance if provided
     try {
       const feedbackData = {
         diagnosis_id: result.diagnosis_id,
         feedback_type: 'positive'
       };
-      
+
       // Include source relevance feedback if user rated any sources
       if (Object.keys(sourceRelevance).length > 0) {
         feedbackData.source_relevance = Object.entries(sourceRelevance).map(([source, relevant]) => ({
@@ -596,9 +600,9 @@ function App() {
           relevant
         }));
       }
-      
+
       await api.post('/diagnose/feedback', feedbackData);
-      
+
       setFeedbackSubmitted(true);
       setToast({ type: 'info', message: language === 'tr' ? 'Geri bildiriminiz için teşekkürler! 👍' : 'Thanks for your feedback! 👍' });
     } catch (error) {
@@ -612,7 +616,7 @@ function App() {
    */
   const submitNegativeFeedback = async (requestRetry = false) => {
     if (!result?.diagnosis_id) return;
-    
+
     try {
       const feedbackData = {
         diagnosis_id: result.diagnosis_id,
@@ -620,7 +624,7 @@ function App() {
         negative_reason: feedbackReason || 'other',
         user_comment: feedbackComment
       };
-      
+
       // Include source relevance feedback if user rated any sources
       if (Object.keys(sourceRelevance).length > 0) {
         feedbackData.source_relevance = Object.entries(sourceRelevance).map(([source, relevant]) => ({
@@ -628,15 +632,15 @@ function App() {
           relevant
         }));
       }
-      
+
       await api.post('/diagnose/feedback', feedbackData);
-      
+
       setFeedbackSubmitted(true);
       setShowFeedbackModal(false);
       setFeedbackReason('');
       setFeedbackComment('');
       setSourceRelevance({});  // Reset source relevance
-      
+
       if (requestRetry) {
         // Get alternative suggestion
         setToast({ type: 'info', message: language === 'tr' ? 'Yeni öneri alınıyor...' : 'Getting new suggestion...' });
@@ -660,7 +664,7 @@ function App() {
    */
   const handleProductSelect = (e) => {
     if (!e) return;
-    
+
     // Direct product object (from grid click)
     if (typeof e === 'object' && e.part_number) {
       setSelectedProduct(e);
@@ -679,7 +683,7 @@ function App() {
    */
   const getImages = (p) => {
     if (!p) return [];
-    
+
     // Filter out placeholder images
     const isValidImage = (url) => {
       if (!url || typeof url !== 'string') return false;
@@ -688,11 +692,11 @@ function App() {
       if (lower.includes('placeholder') || lower.includes('default') || lower === '-') return false;
       return true;
     };
-    
+
     // Handle array fields
     if (Array.isArray(p.image_url)) return p.image_url.filter(isValidImage);
     if (Array.isArray(p.images)) return p.images.filter(isValidImage);
-    
+
     // Handle image_urls field (comma-separated string or array)
     if (p.image_urls) {
       if (Array.isArray(p.image_urls)) return p.image_urls.filter(isValidImage);
@@ -700,7 +704,7 @@ function App() {
         return p.image_urls.split(',').map(s => s.trim()).filter(isValidImage);
       }
     }
-    
+
     // Handle single image_url string
     if (p.image_url && typeof p.image_url === 'string') {
       if (p.image_url.includes(',')) {
@@ -710,7 +714,7 @@ function App() {
         return [p.image_url];
       }
     }
-    
+
     return [];
   };
 
@@ -789,9 +793,9 @@ function App() {
               <div className="chart-bar-container">
                 {dashboardData.daily_trend?.map((day, i) => (
                   <div key={i} className="chart-bar-item">
-                    <div 
-                      className="chart-bar" 
-                      style={{ 
+                    <div
+                      className="chart-bar"
+                      style={{
                         height: `${Math.max(day.count * 20, 10)}px`,
                         backgroundColor: day.count > 0 ? 'var(--primary)' : '#e0e0e0'
                       }}
@@ -810,12 +814,12 @@ function App() {
               <div className="confidence-chart">
                 <div className="confidence-item">
                   <div className="confidence-bar-wrapper">
-                    <div 
-                      className="confidence-bar high" 
-                      style={{ 
-                        width: `${dashboardData.overview?.total_diagnoses > 0 
-                          ? (dashboardData.confidence_breakdown?.high / dashboardData.overview.total_diagnoses * 100) 
-                          : 0}%` 
+                    <div
+                      className="confidence-bar high"
+                      style={{
+                        width: `${dashboardData.overview?.total_diagnoses > 0
+                          ? (dashboardData.confidence_breakdown?.high / dashboardData.overview.total_diagnoses * 100)
+                          : 0}%`
                       }}
                     ></div>
                   </div>
@@ -823,12 +827,12 @@ function App() {
                 </div>
                 <div className="confidence-item">
                   <div className="confidence-bar-wrapper">
-                    <div 
-                      className="confidence-bar medium" 
-                      style={{ 
-                        width: `${dashboardData.overview?.total_diagnoses > 0 
-                          ? (dashboardData.confidence_breakdown?.medium / dashboardData.overview.total_diagnoses * 100) 
-                          : 0}%` 
+                    <div
+                      className="confidence-bar medium"
+                      style={{
+                        width: `${dashboardData.overview?.total_diagnoses > 0
+                          ? (dashboardData.confidence_breakdown?.medium / dashboardData.overview.total_diagnoses * 100)
+                          : 0}%`
                       }}
                     ></div>
                   </div>
@@ -836,12 +840,12 @@ function App() {
                 </div>
                 <div className="confidence-item">
                   <div className="confidence-bar-wrapper">
-                    <div 
-                      className="confidence-bar low" 
-                      style={{ 
-                        width: `${dashboardData.overview?.total_diagnoses > 0 
-                          ? (dashboardData.confidence_breakdown?.low / dashboardData.overview.total_diagnoses * 100) 
-                          : 0}%` 
+                    <div
+                      className="confidence-bar low"
+                      style={{
+                        width: `${dashboardData.overview?.total_diagnoses > 0
+                          ? (dashboardData.confidence_breakdown?.low / dashboardData.overview.total_diagnoses * 100)
+                          : 0}%`
                       }}
                     ></div>
                   </div>
@@ -955,29 +959,47 @@ function App() {
     <div className="admin-layout">
       {/* Admin Tabs */}
       <div className="admin-tabs">
-        <button 
+        <button
           className={`admin-tab ${adminTab === 'dashboard' ? 'active' : ''}`}
           onClick={() => setAdminTab('dashboard')}
         >
           📊 Dashboard
         </button>
-        <button 
+        <button
           className={`admin-tab ${adminTab === 'users' ? 'active' : ''}`}
           onClick={() => setAdminTab('users')}
         >
           👥 Users
         </button>
-        <button 
+        <button
           className={`admin-tab ${adminTab === 'documents' ? 'active' : ''}`}
           onClick={() => setAdminTab('documents')}
         >
           📚 Documents
         </button>
-        <button 
+        <button
           className={`admin-tab ${adminTab === 'maintenance' ? 'active' : ''}`}
           onClick={() => setAdminTab('maintenance')}
         >
           🛠️ Maintenance
+        </button>
+        <button
+          className={`admin-tab ${adminTab === 'metrics' ? 'active' : ''}`}
+          onClick={() => setAdminTab('metrics')}
+        >
+          ⚡ Metrics
+        </button>
+        <button
+          className={`admin-tab ${adminTab === 'learning' ? 'active' : ''}`}
+          onClick={() => setAdminTab('learning')}
+        >
+          🧠 Learning
+        </button>
+        <button
+          className={`admin-tab ${adminTab === 'domain' ? 'active' : ''}`}
+          onClick={() => setAdminTab('domain')}
+        >
+          📚 Domain
         </button>
       </div>
 
@@ -1024,7 +1046,7 @@ function App() {
           {/* User Management */}
           <div className="card">
             <h2>👥 User Management</h2>
-            
+
             <form onSubmit={handleAdminAddUser} className="add-user-form">
               <h3>Add New User</h3>
               <div className="form-row">
@@ -1101,13 +1123,13 @@ function App() {
           <div className="card document-management">
             <h2>📚 RAG Document Management</h2>
             <p className="section-desc">Upload documents (PDF, Word, PowerPoint) to enhance the AI repair assistant knowledge base.</p>
-            
+
             {/* Upload Section */}
             <div className="upload-section">
               <h3>Upload New Document</h3>
               <div className="upload-form">
-                <select 
-                  value={adminUploadType} 
+                <select
+                  value={adminUploadType}
                   onChange={(e) => setAdminUploadType(e.target.value)}
                   className="doc-type-select"
                 >
@@ -1115,9 +1137,9 @@ function App() {
                   <option value="bulletin">📋 Service Bulletin</option>
                 </select>
                 <label className="file-upload-btn">
-                  <input 
-                    type="file" 
-                    accept=".pdf,.docx,.doc,.pptx,.ppt" 
+                  <input
+                    type="file"
+                    accept=".pdf,.docx,.doc,.pptx,.ppt"
                     onChange={handleAdminUploadDocument}
                     disabled={adminUploading}
                   />
@@ -1130,7 +1152,7 @@ function App() {
             <div className="documents-list">
               <div className="docs-header">
                 <h3>Uploaded Documents ({adminDocuments.length})</h3>
-                <button 
+                <button
                   className="btn-action btn-ingest"
                   onClick={handleAdminIngestDocuments}
                   disabled={adminIngesting || adminDocuments.length === 0}
@@ -1138,7 +1160,7 @@ function App() {
                   {adminIngesting ? '⏳ Processing...' : '🔄 Re-index All Documents'}
                 </button>
               </div>
-              
+
               {adminLoadingDocs ? (
                 <p className="loading">Loading documents...</p>
               ) : adminDocuments.length === 0 ? (
@@ -1197,31 +1219,31 @@ function App() {
         <div className="admin-tab-content">
           <div className="card">
             <h2>🛠️ Maintenance</h2>
-            
+
             <div className="action-buttons">
-              <button 
+              <button
                 className="btn-action"
                 onClick={handleAdminScrape}
                 disabled={adminScraping}
               >
                 {adminScraping ? '⏳ Scraping...' : '🔄 Run Scraper'}
               </button>
-              
-              <button 
+
+              <button
                 className="btn-action"
                 onClick={() => { loadProducts(); loadStats(); loadDashboard(); setToast({ type: 'info', message: 'Data refreshed' }); }}
               >
                 🔄 Refresh All Data
               </button>
-              
-              <button 
+
+              <button
                 className="btn-action"
                 onClick={() => window.open(`${API_BASE}/docs`, '_blank')}
               >
                 📚 API Docs
               </button>
-              
-              <button 
+
+              <button
                 className="btn-action"
                 onClick={() => window.open(`${API_BASE}/ui`, '_blank')}
               >
@@ -1259,8 +1281,8 @@ function App() {
                 </div>
               ))}
             </div>
-            <button 
-              className="btn-secondary" 
+            <button
+              className="btn-secondary"
               style={{ marginTop: '16px' }}
               onClick={() => setAuth({ ...auth, role: 'technician' })}
             >
@@ -1269,6 +1291,11 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* NEW DASHBOARD TABS */}
+      {adminTab === 'metrics' && <MetricsDashboard token={localStorage.getItem('auth_token')} />}
+      {adminTab === 'learning' && <LearningInsights token={localStorage.getItem('auth_token')} />}
+      {adminTab === 'domain' && <DomainManagement token={localStorage.getItem('auth_token')} />}
     </div>
   );
 
@@ -1285,462 +1312,462 @@ function App() {
    * Keeping for reference - replaced with TechWizard component
    */
   const renderTechnicianPanelOld = () => (
-      <div className="technician-layout">
-        {/* Left: Product Selection */}
-        <section className="tech-left">
-          <div className="card">
-            <div className="card-header">
-              <h2>📦 Products</h2>
-              <div className="view-toggle">
-                <button 
-                  className={viewMode === 'grid' ? 'active' : ''} 
-                  onClick={() => setViewMode('grid')}
-                  title="Grid View"
-                >
-                  ⊞
-                </button>
-                <button 
-                  className={viewMode === 'list' ? 'active' : ''} 
-                  onClick={() => setViewMode('list')}
-                  title="List View"
-                >
-                  ☰
-                </button>
-              </div>
+    <div className="technician-layout">
+      {/* Left: Product Selection */}
+      <section className="tech-left">
+        <div className="card">
+          <div className="card-header">
+            <h2>📦 Products</h2>
+            <div className="view-toggle">
+              <button
+                className={viewMode === 'grid' ? 'active' : ''}
+                onClick={() => setViewMode('grid')}
+                title="Grid View"
+              >
+                ⊞
+              </button>
+              <button
+                className={viewMode === 'list' ? 'active' : ''}
+                onClick={() => setViewMode('list')}
+                title="List View"
+              >
+                ☰
+              </button>
             </div>
-
-            {/* Search & Filters */}
-            <div className="search-filters">
-              <div className="search-box">
-                <span className="search-icon">🔍</span>
-                <input
-                  type="search"
-                  placeholder="Search by model or part number..."
-                  value={search}
-                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                />
-              </div>
-              
-              <div className="filter-row">
-                <select 
-                  value={filterSeries} 
-                  onChange={(e) => { setFilterSeries(e.target.value); setPage(1); }}
-                >
-                  <option value="">All Series</option>
-                  {facets.series.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-
-                <label className="checkbox-filter">
-                  <input
-                    type="checkbox"
-                    checked={filterWirelessOnly}
-                    onChange={(e) => { setFilterWirelessOnly(e.target.checked); setPage(1); }}
-                  />
-                  Wireless Only
-                </label>
-              </div>
-            </div>
-
-            {/* Product Results Info */}
-            <div className="results-info">
-              <span>{filteredProducts.length} products found</span>
-              {(search || filterSeries || filterWirelessOnly) && (
-                <button 
-                  className="clear-filters"
-                  onClick={() => {
-                    setSearch('');
-                    setFilterSeries('');
-                    setFilterWirelessOnly(false);
-                    setPage(1);
-                  }}
-                >
-                  Clear Filters
-                </button>
-              )}
-            </div>
-
-            {/* Product Grid/List */}
-            <div className={`products-container ${viewMode}`}>
-              {pagedProducts.map(product => (
-                <div
-                  key={product.part_number}
-                  className={`product-card ${selectedProduct?.part_number === product.part_number ? 'selected' : ''}`}
-                  onClick={() => handleProductSelect(product)}
-                >
-                  <div className="pc-img">
-                    {getImages(product).length > 0 ? (
-                      <img src={getImages(product)[0]} alt={product.model_name} />
-                    ) : (
-                      <span className="no-img">📷</span>
-                    )}
-                  </div>
-                  <div className="pc-body">
-                    <div className="pc-title">{product.model_name}</div>
-                    <div className="pc-sub">{product.part_number}</div>
-                    <div className="pc-tags">
-                      {product.series_name && <span className="tag">{product.series_name}</span>}
-                      {product.wireless_communication?.toLowerCase().includes('yes') && (
-                        <span className="tag tag-wireless">📶 Wireless</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="pagination">
-                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>
-                  ← Prev
-                </button>
-                <span className="page-info">Page {page} of {totalPages}</span>
-                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
-                  Next →
-                </button>
-              </div>
-            )}
           </div>
-        </section>
 
-        {/* Right: Diagnosis */}
-        <section className="tech-right">
-          {/* Selected Product Details */}
-          {selectedProduct && (
-            <div className="card selected-product-card">
-              <h2>🔧 Selected Product</h2>
-              <div className="selected-product-details">
-                <div className="sp-image">
-                  {getImages(selectedProduct).length > 0 ? (
-                    <img src={getImages(selectedProduct)[0]} alt={selectedProduct.model_name} />
-                  ) : (
-                    <span className="no-img-lg">📷</span>
-                  )}
-                </div>
-                <div className="sp-info">
-                  <h3>{selectedProduct.model_name}</h3>
-                  <div className="sp-details">
-                    <div><strong>Part Number:</strong> {selectedProduct.part_number}</div>
-                    <div><strong>Series:</strong> {selectedProduct.series_name || 'N/A'}</div>
-                    <div><strong>Torque:</strong> {selectedProduct.min_torque || '?'} - {selectedProduct.max_torque || '?'}</div>
-                    <div><strong>Output:</strong> {selectedProduct.output_drive || 'N/A'}</div>
-                    <div><strong>Wireless:</strong> {selectedProduct.wireless_communication || 'N/A'}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Diagnosis Form */}
-          <div className="card diagnosis-card">
-            <h2>🩺 Diagnose Problem</h2>
-            
-            {!selectedProduct && (
-              <div className="select-product-hint">
-                <span>👈</span>
-                <p>Select a product from the list to start diagnosis</p>
-              </div>
-            )}
-
-            <div className="form-group">
-              <label>Fault Description *</label>
-              <textarea
-                value={faultDescription}
-                onChange={(e) => setFaultDescription(e.target.value)}
-                placeholder="Describe the problem in detail... (e.g., motor makes grinding noise, tool doesn't start, battery drains quickly)"
-                rows="4"
-                disabled={loading || !selectedProduct}
+          {/* Search & Filters */}
+          <div className="search-filters">
+            <div className="search-box">
+              <span className="search-icon">🔍</span>
+              <input
+                type="search"
+                placeholder="Search by model or part number..."
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               />
             </div>
 
-            <div className="form-group">
-              <label>Response Language</label>
-              <div className="language-selector">
-                <button 
-                  className={language === 'en' ? 'active' : ''}
-                  onClick={() => setLanguage('en')}
-                  disabled={loading}
-                >
-                  🇬🇧 English
-                </button>
-                <button 
-                  className={language === 'tr' ? 'active' : ''}
-                  onClick={() => setLanguage('tr')}
-                  disabled={loading}
-                >
-                  🇹🇷 Türkçe
-                </button>
-              </div>
-            </div>
+            <div className="filter-row">
+              <select
+                value={filterSeries}
+                onChange={(e) => { setFilterSeries(e.target.value); setPage(1); }}
+              >
+                <option value="">All Series</option>
+                {facets.series.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
 
-            <button 
-              className="btn-primary btn-diagnose"
-              onClick={handleDiagnose}
-              disabled={loading || !selectedProduct || !faultDescription}
-            >
-              {loading ? (
-                <span className="spinner">⏳ Analyzing...</span>
-              ) : (
-                <>🔍 Get Repair Suggestion</>
-              )}
-            </button>
+              <label className="checkbox-filter">
+                <input
+                  type="checkbox"
+                  checked={filterWirelessOnly}
+                  onChange={(e) => { setFilterWirelessOnly(e.target.checked); setPage(1); }}
+                />
+                Wireless Only
+              </label>
+            </div>
           </div>
 
-          {/* Result */}
-          {result && (
-            <div className="card result-card">
-              <div className="result-header">
-                <h2>✅ Repair Suggestion</h2>
-                <span className={`confidence confidence-${result.confidence}`}>
-                  {result.confidence === 'high' && '🟢'}
-                  {result.confidence === 'medium' && '🟡'}
-                  {result.confidence === 'low' && '🔴'}
-                  {result.confidence}
-                </span>
-              </div>
+          {/* Product Results Info */}
+          <div className="results-info">
+            <span>{filteredProducts.length} products found</span>
+            {(search || filterSeries || filterWirelessOnly) && (
+              <button
+                className="clear-filters"
+                onClick={() => {
+                  setSearch('');
+                  setFilterSeries('');
+                  setFilterWirelessOnly(false);
+                  setPage(1);
+                }}
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
 
-              <div className="result-content">
-                <div className="suggestion-text">
-                  {result.suggestion}
+          {/* Product Grid/List */}
+          <div className={`products-container ${viewMode}`}>
+            {pagedProducts.map(product => (
+              <div
+                key={product.part_number}
+                className={`product-card ${selectedProduct?.part_number === product.part_number ? 'selected' : ''}`}
+                onClick={() => handleProductSelect(product)}
+              >
+                <div className="pc-img">
+                  {getImages(product).length > 0 ? (
+                    <img src={getImages(product)[0]} alt={product.model_name} />
+                  ) : (
+                    <span className="no-img">📷</span>
+                  )}
                 </div>
-
-                {result.sources && result.sources.length > 0 && (
-                  <div className="sources-section">
-                    <h4>📚 {result.language === 'tr' ? 'İlgili Dokümanlar' : 'Related Documents'} ({result.sources.length})</h4>
-                    <p className="sources-hint">
-                      {result.language === 'tr' 
-                        ? 'Dokümanları değerlendirin ve faydalı olanları işaretleyin:' 
-                        : 'Rate documents and mark helpful ones:'}
-                    </p>
-                    <div className="sources-cards">
-                      {result.sources.slice(0, 5).map((source, idx) => (
-                        <div key={idx} className={`source-card ${sourceRelevance[source.source] === true ? 'relevant' : sourceRelevance[source.source] === false ? 'irrelevant' : ''}`}>
-                          <div className="source-info">
-                            <span className="source-name">{source.source}</span>
-                            <span className="source-similarity">{result.language === 'tr' ? 'Benzerlik' : 'Similarity'}: {source.similarity}</span>
-                          </div>
-                          <div className="source-actions">
-                            {/* Relevance feedback buttons */}
-                            {!feedbackSubmitted && (
-                              <div className="relevance-buttons">
-                                <button 
-                                  className={`relevance-btn relevant ${sourceRelevance[source.source] === true ? 'active' : ''}`}
-                                  onClick={() => setSourceRelevance(prev => ({...prev, [source.source]: true}))}
-                                  title={result.language === 'tr' ? 'Alakalı' : 'Relevant'}
-                                >
-                                  ✓
-                                </button>
-                                <button 
-                                  className={`relevance-btn irrelevant ${sourceRelevance[source.source] === false ? 'active' : ''}`}
-                                  onClick={() => setSourceRelevance(prev => ({...prev, [source.source]: false}))}
-                                  title={result.language === 'tr' ? 'Alakasız' : 'Not Relevant'}
-                                >
-                                  ✗
-                                </button>
-                              </div>
-                            )}
-                            <button 
-                              className="open-doc-btn"
-                              onClick={() => window.open(`${API_BASE}/documents/download/${encodeURIComponent(source.source)}`, '_blank')}
-                            >
-                              📄 {result.language === 'tr' ? 'Aç' : 'Open'}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {result.sources.length > 5 && (
-                      <details className="more-sources">
-                        <summary>+{result.sources.length - 5} {result.language === 'tr' ? 'daha fazla kaynak' : 'more sources'}</summary>
-                        <ul className="sources-list">
-                          {result.sources.slice(5).map((source, idx) => (
-                            <li key={idx} className={sourceRelevance[source.source] === true ? 'relevant' : sourceRelevance[source.source] === false ? 'irrelevant' : ''}>
-                              <span>{source.source}</span>
-                              <div className="source-actions-small">
-                                {!feedbackSubmitted && (
-                                  <div className="relevance-buttons-small">
-                                    <button 
-                                      className={`relevance-btn-small relevant ${sourceRelevance[source.source] === true ? 'active' : ''}`}
-                                      onClick={() => setSourceRelevance(prev => ({...prev, [source.source]: true}))}
-                                    >
-                                      ✓
-                                    </button>
-                                    <button 
-                                      className={`relevance-btn-small irrelevant ${sourceRelevance[source.source] === false ? 'active' : ''}`}
-                                      onClick={() => setSourceRelevance(prev => ({...prev, [source.source]: false}))}
-                                    >
-                                      ✗
-                                    </button>
-                                  </div>
-                                )}
-                                <button 
-                                  className="open-doc-btn-small"
-                                  onClick={() => window.open(`${API_BASE}/documents/download/${encodeURIComponent(source.source)}`, '_blank')}
-                                >
-                                  {result.language === 'tr' ? 'Aç' : 'Open'}
-                                </button>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
+                <div className="pc-body">
+                  <div className="pc-title">{product.model_name}</div>
+                  <div className="pc-sub">{product.part_number}</div>
+                  <div className="pc-tags">
+                    {product.series_name && <span className="tag">{product.series_name}</span>}
+                    {product.wireless_communication?.toLowerCase().includes('yes') && (
+                      <span className="tag tag-wireless">📶 Wireless</span>
                     )}
                   </div>
-                )}
-
-                {/* Feedback Section */}
-                <div className="feedback-section">
-                  <h4>
-                    {result.language === 'tr' ? 'Bu öneri işinize yaradı mı?' : 'Was this suggestion helpful?'}
-                  </h4>
-                  
-                  {/* Source relevance summary */}
-                  {!feedbackSubmitted && Object.keys(sourceRelevance).length > 0 && (
-                    <div className="source-relevance-summary">
-                      <span className="relevance-icon">📊</span>
-                      {result.language === 'tr' 
-                        ? `${Object.values(sourceRelevance).filter(v => v === true).length} alakalı, ${Object.values(sourceRelevance).filter(v => v === false).length} alakasız kaynak işaretlendi`
-                        : `${Object.values(sourceRelevance).filter(v => v === true).length} relevant, ${Object.values(sourceRelevance).filter(v => v === false).length} irrelevant sources marked`}
-                    </div>
-                  )}
-                  
-                  {retryLoading ? (
-                    <div className="retry-loading">
-                      <div className="spinner"></div>
-                      <p>{result.language === 'tr' ? 'Yeni öneri hazırlanıyor...' : 'Preparing new suggestion...'}</p>
-                    </div>
-                  ) : !feedbackSubmitted ? (
-                    <div className="feedback-buttons">
-                      <button 
-                        className="feedback-btn positive"
-                        onClick={() => handleFeedback('positive')}
-                      >
-                        <span>👍</span> {result.language === 'tr' ? 'Evet, Faydalı' : 'Yes, Helpful'}
-                      </button>
-                      <button 
-                        className="feedback-btn negative"
-                        onClick={() => handleFeedback('negative')}
-                      >
-                        <span>👎</span> {result.language === 'tr' ? 'Hayır, Farklı Öneri' : 'No, Try Different'}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="feedback-success">
-                      <span>✅</span> {result.language === 'tr' ? 'Geri bildiriminiz kaydedildi!' : 'Feedback recorded!'}
-                    </div>
-                  )}
                 </div>
+              </div>
+            ))}
+          </div>
 
-                {/* Response time */}
-                {result.response_time_ms && (
-                  <div className="response-time">
-                    ⚡ {result.language === 'tr' ? 'Yanıt süresi' : 'Response time'}: {(result.response_time_ms / 1000).toFixed(1)}s
-                  </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>
+                ← Prev
+              </button>
+              <span className="page-info">Page {page} of {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
+                Next →
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Right: Diagnosis */}
+      <section className="tech-right">
+        {/* Selected Product Details */}
+        {selectedProduct && (
+          <div className="card selected-product-card">
+            <h2>🔧 Selected Product</h2>
+            <div className="selected-product-details">
+              <div className="sp-image">
+                {getImages(selectedProduct).length > 0 ? (
+                  <img src={getImages(selectedProduct)[0]} alt={selectedProduct.model_name} />
+                ) : (
+                  <span className="no-img-lg">📷</span>
                 )}
               </div>
+              <div className="sp-info">
+                <h3>{selectedProduct.model_name}</h3>
+                <div className="sp-details">
+                  <div><strong>Part Number:</strong> {selectedProduct.part_number}</div>
+                  <div><strong>Series:</strong> {selectedProduct.series_name || 'N/A'}</div>
+                  <div><strong>Torque:</strong> {selectedProduct.min_torque || '?'} - {selectedProduct.max_torque || '?'}</div>
+                  <div><strong>Output:</strong> {selectedProduct.output_drive || 'N/A'}</div>
+                  <div><strong>Wireless:</strong> {selectedProduct.wireless_communication || 'N/A'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Diagnosis Form */}
+        <div className="card diagnosis-card">
+          <h2>🩺 Diagnose Problem</h2>
+
+          {!selectedProduct && (
+            <div className="select-product-hint">
+              <span>👈</span>
+              <p>Select a product from the list to start diagnosis</p>
             </div>
           )}
 
-          {/* Feedback Modal */}
-          {showFeedbackModal && (
-            <div className="feedback-modal">
-              <div className="modal-overlay" onClick={() => setShowFeedbackModal(false)}></div>
-              <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="form-group">
+            <label>Fault Description *</label>
+            <textarea
+              value={faultDescription}
+              onChange={(e) => setFaultDescription(e.target.value)}
+              placeholder="Describe the problem in detail... (e.g., motor makes grinding noise, tool doesn't start, battery drains quickly)"
+              rows="4"
+              disabled={loading || !selectedProduct}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Response Language</label>
+            <div className="language-selector">
+              <button
+                className={language === 'en' ? 'active' : ''}
+                onClick={() => setLanguage('en')}
+                disabled={loading}
+              >
+                🇬🇧 English
+              </button>
+              <button
+                className={language === 'tr' ? 'active' : ''}
+                onClick={() => setLanguage('tr')}
+                disabled={loading}
+              >
+                🇹🇷 Türkçe
+              </button>
+            </div>
+          </div>
+
+          <button
+            className="btn-primary btn-diagnose"
+            onClick={handleDiagnose}
+            disabled={loading || !selectedProduct || !faultDescription}
+          >
+            {loading ? (
+              <span className="spinner">⏳ Analyzing...</span>
+            ) : (
+              <>🔍 Get Repair Suggestion</>
+            )}
+          </button>
+        </div>
+
+        {/* Result */}
+        {result && (
+          <div className="card result-card">
+            <div className="result-header">
+              <h2>✅ Repair Suggestion</h2>
+              <span className={`confidence confidence-${result.confidence}`}>
+                {result.confidence === 'high' && '🟢'}
+                {result.confidence === 'medium' && '🟡'}
+                {result.confidence === 'low' && '🔴'}
+                {result.confidence}
+              </span>
+            </div>
+
+            <div className="result-content">
+              <div className="suggestion-text">
+                {result.suggestion}
+              </div>
+
+              {result.sources && result.sources.length > 0 && (
+                <div className="sources-section">
+                  <h4>📚 {result.language === 'tr' ? 'İlgili Dokümanlar' : 'Related Documents'} ({result.sources.length})</h4>
+                  <p className="sources-hint">
+                    {result.language === 'tr'
+                      ? 'Dokümanları değerlendirin ve faydalı olanları işaretleyin:'
+                      : 'Rate documents and mark helpful ones:'}
+                  </p>
+                  <div className="sources-cards">
+                    {result.sources.slice(0, 5).map((source, idx) => (
+                      <div key={idx} className={`source-card ${sourceRelevance[source.source] === true ? 'relevant' : sourceRelevance[source.source] === false ? 'irrelevant' : ''}`}>
+                        <div className="source-info">
+                          <span className="source-name">{source.source}</span>
+                          <span className="source-similarity">{result.language === 'tr' ? 'Benzerlik' : 'Similarity'}: {source.similarity}</span>
+                        </div>
+                        <div className="source-actions">
+                          {/* Relevance feedback buttons */}
+                          {!feedbackSubmitted && (
+                            <div className="relevance-buttons">
+                              <button
+                                className={`relevance-btn relevant ${sourceRelevance[source.source] === true ? 'active' : ''}`}
+                                onClick={() => setSourceRelevance(prev => ({ ...prev, [source.source]: true }))}
+                                title={result.language === 'tr' ? 'Alakalı' : 'Relevant'}
+                              >
+                                ✓
+                              </button>
+                              <button
+                                className={`relevance-btn irrelevant ${sourceRelevance[source.source] === false ? 'active' : ''}`}
+                                onClick={() => setSourceRelevance(prev => ({ ...prev, [source.source]: false }))}
+                                title={result.language === 'tr' ? 'Alakasız' : 'Not Relevant'}
+                              >
+                                ✗
+                              </button>
+                            </div>
+                          )}
+                          <button
+                            className="open-doc-btn"
+                            onClick={() => window.open(`${API_BASE}/documents/download/${encodeURIComponent(source.source)}`, '_blank')}
+                          >
+                            📄 {result.language === 'tr' ? 'Aç' : 'Open'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {result.sources.length > 5 && (
+                    <details className="more-sources">
+                      <summary>+{result.sources.length - 5} {result.language === 'tr' ? 'daha fazla kaynak' : 'more sources'}</summary>
+                      <ul className="sources-list">
+                        {result.sources.slice(5).map((source, idx) => (
+                          <li key={idx} className={sourceRelevance[source.source] === true ? 'relevant' : sourceRelevance[source.source] === false ? 'irrelevant' : ''}>
+                            <span>{source.source}</span>
+                            <div className="source-actions-small">
+                              {!feedbackSubmitted && (
+                                <div className="relevance-buttons-small">
+                                  <button
+                                    className={`relevance-btn-small relevant ${sourceRelevance[source.source] === true ? 'active' : ''}`}
+                                    onClick={() => setSourceRelevance(prev => ({ ...prev, [source.source]: true }))}
+                                  >
+                                    ✓
+                                  </button>
+                                  <button
+                                    className={`relevance-btn-small irrelevant ${sourceRelevance[source.source] === false ? 'active' : ''}`}
+                                    onClick={() => setSourceRelevance(prev => ({ ...prev, [source.source]: false }))}
+                                  >
+                                    ✗
+                                  </button>
+                                </div>
+                              )}
+                              <button
+                                className="open-doc-btn-small"
+                                onClick={() => window.open(`${API_BASE}/documents/download/${encodeURIComponent(source.source)}`, '_blank')}
+                              >
+                                {result.language === 'tr' ? 'Aç' : 'Open'}
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              )}
+
+              {/* Feedback Section */}
+              <div className="feedback-section">
                 <h4>
-                  {result?.language === 'tr' ? 'Neden faydalı olmadı?' : 'Why wasn\'t it helpful?'}
+                  {result.language === 'tr' ? 'Bu öneri işinize yaradı mı?' : 'Was this suggestion helpful?'}
                 </h4>
-                
-                <div className="feedback-reasons">
-                  <label className={`reason-option ${feedbackReason === 'wrong_product' ? 'selected' : ''}`}>
-                    <input 
-                      type="radio" 
-                      name="reason" 
-                      value="wrong_product"
-                      checked={feedbackReason === 'wrong_product'}
-                      onChange={(e) => setFeedbackReason(e.target.value)}
-                    />
-                    <span>{result?.language === 'tr' ? 'Yanlış ürün/parça önerildi' : 'Wrong product/part suggested'}</span>
-                  </label>
-                  <label className={`reason-option ${feedbackReason === 'wrong_fault_type' ? 'selected' : ''}`}>
-                    <input 
-                      type="radio" 
-                      name="reason" 
-                      value="wrong_fault_type"
-                      checked={feedbackReason === 'wrong_fault_type'}
-                      onChange={(e) => setFeedbackReason(e.target.value)}
-                    />
-                    <span>{result?.language === 'tr' ? 'Arıza tipi farklı' : 'Different fault type'}</span>
-                  </label>
-                  <label className={`reason-option ${feedbackReason === 'incomplete_info' ? 'selected' : ''}`}>
-                    <input 
-                      type="radio" 
-                      name="reason" 
-                      value="incomplete_info"
-                      checked={feedbackReason === 'incomplete_info'}
-                      onChange={(e) => setFeedbackReason(e.target.value)}
-                    />
-                    <span>{result?.language === 'tr' ? 'Eksik bilgi var' : 'Missing information'}</span>
-                  </label>
-                  <label className={`reason-option ${feedbackReason === 'incorrect_steps' ? 'selected' : ''}`}>
-                    <input 
-                      type="radio" 
-                      name="reason" 
-                      value="incorrect_steps"
-                      checked={feedbackReason === 'incorrect_steps'}
-                      onChange={(e) => setFeedbackReason(e.target.value)}
-                    />
-                    <span>{result?.language === 'tr' ? 'Adımlar yanlış' : 'Steps are incorrect'}</span>
-                  </label>
-                  <label className={`reason-option ${feedbackReason === 'other' ? 'selected' : ''}`}>
-                    <input 
-                      type="radio" 
-                      name="reason" 
-                      value="other"
-                      checked={feedbackReason === 'other'}
-                      onChange={(e) => setFeedbackReason(e.target.value)}
-                    />
-                    <span>{result?.language === 'tr' ? 'Diğer' : 'Other'}</span>
-                  </label>
-                </div>
 
-                {feedbackReason === 'other' && (
-                  <div className="custom-feedback-input">
-                    <textarea
-                      placeholder={result?.language === 'tr' ? 'Lütfen açıklayınız...' : 'Please explain...'}
-                      value={feedbackComment}
-                      onChange={(e) => setFeedbackComment(e.target.value)}
-                      rows={3}
-                    />
+                {/* Source relevance summary */}
+                {!feedbackSubmitted && Object.keys(sourceRelevance).length > 0 && (
+                  <div className="source-relevance-summary">
+                    <span className="relevance-icon">📊</span>
+                    {result.language === 'tr'
+                      ? `${Object.values(sourceRelevance).filter(v => v === true).length} alakalı, ${Object.values(sourceRelevance).filter(v => v === false).length} alakasız kaynak işaretlendi`
+                      : `${Object.values(sourceRelevance).filter(v => v === true).length} relevant, ${Object.values(sourceRelevance).filter(v => v === false).length} irrelevant sources marked`}
                   </div>
                 )}
 
-                <div className="modal-buttons">
-                  <button 
-                    className="modal-btn cancel"
-                    onClick={() => setShowFeedbackModal(false)}
-                  >
-                    {result?.language === 'tr' ? 'İptal' : 'Cancel'}
-                  </button>
-                  <button 
-                    className="modal-btn submit"
-                    onClick={() => submitNegativeFeedback(true)}
-                    disabled={!feedbackReason || retryLoading}
-                  >
-                    {retryLoading ? '...' : (result?.language === 'tr' ? '🔄 Yeni Öneri Al' : '🔄 Get New Suggestion')}
-                  </button>
+                {retryLoading ? (
+                  <div className="retry-loading">
+                    <div className="spinner"></div>
+                    <p>{result.language === 'tr' ? 'Yeni öneri hazırlanıyor...' : 'Preparing new suggestion...'}</p>
+                  </div>
+                ) : !feedbackSubmitted ? (
+                  <div className="feedback-buttons">
+                    <button
+                      className="feedback-btn positive"
+                      onClick={() => handleFeedback('positive')}
+                    >
+                      <span>👍</span> {result.language === 'tr' ? 'Evet, Faydalı' : 'Yes, Helpful'}
+                    </button>
+                    <button
+                      className="feedback-btn negative"
+                      onClick={() => handleFeedback('negative')}
+                    >
+                      <span>👎</span> {result.language === 'tr' ? 'Hayır, Farklı Öneri' : 'No, Try Different'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="feedback-success">
+                    <span>✅</span> {result.language === 'tr' ? 'Geri bildiriminiz kaydedildi!' : 'Feedback recorded!'}
+                  </div>
+                )}
+              </div>
+
+              {/* Response time */}
+              {result.response_time_ms && (
+                <div className="response-time">
+                  ⚡ {result.language === 'tr' ? 'Yanıt süresi' : 'Response time'}: {(result.response_time_ms / 1000).toFixed(1)}s
                 </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Feedback Modal */}
+        {showFeedbackModal && (
+          <div className="feedback-modal">
+            <div className="modal-overlay" onClick={() => setShowFeedbackModal(false)}></div>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+              <h4>
+                {result?.language === 'tr' ? 'Neden faydalı olmadı?' : 'Why wasn\'t it helpful?'}
+              </h4>
+
+              <div className="feedback-reasons">
+                <label className={`reason-option ${feedbackReason === 'wrong_product' ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="reason"
+                    value="wrong_product"
+                    checked={feedbackReason === 'wrong_product'}
+                    onChange={(e) => setFeedbackReason(e.target.value)}
+                  />
+                  <span>{result?.language === 'tr' ? 'Yanlış ürün/parça önerildi' : 'Wrong product/part suggested'}</span>
+                </label>
+                <label className={`reason-option ${feedbackReason === 'wrong_fault_type' ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="reason"
+                    value="wrong_fault_type"
+                    checked={feedbackReason === 'wrong_fault_type'}
+                    onChange={(e) => setFeedbackReason(e.target.value)}
+                  />
+                  <span>{result?.language === 'tr' ? 'Arıza tipi farklı' : 'Different fault type'}</span>
+                </label>
+                <label className={`reason-option ${feedbackReason === 'incomplete_info' ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="reason"
+                    value="incomplete_info"
+                    checked={feedbackReason === 'incomplete_info'}
+                    onChange={(e) => setFeedbackReason(e.target.value)}
+                  />
+                  <span>{result?.language === 'tr' ? 'Eksik bilgi var' : 'Missing information'}</span>
+                </label>
+                <label className={`reason-option ${feedbackReason === 'incorrect_steps' ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="reason"
+                    value="incorrect_steps"
+                    checked={feedbackReason === 'incorrect_steps'}
+                    onChange={(e) => setFeedbackReason(e.target.value)}
+                  />
+                  <span>{result?.language === 'tr' ? 'Adımlar yanlış' : 'Steps are incorrect'}</span>
+                </label>
+                <label className={`reason-option ${feedbackReason === 'other' ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="reason"
+                    value="other"
+                    checked={feedbackReason === 'other'}
+                    onChange={(e) => setFeedbackReason(e.target.value)}
+                  />
+                  <span>{result?.language === 'tr' ? 'Diğer' : 'Other'}</span>
+                </label>
+              </div>
+
+              {feedbackReason === 'other' && (
+                <div className="custom-feedback-input">
+                  <textarea
+                    placeholder={result?.language === 'tr' ? 'Lütfen açıklayınız...' : 'Please explain...'}
+                    value={feedbackComment}
+                    onChange={(e) => setFeedbackComment(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              )}
+
+              <div className="modal-buttons">
+                <button
+                  className="modal-btn cancel"
+                  onClick={() => setShowFeedbackModal(false)}
+                >
+                  {result?.language === 'tr' ? 'İptal' : 'Cancel'}
+                </button>
+                <button
+                  className="modal-btn submit"
+                  onClick={() => submitNegativeFeedback(true)}
+                  disabled={!feedbackReason || retryLoading}
+                >
+                  {retryLoading ? '...' : (result?.language === 'tr' ? '🔄 Yeni Öneri Al' : '🔄 Get New Suggestion')}
+                </button>
               </div>
             </div>
-          )}
-        </section>
-      </div>
-    );
-  
+          </div>
+        )}
+      </section>
+    </div>
+  );
+
 
   // ===========================================================================
   // MAIN RENDER - Application Root Component
   // ===========================================================================
-  
+
   // Show loading screen while checking authentication
   if (initializing) {
     return (
@@ -1752,7 +1779,7 @@ function App() {
       </div>
     );
   }
-  
+
   return (
     <div className="app">
       <nav className="navbar">
@@ -1878,10 +1905,10 @@ function App() {
           <div className="footer-credits">
             <span>Developed by</span>
             <a href="https://github.com/fatihhbayramm" target="_blank" rel="noreferrer" className="footer-link">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" /></svg>
             </a>
             <a href="https://www.linkedin.com/in/fatihhbayramm/" target="_blank" rel="noreferrer" className="footer-link">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" /></svg>
             </a>
             <span className="footer-author">adentechio</span>
           </div>

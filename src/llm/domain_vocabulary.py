@@ -236,6 +236,22 @@ class DomainVocabulary:
     }
     
     # -------------------------------------------------------------------------
+    # REPAIR PROCEDURES AND ACTIONS
+    # -------------------------------------------------------------------------
+    PROCEDURES = {
+        "replace": ["replace", "replacement", "swap", "change", "install new"],
+        "calibrate": ["calibrate", "calibration", "adjust", "tune", "alignment"],
+        "clean": ["clean", "cleaning", "wipe", "remove debris"],
+        "inspect": ["inspect", "check", "examine", "verify", "test"],
+        "tighten": ["tighten", "secure", "fasten", "torque"],
+        "lubricate": ["lubricate", "oil", "grease", "apply lubricant"],
+        "reset": ["reset", "reboot", "restart", "power cycle"],
+        "update": ["update", "upgrade", "flash", "install firmware"],
+        "measure": ["measure", "test", "check voltage", "check current"],
+        "disassemble": ["disassemble", "remove", "take apart", "open"],
+    }
+    
+    # -------------------------------------------------------------------------
     # UTILITY METHODS
     # -------------------------------------------------------------------------
     

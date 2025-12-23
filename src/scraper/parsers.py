@@ -308,20 +308,52 @@ class ProductParser:
         min_torque = "-"
         max_torque = "-"
         
-        # Try range pattern: "1.5 to 8 Nm" or "1.5-8 Nm"
-        torque_match = re.search(
-            r'([0-9.]+)\s*(?:to|-|–)\s*([0-9.]+)\s*Nm',
+        # Strategy 1: Look for explicit range with "to" (most reliable)
+        # Matches: "0.45 to 1.8 Nm", "0.45Nm to 1.8Nm", "-0.45 to 1.8 Nm"
+        torque_to_match = re.search(
+            r'(-?[0-9.]+)\s*(?:Nm)?\s+to\s+(-?[0-9.]+)\s*Nm',
             html_text,
             re.IGNORECASE
         )
-        if torque_match:
-            min_torque = f"{torque_match.group(1)} Nm"
-            max_torque = f"{torque_match.group(2)} Nm"
-        else:
-            # Try single value: "8 Nm"
-            single_match = re.search(r'([0-9.]+)\s*Nm', html_text, re.IGNORECASE)
-            if single_match:
-                max_torque = f"{single_match.group(1)} Nm"
+        if torque_to_match:
+            # Take absolute values to handle negative signs (e.g., "M20 -0.45Nm" → 0.45)
+            min_val = abs(float(torque_to_match.group(1)))
+            max_val = abs(float(torque_to_match.group(2)))
+            min_torque = f"{min_val} Nm"
+            max_torque = f"{max_val} Nm"
+            return min_torque, max_torque
+        
+        # Strategy 2: Look for range with dash/hyphen ONLY if both sides have Nm
+        # Matches: "1.5Nm-8Nm", "1.5 Nm - 8 Nm"
+        # Avoids: "M20 -0.45Nm" (only one Nm), "5-25 Nm" (only one Nm)
+        torque_dash_match = re.search(
+            r'([0-9.]+)\s*Nm\s*[-–]\s*([0-9.]+)\s*Nm',
+            html_text,
+            re.IGNORECASE
+        )
+        if torque_dash_match:
+            min_torque = f"{torque_dash_match.group(1)} Nm"
+            max_torque = f"{torque_dash_match.group(2)} Nm"
+            return min_torque, max_torque
+        
+        # Strategy 3: Single value with validation
+        # Use negative lookbehind to exclude model codes (M20, M10, etc.)
+        # Also use negative lookbehind for dash to avoid "5-25 Nm" → "25"
+        # Matches: "8 Nm", "0.45 Nm"
+        # Avoids: "M20", "-25 Nm" (from "5-25 Nm")
+        single_match = re.search(
+            r'(?<![A-Z-])([0-9.]+)\s*Nm',
+            html_text,
+            re.IGNORECASE
+        )
+        if single_match:
+            try:
+                torque_val = float(single_match.group(1))
+                # Only accept if it looks like a reasonable torque value (0.01 to 500 Nm)
+                if 0.01 <= torque_val <= 500:
+                    max_torque = f"{single_match.group(1)} Nm"
+            except ValueError:
+                pass
         
         return min_torque, max_torque
     
@@ -357,16 +389,44 @@ class ProductParser:
     
     @staticmethod
     def _extract_wireless(html_text: str) -> str:
-        """Extract wireless communication capability"""
-        wireless_patterns = [
-            r'wi-?fi',
-            r'wireless',
-            r'2\.4\s*(?:g|GHz)',
-            r'5\s*GHz',
-            r'bluetooth'
+        """
+        Extract wireless communication capability.
+        
+        Battery tools wireless detection based on model code:
+        - EPBC, EABC, EABS, ELC, BLRTC, etc. → Wireless (C = Connected/Communication)
+        - EPB, EPBA, EAB, BLRTA, etc. → Standalone battery, NOT wireless
+        
+        Cable tools: Check for actual wireless keywords in text
+        """
+        # Strategy 1: Check model code for wireless indicators
+        # Wireless battery tool patterns (C suffix = Connected/Communication)
+        wireless_model_patterns = [
+            r'\bEPBC\b',      # Electric Pistol Battery Connected
+            r'\bEABC\b',      # Electric Angle Battery Connected  
+            r'\bEABS\b',      # Electric Angle Battery Straight (wireless)
+            r'\bEIBS\b',      # Electric Inline Battery Straight (wireless)
+            r'\bELC\b',       # Electric Lit Connected
+            r'\bELS\b',       # Electric Lit Straight (wireless)
+            r'\bBLRTC\b',     # Battery Low Reaction Torque Connected
+            r'\bEPBCHT\b',    # Electric Pistol Battery Connected High Torque
+            r'\bEABCHT\b',    # Electric Angle Battery Connected High Torque
+            r'\bEABCHT\b',    # Electric Angle Battery Connected High Torque
         ]
         
-        for pattern in wireless_patterns:
+        for pattern in wireless_model_patterns:
+            if re.search(pattern, html_text, re.IGNORECASE):
+                return "Yes"
+        
+        # Strategy 2: For cable tools, check for explicit wireless keywords
+        # Only if we haven't matched a battery model code above
+        wireless_keywords = [
+            r'wi-?fi\s+(?:capable|enabled|module)',  # "WiFi capable", "WiFi enabled"
+            r'bluetooth\s+(?:capable|enabled|module)',  # "Bluetooth capable"
+            r'2\.4\s*GHz\s+wireless',  # "2.4 GHz wireless"
+            r'wireless\s+communication',  # "wireless communication"
+        ]
+        
+        for pattern in wireless_keywords:
             if re.search(pattern, html_text, re.IGNORECASE):
                 return "Yes"
         
