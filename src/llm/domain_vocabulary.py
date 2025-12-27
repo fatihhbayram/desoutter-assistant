@@ -348,6 +348,185 @@ class DomainVocabulary:
         """
         return cls.PRODUCT_SERIES.get(abbrev.upper())
     
+    # -------------------------------------------------------------------------
+    # CONNECTION ARCHITECTURE (Product Family Connectivity)
+    # -------------------------------------------------------------------------
+    CONNECTION_ARCHITECTURE = {
+        "CVI3_RANGE": {
+            "description": "Corded tools requiring CVI3 controller unit",
+            "tools": {
+                "ExD": {"connection_type": "corded", "unit_family": "CVI3", "requires_unit": True},
+                "EFMx": {"connection_type": "corded", "unit_family": "CVI3", "requires_unit": True},
+                "EFDx": {"connection_type": "corded", "unit_family": "CVI3", "requires_unit": True},
+                "EPD": {"connection_type": "corded", "unit_family": "CVI3", "requires_unit": True},
+                "EIDS": {"connection_type": "corded", "unit_family": "CVI3", "requires_unit": True},
+                "ERS": {"connection_type": "corded", "unit_family": "CVI3", "requires_unit": True, "adapter_required": True}
+            }
+        },
+        
+        "CVIC_II_H2_RANGE": {
+            "description": "CVIC II H2 controller family",
+            "unit_family": "CVIC_II_H2",
+            "requires_unit": True,
+            "supported_tool_series": ["ECS"]
+        },
+        
+        "CVIC_II_H4_RANGE": {
+            "description": "CVIC II H4 controller family",
+            "unit_family": "CVIC_II_H4",
+            "requires_unit": True,
+            "supported_tool_series": ["MC"]
+        },
+        
+        "CVIR_II_RANGE": {
+            "description": "CVIR II controller family",
+            "unit_family": "CVIR_II",
+            "requires_unit": True,
+            "supported_tool_series": ["ERS", "ECS"],
+            "unit_feature_required": True
+        },
+        
+        "CVIL_II_RANGE": {
+            "description": "CVIL II controller family",
+            "unit_family": "CVIL_II",
+            "requires_unit": True,
+            "supported_tool_series": ["EM", "ERAL", "EME", "EMEL"]
+        },
+        
+        "BATTERY_WIFI_TOOLS": {
+            "description": "WiFi-capable battery tools (wireless communication)",
+            "tools": {
+                "ExBC": {
+                    "connection_type": "wifi",
+                    "unit_family": "Connect/CVI3 AP",
+                    "standalone_mode_supported": True,
+                    "unit_required_for_config": True,
+                    "wifi_card": True,
+                    "model_dependent": True
+                },
+                "EABS": {
+                    "connection_type": "wifi",
+                    "unit_family": "Connect/CVI3 AP",
+                    "standalone_mode_supported": True,
+                    "unit_required_for_config": True,
+                    "wifi_card": True
+                },
+                "BLRTC": {
+                    "connection_type": "wifi",
+                    "unit_family": "Connect/CVI3 AP",
+                    "standalone_mode_supported": True,
+                    "unit_required_for_config": True,
+                    "wifi_card": True
+                },
+                "QShield": {
+                    "connection_type": "wifi",
+                    "unit_family": "CVI3/Connect",
+                    "standalone_mode_supported": True,
+                    "unit_required_for_config": True,
+                    "wifi_card": True
+                },
+                "ELC": {
+                    "connection_type": "wifi",
+                    "unit_family": "Connect/CVI3 AP",
+                    "standalone_mode_supported": True,
+                    "unit_required_for_config": True,
+                    "wifi_card": True
+                }
+            }
+        },
+        
+        "STANDALONE_BATTERY": {
+            "description": "Standalone battery tools (no controller required, no WiFi)",
+            "tools": {
+                "ExBA": {"standalone": True, "requires_unit": False},
+                "EABA": {"standalone": True, "requires_unit": False},
+                "ExB": {"standalone": True, "requires_unit": False},  # Covers EPB, EAB (non-C variants)
+                "BLRTA": {"standalone": True, "requires_unit": False},
+                "ExB_Flex": {"standalone": True, "requires_unit": False},
+                "XPB": {"standalone": True, "requires_unit": False},
+                "ELS": {"standalone": True, "requires_unit": False},
+                "ELB": {"standalone": True, "requires_unit": False}
+            }
+        },
+        
+        "CONNECT_FAMILY": {
+            "description": "Connect controller units for WiFi tools",
+            "units": {
+                "CONNECT_W": {
+                    "standalone_unit": True,
+                    "builtin_ap": True,
+                    "requires_external_ap": False,
+                    "software_based": False
+                },
+                "CONNECT_X": {
+                    "standalone_unit": True,
+                    "builtin_ap": False,
+                    "requires_external_ap": True,
+                    "software_based": False
+                },
+                "CONNECT_D": {
+                    "standalone_unit": False,
+                    "builtin_ap": False,
+                    "requires_external_ap": False,
+                    "software_based": True
+                }
+            }
+        }
+    }
+    
+    @classmethod
+    def get_connection_info(cls, model_name: str) -> Optional[Dict]:
+        """
+        Get connection architecture info for a tool model.
+        
+        Args:
+            model_name: Tool model name (e.g., "EPBC8-1800-4Q")
+            
+        Returns:
+            Connection info dict or None if not found
+            
+        Example:
+            >>> get_connection_info("EPBC8-1800-4Q")
+            {
+                "connection_type": "wifi",
+                "unit_family": "Connect/CVI3 AP",
+                "standalone_mode_supported": True,
+                "wifi_card": True
+            }
+        """
+        # Extract series prefix (e.g., "EPBC" from "EPBC8-1800-4Q")
+        series_match = re.match(r'^([A-Z]+)', model_name.upper())
+        if not series_match:
+            return None
+        
+        series = series_match.group(1)
+        
+        # Check WiFi battery tools
+        wifi_tools = cls.CONNECTION_ARCHITECTURE.get("BATTERY_WIFI_TOOLS", {}).get("tools", {})
+        for pattern, info in wifi_tools.items():
+            # Convert pattern with 'x' wildcard to regex (e.g., "ExBC" -> "E.BC")
+            regex_pattern = pattern.replace("x", ".").upper()
+            if re.match(f"^{regex_pattern}", series):
+                return {**info, "series": series, "category": "battery_wifi"}
+        
+        # Check standalone battery tools
+        standalone_tools = cls.CONNECTION_ARCHITECTURE.get("STANDALONE_BATTERY", {}).get("tools", {})
+        for pattern, info in standalone_tools.items():
+            # Convert pattern with 'x' wildcard to regex (e.g., "ExBA" -> "E.BA")
+            regex_pattern = pattern.replace("x", ".").upper()
+            if re.match(f"^{regex_pattern}", series):
+                return {**info, "series": series, "category": "standalone_battery"}
+        
+        # Check CVI3 range (corded tools)
+        cvi3_tools = cls.CONNECTION_ARCHITECTURE.get("CVI3_RANGE", {}).get("tools", {})
+        for pattern, info in cvi3_tools.items():
+            # Convert pattern with 'x' wildcard to regex (e.g., "EFDx" -> "EFD.")
+            regex_pattern = pattern.replace("x", ".").upper()
+            if re.match(f"^{regex_pattern}", series):
+                return {**info, "series": series, "category": "corded_cvi3"}
+        
+        return None
+    
     @classmethod
     def get_error_message(cls, error_code: str) -> Optional[str]:
         """

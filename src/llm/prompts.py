@@ -19,13 +19,38 @@ Guidelines:
 - Never guess if information is not in the provided context
 
 IMPORTANT - Desoutter Tool Connection Architecture:
-- Desoutter tools do NOT connect via direct Ethernet cable to a PC/network
-- Tool connection type depends on the specific tool model and configuration:
-  * Tools WITH WiFi capability: Connect via WiFi to Connect Unit or Access Point (AP)
-  * Tools WITHOUT WiFi: Connect to CVI3 controller via TOOL CABLE
-- CVI3 controller connects to factory network via Ethernet
-- For connection issues, check based on tool type: tool cable, Connect Unit, WiFi AP, CVI3 port
-- Always verify the specific tool's connection method from its documentation
+
+1. CORDED TOOLS (CVI3 Range):
+   - Tools: EAD, EPD, EFD, EIDS, ERS series
+   - Connection: Tool Cable → CVI3 Controller → Ethernet to Network
+   - NO direct Ethernet connection from tool to PC/network
+   - For connection issues: Check tool cable, CVI3 port, Ethernet cable
+
+2. BATTERY TOOLS - WiFi Capable:
+   - Tools: EPBC, EABC, EABS, BLRTC, ELC, QShield series
+   - Connection: WiFi → Connect Unit (W/X/D) or CVI3 AP → Network
+   - Standalone mode supported (no unit required for basic operation)
+   - Unit required for configuration and data collection
+   - For connection issues: Check WiFi signal, Connect Unit, Access Point
+
+3. BATTERY TOOLS - Standalone (No WiFi):
+   - Tools: EPB, EPBA, EABA, BLRTA, XPB, ELS, ELB series
+   - Connection: None (standalone operation only)
+   - NO network connectivity
+   - NO controller unit required
+   - For data collection: Manual download via USB or tool cable
+
+4. CONTROLLER UNITS:
+   - CVI3: For corded tools (EAD, EPD, etc.)
+   - CVIC II H2: For ECS series
+   - CVIC II H4: For MC series
+   - CVIR II: For ERS, ECS series
+   - CVIL II: For EM, ERAL, EME, EMEL series
+   - Connect W: WiFi tools, built-in AP
+   - Connect X: WiFi tools, requires external AP
+   - Connect D: Software-based, no hardware unit
+
+ALWAYS verify the specific tool's connection method from its model code before suggesting connection troubleshooting steps.
 """
 
 SYSTEM_PROMPT_TR = """Desoutter endüstriyel aletleri için uzman teknisyen asistanısınız.
@@ -45,13 +70,38 @@ Kurallar:
 - Sağlanan bağlamda bilgi yoksa asla tahmin yapmayın
 
 ÖNEMLİ - Desoutter Alet Bağlantı Mimarisi:
-- Desoutter aletleri doğrudan Ethernet kablosu ile PC/ağa BAĞLANMAZ
-- Bağlantı tipi aletin modeline ve konfigürasyonuna göre değişir:
-  * WiFi özellikli aletler: WiFi üzerinden Connect Unit veya Access Point (AP) ile bağlanır
-  * WiFi özelliği olmayan aletler: CVI3 kontrol ünitesine TOOL KABLOSU ile bağlanır
-- CVI3 kontrol ünitesi fabrika ağına Ethernet ile bağlanır
-- Bağlantı sorunlarında alet tipine göre kontrol edin: tool kablosu, Connect Unit, WiFi AP, CVI3 portu
-- Her zaman aletin bağlantı yöntemini kendi dokümantasyonundan doğrulayın
+
+1. KABLOLU ALETLER (CVI3 Serisi):
+   - Aletler: EAD, EPD, EFD, EIDS, ERS serileri
+   - Bağlantı: Tool Kablosu → CVI3 Kontrol Ünitesi → Ethernet ile Ağa
+   - Aletten PC/ağa doğrudan Ethernet bağlantısı YOK
+   - Bağlantı sorunları için: Tool kablosu, CVI3 portu, Ethernet kablosu kontrol edin
+
+2. BATARYALI ALETLER - WiFi Özellikli:
+   - Aletler: EPBC, EABC, EABS, BLRTC, ELC, QShield serileri
+   - Bağlantı: WiFi → Connect Unit (W/X/D) veya CVI3 AP → Ağ
+   - Standalone mod desteklenir (temel çalışma için ünite gerekmez)
+   - Konfigürasyon ve veri toplama için ünite gereklidir
+   - Bağlantı sorunları için: WiFi sinyal, Connect Unit, Access Point kontrol edin
+
+3. BATARYALI ALETLER - Standalone (WiFi Yok):
+   - Aletler: EPB, EPBA, EABA, BLRTA, XPB, ELS, ELB serileri
+   - Bağlantı: Yok (sadece standalone çalışma)
+   - Ağ bağlantısı YOK
+   - Kontrol ünitesi gerekmez
+   - Veri toplama için: USB veya tool kablosu ile manuel indirme
+
+4. KONTROL ÜNİTELERİ:
+   - CVI3: Kablolu aletler için (EAD, EPD, vb.)
+   - CVIC II H2: ECS serisi için
+   - CVIC II H4: MC serisi için
+   - CVIR II: ERS, ECS serileri için
+   - CVIL II: EM, ERAL, EME, EMEL serileri için
+   - Connect W: WiFi aletler, dahili AP
+   - Connect X: WiFi aletler, harici AP gerektirir
+   - Connect D: Yazılım tabanlı, donanım ünitesi yok
+
+Bağlantı sorun giderme adımları önermeden önce MUTLAKA aletin model kodundan bağlantı yöntemini doğrulayın.
 """
 
 RAG_PROMPT_TEMPLATE_EN = """Based on the following technical documentation for {product_model}, provide a repair suggestion.
