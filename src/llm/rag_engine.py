@@ -50,6 +50,7 @@ class RAGEngine:
         self.response_cache = None
         self.self_learning_engine = None  # Phase 6
         self.domain_embeddings = None  # Phase 3.1
+        self.query_processor = None  # Phase 2.2
         self.context_optimizer = ContextOptimizer(token_budget=8000)  # Phase 3.4
         self.performance_monitor = get_performance_monitor()  # Phase 5.1
         
@@ -66,6 +67,9 @@ class RAGEngine:
         
         # Initialize domain embeddings (Phase 3.1)
         self._init_domain_embeddings()
+        
+        # Initialize query processor (Phase 2.2)
+        self._init_query_processor()
         
         logger.info("✅ RAG Engine initialized")
     
@@ -116,6 +120,16 @@ class RAGEngine:
         except Exception as e:
             logger.warning(f"Failed to initialize domain embeddings: {e}")
             self.domain_embeddings = None
+    
+    def _init_query_processor(self):
+        """Initialize query processor (Phase 2.2)"""
+        try:
+            from src.llm.query_processor import get_query_processor
+            self.query_processor = get_query_processor(self.domain_embeddings)
+            logger.info("✅ Query processor enabled (Phase 2.2)")
+        except Exception as e:
+            logger.warning(f"Failed to initialize query processor: {e}")
+            self.query_processor = None
     
     def _apply_metadata_boost(self, base_score: float, metadata: Dict) -> float:
         """

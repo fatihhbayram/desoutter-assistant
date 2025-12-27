@@ -177,12 +177,12 @@ RELEVANCE_FILTER_RULES = {
     
     # Cable & Connector
     "cable_connector": {
-        "trigger_keywords": ["cable", "connector", "plug", "connection", "wire"],
+        "trigger_keywords": ["cable", "connector", "plug", "wire", "wiring", "cable damage", "loose cable"],
         "exclude_if_contains": [
-            "motor replacement", "gearbox", "display", "touchscreen"
+            "motor replacement", "gearbox", "display", "touchscreen", "wifi", "network"
         ],
         "require_at_least_one": [
-            "cable", "connector", "plug", "connection", "wire", "wiring"
+            "cable", "connector", "plug", "wire", "wiring"
         ]
     }
 }
