@@ -37,19 +37,31 @@
 - [ ] feedback_engine.py → delegation pattern
 - [ ] rag_engine.py → self_learning_engine kullan
 - [ ] API endpoint'leri güncelle
-- [ ] End-to-end test
+- [x] End-to-end test
+
+#### Phase 0.2: Product-Aware Response Filtering (NEW - HIGH PRIORITY)
+**Problem:** System suggests WiFi troubleshooting for non-wireless tools (e.g., EPBA8)
+- [ ] Add product capability check in RAG pipeline
+- [ ] Filter responses based on product features:
+  * Wireless capable → WiFi/network suggestions OK
+  * Standalone battery → No network suggestions
+  * Corded tools → No battery/WiFi suggestions
+- [ ] Update prompt with product capability context
+- [ ] Test with edge cases (EPBA8 WiFi, EPB network, EAD battery)
 
 #### Phase 1.3: Remove Unused Config
-- [ ] `EMBEDDING_CACHE_ENABLED` kaldır
-- [ ] `EMBEDDING_CACHE_TTL` kaldır
-- [ ] Runtime test
+- [x] `EMBEDDING_CACHE_ENABLED` kaldır
+- [x] `EMBEDDING_CACHE_TTL` kaldır
+- [x] Runtime test
+- Commit: b5ed021
 
 ### 🟡 Orta Öncelik
 
 #### Phase 2.2: Extract Query Processor
-- [ ] `src/llm/query_processor.py` oluştur
-- [ ] Query enhancement logic centralize et
-- [ ] rag_engine.py entegre et
+- [x] `src/llm/query_processor.py` oluştur
+- [x] Query enhancement logic centralize et
+- [x] rag_engine.py entegre et
+- Commit: 1e229c2
 
 #### Phase 3.1: Config Consolidation
 - [ ] Hardcoded değerleri ai_settings.py'ye taşı
