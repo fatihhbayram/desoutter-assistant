@@ -46,6 +46,64 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 
 ---
 
+## 📆 27 Aralık 2025 (Cuma) - RAG Relevance Filtering & System Updates
+
+### 🆕 Phase 0.1: RAG Relevance Filtering ✅
+**Yeni Dosyalar:** 
+- `config/relevance_filters.py` (197 satır)
+- `src/llm/relevance_filter.py` (220 satır)
+
+**Özellikler:**
+- 15 fault category (WiFi, motor, torque, battery, display, touchscreen, pset, sensor, error codes, sound, communication, LED, button, cable, software)
+- Negative keyword filtering ile alakasız dökümanları exclude etme
+- Word boundary regex matching (false positive önleme - 'led' in 'failed' gibi)
+- Production-safe: Config-driven, try-catch, max exclusion limits
+- Test sonucu: 10/10 passed
+
+**Etki:** %70-80 irrelevant result azalması bekleniyor
+
+### 🆕 Connection Architecture Mapping ✅
+**Dosya:** `src/llm/domain_vocabulary.py` (+184 satır)
+
+- 6 ürün ailesi kategorisi:
+  - CVI3 Range (corded tools)
+  - CVIC/CVIR/CVIL II families
+  - Battery WiFi tools (EPBC, EABC, EABS, BLRTC, ELC, QShield)
+  - Standalone battery tools (EPB, EPBA, EAB)
+  - Connect family units
+- `get_connection_info()` metodu ile model bazlı bağlantı bilgisi
+- Regex pattern matching (ExBC → EPBC/EABC)
+
+### 🆕 Document Ingestion ✅
+- 541 döküman işlendi (121 PDF + 420 Word)
+- 3,651 yeni semantic chunk oluşturuldu
+- ChromaDB toplam: 6,798 chunk (%116 artış)
+- Başarı oranı: %98.7 (539/546)
+
+### 🆕 RAG Prompt Enhancement ✅
+**Dosya:** `src/llm/prompts.py` (+50 satır)
+
+- İngilizce ve Türkçe sistem prompt'ları güncellendi
+- 4 bağlantı kategorisi detaylandırıldı
+- Controller unit açıklamaları eklendi
+
+### 🔧 Wireless Field Düzeltmesi
+- 300 ürün güncellendi (null → false)
+- Son durum: 71 wireless, 380 non-wireless, 0 null
+
+### 📝 Değiştirilen Dosyalar
+- `config/relevance_filters.py` (NEW)
+- `src/llm/relevance_filter.py` (NEW)
+- `src/llm/rag_engine.py` (+10 satır)
+- `src/llm/domain_vocabulary.py` (+184 satır)
+- `src/llm/prompts.py` (+50 satır)
+
+### ✅ Commit'ler
+- `cd44ecc`: Connection architecture & RAG system enhancement
+- `e199ee4`: RAG relevance filtering (15 categories)
+
+---
+
 ## 📆 23 Aralık 2025 (Pazartesi) - Product Data Quality Fix
 
 ### ✅ Tamamlanan

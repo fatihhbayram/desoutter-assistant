@@ -1,125 +1,155 @@
-# 🎯 TODO - Sonraki Oturum (23 Aralık 2025)
+# 🎯 TODO - Sonraki Oturum (28 Aralık 2025)
 
-## 🎉 RAG ENHANCEMENT ROADMAP TAMAMLANDI!
+## 🎉 SON GÜNCELLEME: 27 Aralık 2025
 
-**Tüm ana fazlar başarıyla tamamlandı ve production'da çalışıyor:**
+### ✅ Bugün Tamamlanan (27 Aralık)
 
-| Faz | Açıklama | Durum | Tarih |
-|-----|----------|-------|-------|
-| Phase 1 | Semantic Chunking | ✅ | 15 Ara |
-| Phase 2 | Hybrid Search + Cache | ✅ | 16 Ara |
-| Phase 3.3 | Source Relevance Feedback | ✅ | 17 Ara |
-| Phase 3.4 | Context Window Optimization | ✅ | 17 Ara |
-| Phase 4.1 | Metadata Filtering & Boosting | ✅ | 17 Ara |
-| Phase 5 | Performance Metrics | ✅ | 22 Ara |
-| Phase 3.5 | Multi-turn Conversation | ✅ | 22 Ara |
-| Phase 6 | Self-Learning Feedback Loop | ✅ | 22 Ara |
-| **Phase 3.1** | **Domain Embeddings** | ✅ | **22 Ara** |
+| Görev | Açıklama | Commit |
+|-------|----------|--------|
+| RAG Relevance Filtering | 15 fault category, word boundary matching | e199ee4 |
+| Connection Architecture | 6 ürün ailesi, get_connection_info() | cd44ecc |
+| Document Ingestion | 541 doc, 3,651 chunk → toplam 6,798 | - |
+| Wireless Field Fix | 300 ürün güncellendi (null → false) | - |
+| RAG Prompt Enhancement | EN + TR prompt'ları güncellendi | cd44ecc |
 
 ---
 
-## 📋 Scrape Komutu (Rate Limit Sonrası)
-
-```bash
-cd /home/adentechio/desoutter-assistant && sudo docker cp config/settings.py desoutter-api:/app/config/ && sudo docker cp src/utils/http_client.py desoutter-api:/app/src/utils/ && sudo docker exec desoutter-api python3 /app/scripts/scrape_all.py 2>&1 | tee scrape_log.txt
-```
-
----
-
-## 📊 Yeni API Endpoint'leri (Toplam 16 yeni endpoint)
-
-### Phase 5 (Performance Metrics):
-- `GET /admin/metrics/health` - Sistem sağlık durumu
-- `GET /admin/metrics/stats` - İstatistikler
-- `GET /admin/metrics/queries` - Son sorgular
-- `GET /admin/metrics/slow` - Yavaş sorgular
-- `POST /admin/metrics/reset` - Metrikleri sıfırla
-
-### Phase 3.5 (Multi-turn Conversation):
-- `POST /conversation/start` - Yeni konuşma başlat
-- `POST /conversation/{session_id}/query` - Konuşmada soru sor
-- `GET /conversation/{session_id}/history` - Konuşma geçmişi
-- `DELETE /conversation/{session_id}` - Konuşmayı sonlandır
-- `POST /query` - session_id parametresi eklendi
-
-### Phase 6 (Self-Learning):
-- `GET /admin/learning/stats` - Öğrenme istatistikleri
-- `GET /admin/learning/top-sources` - En iyi kaynaklar
-- `POST /admin/learning/recommendations` - Keyword önerileri
-- `GET /admin/learning/training-status` - Eğitim durumu
-- `POST /admin/learning/schedule-retraining` - Eğitim planla
-- `POST /admin/learning/reset` - Öğrenmeyi sıfırla
-
-### Phase 3.1 (Domain Embeddings):
-- `GET /admin/domain/stats` - Domain istatistikleri  
-- `GET /admin/domain/vocabulary` - Vocabulary bilgisi
-- `POST /admin/domain/enhance-query` - Sorgu zenginleştirme
-- `GET /admin/domain/error-codes` - Hata kodları listesi (29 kod)
-- `GET /admin/domain/product-series` - Ürün serileri listesi (27 seri)
-
----
-
-## 🚀 Sonraki Adımlar
-
-### 1. Scraping (Öncelik 1 - Rate Limit Sonrası)
-- 11 seri kaldı (Cable Tightening + Electric Drilling)
-- Yukarıdaki komutu çalıştır
-
-### 2. TechWizard Entegrasyonu (Öncelik 2)
-- App.jsx'e TechWizard entegre et
-- Öğrenilen eşlemeleri otomatik güncelleme
-
-### 3. Embedding Fine-tuning (Öncelik 3 - Opsiyonel)
-- 100+ contrastive pair toplandıktan sonra
-- Domain-specific embedding modeli eğit
-
----
-
-## ⏳ Kalan Seriler (11 adet) - Rate Limit Sonrası
-
-### Cable Tightening (7 seri):
-| Seri | URL |
-|------|-----|
-| EFD | https://www.desouttertools.com/en/p/efd-electric-fixtured-direct-nutrunner-130856 |
-| EFM | https://www.desouttertools.com/en/p/efm-electric-fixtured-multi-nutrunner-191845 |
-| ERF | https://www.desouttertools.com/en/p/erf-fixtured-electric-spindles-326679 |
-| EFMA | https://www.desouttertools.com/en/p/efma-transducerized-angle-head-spindle-718240 |
-| EFBCI | https://www.desouttertools.com/en/p/efbci-fast-integration-spindles-straight-718237 |
-| EFBCIT | https://www.desouttertools.com/en/p/efbcit-fast-integration-spindles-straight-telescopic-718238 |
-| EFBCA | https://www.desouttertools.com/en/p/efbca-fast-integration-spindles-angled-715011 |
-
-### Electric Drilling (4 seri):
-| XPB One | https://www.desouttertools.com/en/p/xpb-one-164685 |
-| Tightening Head | https://www.desouttertools.com/en/p/tightening-head-679250 |
-| Drilling Head | https://www.desouttertools.com/en/p/drilling-head-679249 |
-
----
-
-## 📊 Mevcut Durum (22 Aralık 2025)
+## 📊 Sistem Durumu (27 Aralık 2025)
 
 | Metrik | Değer |
 |--------|-------|
-| **Toplam ürün** | ~306 (277 + 29 yeni) |
-| **Battery Tightening** | 151 ✅ |
-| **Cable Tightening** | ~155 (kısmi) |
-| **Electric Drilling** | 0 (bekliyor) |
-| **ChromaDB doküman** | 487 (484 bulletin + 3 manual) |
-| **RAG Fazları** | 7/9 tamamlandı |
+| Toplam Ürün | 451 |
+| Wireless Capable | 71 |
+| Non-Wireless | 380 |
+| ChromaDB Chunks | 6,798 |
+| Döküman Sayısı | 541 |
+| Fault Categories | 15 |
+| Domain Terms | 351 |
 
 ---
 
-## ⚠️ Rate Limit Notu
+## 🚀 Sıradaki Görevler
 
-- Web sitesi HTTP 429 rate limit uyguluyor
-- Script'te delay 90 saniyeye ayarlandı
-- Her seri arasında 90 saniye bekleme var
-- Toplam tahmini süre: ~20 dakika (11 seri × ~2 dk)
+### 🔴 Yüksek Öncelik
+
+#### Phase 2.1: Unify Feedback Systems
+- [ ] MongoDB migration script oluştur
+- [ ] feedback_engine.py → delegation pattern
+- [ ] rag_engine.py → self_learning_engine kullan
+- [ ] API endpoint'leri güncelle
+- [ ] End-to-end test
+
+#### Phase 1.3: Remove Unused Config
+- [ ] `EMBEDDING_CACHE_ENABLED` kaldır
+- [ ] `EMBEDDING_CACHE_TTL` kaldır
+- [ ] Runtime test
+
+### 🟡 Orta Öncelik
+
+#### Phase 2.2: Extract Query Processor
+- [ ] `src/llm/query_processor.py` oluştur
+- [ ] Query enhancement logic centralize et
+- [ ] rag_engine.py entegre et
+
+#### Phase 3.1: Config Consolidation
+- [ ] Hardcoded değerleri ai_settings.py'ye taşı
+- [ ] CHUNK_SIZE gibi conflicting defaults düzelt
+- [ ] Config dökümantasyonu
+
+### 🟢 Düşük Öncelik (Gelecek)
+
+- [ ] Phase 4.1: Unified MongoDB Collections
+- [ ] Phase 4.2: API Versioning
+- [ ] Phase 4.3: Test Coverage Audit
+- [ ] Confidence Scoring Improvement
+- [ ] Embedding Fine-tuning
 
 ---
 
-## 📁 Hazır Script
+## 📋 Yeni Özellikler (27 Aralık)
 
-**`/home/adentechio/desoutter-assistant/scripts/scrape_missing.py`**
-- Sadece kalan 11 seriyi scrape eder
-- 90 saniye delay ile rate limit'e takılmaz
-- Otomatik MongoDB'ye kaydeder
+### RAG Relevance Filtering
+**Dosyalar:**
+- `config/relevance_filters.py`
+- `src/llm/relevance_filter.py`
+- `src/llm/rag_engine.py` (+10 satır)
+
+**15 Fault Category:**
+1. wifi_network
+2. motor_mechanical
+3. torque_calibration
+4. battery_power
+5. software_firmware
+6. display_screen
+7. touchscreen
+8. pset_configuration
+9. sensor
+10. error_codes
+11. sound_noise
+12. communication_protocol
+13. led_indicators
+14. button_controls
+15. cable_connector
+
+**Özellikler:**
+- Negative keyword filtering
+- Word boundary regex (false positive önleme)
+- Config-driven (ENABLE_RELEVANCE_FILTERING flag)
+- Production-safe (try-catch, max limits)
+
+### Connection Architecture Mapping
+**Dosya:** `src/llm/domain_vocabulary.py`
+
+**6 Ürün Ailesi:**
+1. CVI3 Range (corded)
+2. CVIC/CVIR/CVIL II
+3. Battery WiFi (EPBC, EABC, EABS, BLRTC, ELC)
+4. Standalone Battery (EPB, EPBA, EAB)
+5. Connect Family (W/X/D)
+6. Controller Units
+
+---
+
+## 📊 API Endpoint'leri (Toplam 21+)
+
+### Performance Metrics:
+- `GET /admin/metrics/health`
+- `GET /admin/metrics/stats`
+- `GET /admin/metrics/queries`
+- `GET /admin/metrics/slow`
+- `POST /admin/metrics/reset`
+
+### Multi-turn Conversation:
+- `POST /conversation/start`
+- `POST /conversation/{session_id}/query`
+- `GET /conversation/{session_id}/history`
+- `DELETE /conversation/{session_id}`
+
+### Self-Learning:
+- `GET /admin/learning/stats`
+- `GET /admin/learning/top-sources`
+- `POST /admin/learning/recommendations`
+- `GET /admin/learning/training-status`
+- `POST /admin/learning/schedule-retraining`
+- `POST /admin/learning/reset`
+
+### Domain Embeddings:
+- `GET /admin/domain/stats`
+- `GET /admin/domain/vocabulary`
+- `POST /admin/domain/enhance-query`
+- `GET /admin/domain/error-codes`
+- `GET /admin/domain/product-series`
+
+---
+
+## 🔧 Commit History (Son)
+
+| Hash | Tarih | Açıklama |
+|------|-------|----------|
+| e199ee4 | 27 Ara | RAG relevance filtering (15 categories) |
+| cd44ecc | 27 Ara | Connection architecture & RAG enhancement |
+| 254d73c | 23 Ara | Product data quality fix |
+
+---
+
+*Son güncelleme: 27 Aralık 2025, 21:15 UTC*
