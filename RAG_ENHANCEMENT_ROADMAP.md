@@ -1,8 +1,8 @@
 # 🚀 RAG Enhancement Roadmap - Semantic Chunking, Domain Embeddings & Performance Optimization
 
 > **Created:** 15 December 2025  
-> **Updated:** 22 December 2025 - **ALL PHASES COMPLETE ✅ (9/9)**
-> **Purpose:** Comprehensive enhancement of RAG system with semantic chunking, domain embeddings, self-learning, and performance monitoring  
+> **Updated:** 27 December 2025 - **ALL PHASES COMPLETE ✅ (10/10) + Phase 0.1 NEW!**
+> **Purpose:** Comprehensive enhancement of RAG system with semantic chunking, domain embeddings, self-learning, relevance filtering, and performance monitoring  
 > **Target:** Production-ready, high-accuracy repair diagnosis system with continuous improvement
 
 ---
@@ -14,6 +14,8 @@
 - **Embeddings**: HuggingFace all-MiniLM-L6-v2 (384-dim) + **Domain Enhancement ✅** (NEW - 22 Dec)
 - **Chunking**: ~~Basic sentence-based (500 tokens, 50 overlap)~~ → **Semantic chunking LIVE ✅**
 - **Retrieval**: ~~Top-K (5 results) with dynamic similarity threshold~~ → **Hybrid Search + Self-Learning + Domain Boost ✅**
+- **Relevance Filtering**: **15 fault categories + word boundary matching ✅** (NEW - 27 Dec)
+- **Connection Architecture**: **6 product family mappings in domain vocabulary ✅** (NEW - 27 Dec)
 - **Feedback System**: User feedback collection + learned mappings **VERIFIED ACTIVE ✅**
 - **Self-Learning**: **Feedback signal propagation + source ranking ✅** (NEW - 22 Dec)
 - **Domain Embeddings**: **Desoutter vocabulary + term weighting + query enhancement ✅** (NEW - 22 Dec)
@@ -23,6 +25,7 @@
 - **Domain Knowledge**: **Desoutter connection architecture in prompts ✅**
 - **Performance Metrics**: **Query latency, cache hit rate, health monitoring ✅** (NEW - 22 Dec)
 - **Multi-turn Conversation**: **Session management, context preservation ✅** (NEW - 22 Dec)
+- **Document Coverage**: **6,798 chunks from 541 documents** (Updated - 27 Dec)
 
 ### ⚠️ Previous Limitations (ALL RESOLVED ✅)
 1. ~~Chunking: Naive sentence splitting → loses semantic boundaries~~ → **FIXED: Recursive chunking** ✅

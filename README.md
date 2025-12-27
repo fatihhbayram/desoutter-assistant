@@ -7,8 +7,10 @@ AI-powered repair assistant for Desoutter industrial tools. Uses RAG (Retrieval 
 ## 🎯 Key Features
 
 - **🧠 Self-Learning RAG**: System learns from user feedback to improve future suggestions
-- **� Domain Embeddings**: 351 Desoutter-specific terms with query enhancement (Phase 3.1)
-- **�🔄 Multi-turn Conversation**: Follow-up questions with context preservation (Phase 3.5)
+- **🎯 RAG Relevance Filtering**: 15 fault categories filter irrelevant documents (Phase 0.1 - NEW!)
+- **🔌 Connection Architecture**: 6 product family mappings for intelligent troubleshooting
+- **📚 Domain Embeddings**: 351 Desoutter-specific terms with query enhancement (Phase 3.1)
+- **🔄 Multi-turn Conversation**: Follow-up questions with context preservation (Phase 3.5)
 - **📊 Performance Monitoring**: Query latency, cache hit rates, health status (Phase 5)
 - **🔍 Hybrid Search**: BM25 keyword + Semantic vector search with RRF fusion
 - **⚡ Response Caching**: LRU + TTL cache with ~100,000x speedup for repeated queries
@@ -16,7 +18,8 @@ AI-powered repair assistant for Desoutter industrial tools. Uses RAG (Retrieval 
 - **🎯 Context Optimization**: Token budget management, deduplication, warning prioritization
 - **💾 GPU Acceleration**: NVIDIA GPU inference for fast LLM responses
 - **Smart Product Scraping**: Handles Next.js rendered pages with advanced image extraction from DatoCMS assets
-- **MongoDB Integration**: Stores 451 products, users, and learning data
+- **MongoDB Integration**: Stores 451 products (71 wireless, 380 non-wireless)
+- **ChromaDB Vector Store**: 6,798 semantic chunks from 541 documents
 - **Multi-Format Documents**: Support for PDF, Word (DOCX), PowerPoint (PPTX), Excel (XLSX)
 - **Document Viewer**: Open source documents directly from diagnosis results
 - **Source Relevance Feedback**: Rate each retrieved document as relevant/irrelevant
