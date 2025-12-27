@@ -298,6 +298,16 @@ class RAGEngine:
             min_similarity=RAG_SIMILARITY_THRESHOLD
         )
         
+        # Phase 0.1: Apply relevance filtering (production-safe, can be disabled via config)
+        # Filters out documents that don't match query intent (e.g., WiFi query → transducer docs)
+        try:
+            from src.llm.relevance_filter import filter_irrelevant_results
+            results = filter_irrelevant_results(query, results)
+        except Exception as e:
+            logger.warning(f"Relevance filtering failed, using original results: {e}")
+            # Continue with original results if filter fails (safety-first)
+
+        
         filtered_docs = []
         for result in results:
             base_score = result.similarity if result.similarity > 0 else result.score
