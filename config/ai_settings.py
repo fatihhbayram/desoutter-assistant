@@ -88,12 +88,6 @@ EMBEDDING_POOLING = os.getenv("EMBEDDING_POOLING", "mean")  # 'mean', 'cls', 'ma
 # Batch size for processing multiple texts at once (higher = faster, more memory)
 EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
 
-# Enable embedding caching to reduce API calls (for remote APIs)
-EMBEDDING_CACHE_ENABLED = os.getenv("EMBEDDING_CACHE_ENABLED", "false").lower() == "true"
-
-# Cache TTL in seconds (3600 = 1 hour)
-EMBEDDING_CACHE_TTL = int(os.getenv("EMBEDDING_CACHE_TTL", "3600"))
-
 # === Phase 2: Domain Embeddings (Future Enhancement) ===
 # Path to fine-tuned domain-specific embedding model
 # When available, this overrides EMBEDDING_MODEL for better domain accuracy
