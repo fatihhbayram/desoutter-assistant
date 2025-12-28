@@ -39,15 +39,19 @@
 - [ ] API endpoint'leri güncelle
 - [x] End-to-end test
 
-#### Phase 0.2: Product-Aware Response Filtering (NEW - HIGH PRIORITY)
-**Problem:** System suggests WiFi troubleshooting for non-wireless tools (e.g., EPBA8)
-- [ ] Add product capability check in RAG pipeline
-- [ ] Filter responses based on product features:
-  * Wireless capable → WiFi/network suggestions OK
-  * Standalone battery → No network suggestions
-  * Corded tools → No battery/WiFi suggestions
-- [ ] Update prompt with product capability context
-- [ ] Test with edge cases (EPBA8 WiFi, EPB network, EAD battery)
+#### Phase 0.2: Product-Aware Response Filtering
+- [x] Add product capability check in RAG pipeline
+- [x] Filter responses based on product features
+- [x] Update prompt with product capability context
+- [x] Test with edge cases (EPBA8 WiFi test passed)
+- Commit: d1ecdaf
+
+#### Phase 0.3: Controller Capability Enhancement (NEW)
+**Problem:** Controller units (CVI3, CVIL, Connect) have manuals but no capability detection
+- [ ] Add controller detection to _get_product_capabilities()
+- [ ] Detect controller type from query/context
+- [ ] Add controller-specific warnings (e.g., CVI3 for corded tools only)
+- [ ] Test with controller queries
 
 #### Phase 1.3: Remove Unused Config
 - [x] `EMBEDDING_CACHE_ENABLED` kaldır
