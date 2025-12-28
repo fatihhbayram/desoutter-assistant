@@ -1,6 +1,7 @@
 """
 Prompt Templates for Repair Assistant
 """
+from typing import Optional, Dict
 
 SYSTEM_PROMPT_EN = """You are an expert technician assistant for Desoutter industrial tools.
 
@@ -108,7 +109,7 @@ RAG_PROMPT_TEMPLATE_EN = """Based on the following technical documentation for {
 
 Product: {product_model}
 Part Number: {part_number}
-
+{capability_context}
 Fault Description:
 {fault_description}
 
@@ -122,14 +123,14 @@ Instructions:
 4. Mention required tools/parts
 5. Include safety warnings if applicable
 6. If the manual doesn't cover this specific issue, say so and suggest alternatives
-
+{capability_warning}
 Repair Suggestion:"""
 
 RAG_PROMPT_TEMPLATE_TR = """Aşağıdaki {product_model} için teknik dokümantasyona dayanarak bir onarım önerisi sunun.
 
 Ürün: {product_model}
 Parça Numarası: {part_number}
-
+{capability_context}
 Arıza Açıklaması:
 {fault_description}
 
@@ -143,7 +144,7 @@ Talimatlar:
 4. Gerekli araçları/parçaları belirtin
 5. Geçerliyse güvenlik uyarıları ekleyin
 6. Kılavuz bu spesifik sorunu kapsamıyorsa, bunu belirtin ve alternatifleri önerin
-
+{capability_warning}
 Onarım Önerisi:"""
 
 FALLBACK_PROMPT_EN = """The product manual doesn't contain specific information about this fault.
@@ -187,10 +188,11 @@ def build_rag_prompt(
     part_number: str,
     fault_description: str,
     context: str,
-    language: str = "en"
+    language: str = "en",
+    capabilities: Optional[Dict] = None
 ) -> str:
     """
-    Build RAG prompt with context
+    Build RAG prompt with context and product capabilities (Phase 0.2).
     
     Args:
         product_model: Product model name
@@ -198,17 +200,46 @@ def build_rag_prompt(
         fault_description: Fault description
         context: Retrieved context from manuals
         language: Language code
+        capabilities: Product capabilities dict (wireless, battery, etc.)
         
     Returns:
         Formatted prompt
     """
     template = RAG_PROMPT_TEMPLATE_TR if language.lower() == "tr" else RAG_PROMPT_TEMPLATE_EN
     
+    # Build capability context (Phase 0.2)
+    capability_context = ""
+    capability_warning = ""
+    
+    if capabilities and capabilities.get('product_found'):
+        if language.lower() == "tr":
+            capability_context = "\nÜrün Özellikleri:\n"
+            capability_context += f"- WiFi Özelliği: {'Var' if capabilities.get('wireless') else 'Yok'}\n"
+            capability_context += f"- Güç Kaynağı: {'Batarya' if capabilities.get('battery_powered') else 'Kablolu' if capabilities.get('corded') else 'Bilinmiyor'}\n"
+            
+            # Add warning if suggesting incompatible solution
+            if not capabilities.get('wireless'):
+                capability_warning = "\nÖNEMLİ: Bu model WiFi özelliğine sahip DEĞİLDİR. WiFi/ağ sorunları önermeyin.\n"
+            if not capabilities.get('battery_powered'):
+                capability_warning += "ÖNEMLI: Bu model bataryalı DEĞİLDİR. Batarya/şarj sorunları önermeyin.\n"
+        else:
+            capability_context = "\nProduct Capabilities:\n"
+            capability_context += f"- WiFi: {'Yes' if capabilities.get('wireless') else 'No'}\n"
+            capability_context += f"- Power Source: {'Battery' if capabilities.get('battery_powered') else 'Corded' if capabilities.get('corded') else 'Unknown'}\n"
+            
+            # Add warning if suggesting incompatible solution
+            if not capabilities.get('wireless'):
+                capability_warning = "\nIMPORTANT: This model does NOT have WiFi capability. Do NOT suggest WiFi/network troubleshooting.\n"
+            if not capabilities.get('battery_powered'):
+                capability_warning += "IMPORTANT: This model is NOT battery-powered. Do NOT suggest battery/charging issues.\n"
+    
     return template.format(
         product_model=product_model,
         part_number=part_number,
         fault_description=fault_description,
-        context=context
+        context=context,
+        capability_context=capability_context,
+        capability_warning=capability_warning
     )
 
 

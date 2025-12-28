@@ -247,6 +247,89 @@ class RAGEngine:
             logger.error(f"Error getting product info: {e}")
             return None
     
+    def _get_product_capabilities(self, product_model: str) -> Dict:
+        """
+        Get product capabilities for capability-aware responses (Phase 0.2).
+        
+        Detects:
+        - Wireless capability (from MongoDB)
+        - Battery powered vs corded (from model code)
+        - Standalone vs controller-required (from connection architecture)
+        
+        Args:
+            product_model: Product model name (e.g., "EPBA8-1800-4Q")
+            
+        Returns:
+            Dict with capabilities:
+            {
+                'wireless': bool,
+                'battery_powered': bool,
+                'corded': bool,
+                'standalone': bool,
+                'controller_required': bool,
+                'product_found': bool
+            }
+        """
+        capabilities = {
+            'wireless': False,
+            'battery_powered': False,
+            'corded': False,
+            'standalone': False,
+            'controller_required': False,
+            'product_found': False
+        }
+        
+        try:
+            # Get product from MongoDB
+            product_info = self.get_product_info(product_model)
+            
+            if product_info:
+                capabilities['product_found'] = True
+                
+                # 1. Wireless capability (from MongoDB)
+                wireless_info = product_info.get('wireless', {})
+                if isinstance(wireless_info, dict):
+                    capabilities['wireless'] = wireless_info.get('capable', False)
+                else:
+                    capabilities['wireless'] = bool(wireless_info)
+                
+                # 2. Battery vs Corded (from model code patterns)
+                model_upper = product_model.upper()
+                
+                # Battery-powered tools: EPB, EPBC, EABC, EABS, EAB, BLRT, ELC, XPB, ELS, ELB
+                battery_patterns = ['EPB', 'EPBC', 'EABC', 'EABS', 'EAB', 'BLRT', 'ELC', 'XPB', 'ELS', 'ELB']
+                capabilities['battery_powered'] = any(model_upper.startswith(p) for p in battery_patterns)
+                
+                # Corded tools: EAD, EPD, EFD, EIDS, ERS, ECS, MC, EM, ERAL, EME, EMEL
+                corded_patterns = ['EAD', 'EPD', 'EFD', 'EIDS', 'ERS', 'ECS', 'MC', 'EM', 'ERAL', 'EME', 'EMEL']
+                capabilities['corded'] = any(model_upper.startswith(p) for p in corded_patterns)
+                
+                # 3. Standalone vs Controller-required (from connection architecture)
+                if self.domain_embeddings:
+                    try:
+                        from src.llm.domain_vocabulary import DomainVocabulary
+                        connection_info = DomainVocabulary.get_connection_info(product_model)
+                        
+                        if connection_info:
+                            # Standalone: Battery tools without WiFi, or tools that don't need controller
+                            standalone_categories = ['STANDALONE_BATTERY']
+                            capabilities['standalone'] = connection_info.get('category') in standalone_categories
+                            
+                            # Controller required: Corded tools, or WiFi tools (need Connect unit)
+                            controller_categories = ['CVI3_RANGE', 'CVIC_CVIR_CVIL', 'BATTERY_WIFI']
+                            capabilities['controller_required'] = connection_info.get('category') in controller_categories
+                    except Exception as e:
+                        logger.debug(f"Could not get connection info: {e}")
+                
+                logger.debug(f"Product capabilities for {product_model}: {capabilities}")
+            else:
+                logger.warning(f"Product {product_model} not found in MongoDB")
+                
+        except Exception as e:
+            logger.error(f"Error getting product capabilities: {e}")
+        
+        return capabilities
+    
     def retrieve_context(
         self,
         query: str,
@@ -591,13 +674,17 @@ class RAGEngine:
                 ])
                 optimized_sources = None
             
-            # Build RAG prompt
+            # Phase 0.2: Get product capabilities
+            capabilities = self._get_product_capabilities(product_model)
+            
+            # Build RAG prompt with capabilities
             prompt = build_rag_prompt(
                 product_model=product_model,
                 part_number=actual_part_number,
                 fault_description=fault_description,
                 context=context_str,
-                language=language
+                language=language,
+                capabilities=capabilities
             )
             
             confidence = "high" if len(optimized_chunks) >= 3 else "medium" if optimized_chunks else "low"
@@ -725,10 +812,13 @@ class RAGEngine:
         context_result = self.retrieve_context(fault_description, part_number)
         retrieved_docs = context_result["documents"]
         
+        # Phase 0.2: Get product capabilities
+        capabilities = self._get_product_capabilities(product_model)
+        
         # Build prompt
         if retrieved_docs:
             context_str = "\n\n".join([f"[{doc['metadata'].get('source')}]\n{doc['text']}" for doc in retrieved_docs])
-            prompt = build_rag_prompt(product_model, part_number, fault_description, context_str, language)
+            prompt = build_rag_prompt(product_model, part_number, fault_description, context_str, language, capabilities)
         else:
             context_str = build_fallback_response(product_model, language)
             prompt = f"{fault_description}\n\n{context_str}"
