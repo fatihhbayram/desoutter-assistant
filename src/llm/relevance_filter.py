@@ -162,10 +162,10 @@ def detect_query_intent(query: str) -> Optional[str]:
     # Check each intent category
     # Order matters - more specific intents first
     intent_order = [
-        "torque_calibration",  # Most specific
+        "error_codes",  # Error codes are very specific (E018, E01, etc.)
+        "torque_calibration",
         "pset_configuration",
         "sensor",
-        "error_codes",
         "touchscreen",  # More specific than display_screen
         "display_screen",
         "battery_power",

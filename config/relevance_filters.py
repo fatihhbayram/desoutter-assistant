@@ -124,10 +124,18 @@ RELEVANCE_FILTER_RULES = {
     
     # Error Codes
     "error_codes": {
-        "trigger_keywords": ["error", "fault code", "alarm", "warning", "e01", "e02", "e03"],
+        "trigger_keywords": [
+            "error", "fault code", "alarm", "warning", "alert",
+            # Common Desoutter error codes
+            "e01", "e02", "e03", "e04", "e05", "e06", "e07", "e08", "e09",
+            "e10", "e11", "e12", "e13", "e14", "e15", "e16", "e17", "e18", "e018",
+            "e19", "e20", "e21", "e22", "e23", "e24", "e25",
+            # Transducer-related
+            "transducer", "transducer fault", "transducer error"
+        ],
         "exclude_if_contains": [],  # Don't exclude anything - error codes can relate to any system
         "require_at_least_one": [
-            "error", "fault", "alarm", "warning", "code"
+            "error", "fault", "alarm", "warning", "code", "alert", "transducer"
         ]
     },
     
