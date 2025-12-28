@@ -478,4 +478,35 @@ Bu belge, Desoutter Repair Assistant'a eklenecek **Servis Yönetim Sistemi** ve 
 
 ---
 
+## 🚩 2026 KALİTE VE GÜVENİLİRLİK ODAKLI YENİ NESİL RAG YOL HARİTASI
+
+### Kritik Yapılacaklar (2026 Q1)
+
+- [ ] **Document processor:**
+    - Section-aware chunking (başlık, tablo, kod blokları, paragraflar)
+    - Zengin metadata (doc_type, product_line, section_title, content_hash, has_tables, has_numbers, timestamp)
+    - SHA256 hash ile deduplikasyon ve loglama
+- [ ] **Retrieval:**
+    - Hybrid search (vector + BM25)
+    - Metadata filtering (ürün, doc_type, sayısal içerik)
+    - Top-10 retrieval, semantic re-ranking ile top-5
+- [ ] **Prompt engineering:**
+    - Sorgu tipine göre dinamik, grounded prompt
+    - Context injection formatı ve kaynak gösterimi
+    - "Bilmiyorum" cevabı zorunlu
+- [ ] **User profile:**
+    - Kullanıcı profili şeması ve yanıt özelleştirme (beginner/advanced)
+    - Retrieval’da ürün önceliğiyle filtreleme
+- [ ] **Feedback loop:**
+    - Yanıt sonrası thumbs up/down, rating, yorum ve otomatik flagging
+    - Flaglenen yanıtlar için log ve haftalık analiz
+
+#### Başarı Kriterleri
+- Relevance Rate: >80% top-5 chunk gerçekten ilgili
+- User rating ≥4/5: >70% soruda
+- "Bilmiyorum" oranı: 10-15% (hallucination yok)
+- Yanıt süresi: <3 sn end-to-end
+
+---
+
 *Bu belge, geliştirme sürecinde güncellenecektir.*
