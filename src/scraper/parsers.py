@@ -27,7 +27,8 @@ class ProductParser:
         """
         if patterns is None:
             patterns = [
-                r'\b(6151[0-9]{6})\b',  # 6151 series
+                r'\b(6151[0-9]{6})\b',  # 6151 series (CVI3)
+                r'\b(6159[0-9]{6})\b',  # 6159 series (Axon, CVIR, CVIL, Connect, etc.)
                 r'\b(8920[0-9]{6})\b',  # 8920 series
             ]
         
