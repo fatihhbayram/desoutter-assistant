@@ -271,6 +271,47 @@ USE_CACHE = os.getenv("USE_CACHE", "true").lower() == "true"
 CACHE_TTL = int(os.getenv("CACHE_TTL", "3600"))
 
 # =============================================================================
+# RESPONSE GROUNDING CONFIGURATION (Priority 1)
+# =============================================================================
+# Context sufficiency scoring to prevent hallucinations
+# System will refuse to answer when retrieved context is inadequate
+
+# Enable context grounding (recommended for production)
+ENABLE_CONTEXT_GROUNDING = os.getenv("ENABLE_CONTEXT_GROUNDING", "true").lower() == "true"
+
+# Overall sufficiency threshold (0.0-1.0)
+# 0.5 = balanced (recommended), 0.3 = permissive, 0.7 = strict
+CONTEXT_SUFFICIENCY_THRESHOLD = float(os.getenv("CONTEXT_SUFFICIENCY_THRESHOLD", "0.5"))
+
+# Minimum similarity for top document to consider answering
+# Top retrieved document must exceed this threshold
+MIN_SIMILARITY_FOR_ANSWER = float(os.getenv("MIN_SIMILARITY_FOR_ANSWER", "0.35"))
+
+# Minimum number of relevant documents for confident answer
+# Having multiple docs increases confidence
+MIN_DOCS_FOR_CONFIDENCE = int(os.getenv("MIN_DOCS_FOR_CONFIDENCE", "2"))
+
+# =============================================================================
+# RESPONSE VALIDATION CONFIGURATION (Priority 2)
+# =============================================================================
+# Post-processing validation to detect hallucinations and quality issues
+
+# Enable response validation (recommended for production)
+ENABLE_RESPONSE_VALIDATION = os.getenv("ENABLE_RESPONSE_VALIDATION", "true").lower() == "true"
+
+# Flag responses with uncertainty phrases ("might", "probably", etc.)
+FLAG_UNCERTAINTY_PHRASES = os.getenv("FLAG_UNCERTAINTY_PHRASES", "true").lower() == "true"
+
+# Verify numerical values exist in context
+VERIFY_NUMERICAL_VALUES = os.getenv("VERIFY_NUMERICAL_VALUES", "true").lower() == "true"
+
+# Minimum response length in characters
+MIN_RESPONSE_LENGTH = int(os.getenv("MIN_RESPONSE_LENGTH", "30"))
+
+# Maximum uncertain phrases before flagging (2 = balanced)
+MAX_UNCERTAINTY_COUNT = int(os.getenv("MAX_UNCERTAINTY_COUNT", "2"))
+
+# =============================================================================
 # LOGGING CONFIGURATION
 # =============================================================================
 # Control what gets logged for debugging and analytics

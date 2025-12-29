@@ -135,25 +135,5 @@ curl -X POST http://localhost:8000/diagnose \
 
 More details: see `PROXMOX_DEPLOYMENT.md` and `PHASE2_STRUCTURE.md`.
 
-````
-curl http://localhost:8000/health         # API
 
-Troubleshooting — Chroma `$contains` error
-
-```bash
-# Symptom: API returns 500 and logs show:
-# Expected where operator ... got $contains
-
-# Fix: ensure API uses client-side filtering (no $contains in code)
-sudo docker cp desoutter-assistant/desoutter-scraper/src/llm/rag_engine.py desoutter-api:/app/src/llm/rag_engine.py
-sudo docker cp desoutter-assistant/desoutter-scraper/src/vectordb/chroma_client.py desoutter-api:/app/src/vectordb/chroma_client.py
-sudo docker restart desoutter-api
-
-# Verify:
-sudo docker exec desoutter-api sh -lc "grep -Rn '\$contains' /app/src || true"
-
-# Re-test:
-curl -s -X POST http://127.0.0.1:8000/diagnose \
-	-H 'Content-Type: application/json' \
-	-d '{"part_number":"6151659770","fault_description":"does not start","language":"en"}' | jq
-```
+More details: see `PROXMOX_DEPLOYMENT.md` and `PHASE2_STRUCTURE.md`.

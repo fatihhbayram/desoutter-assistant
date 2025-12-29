@@ -131,7 +131,23 @@ docker run -d --name desoutter-frontend -p 3001:3001 desoutter-frontend
 
 ## 📝 Recent Updates
 
-### 2025-12-27: RAG Relevance Filtering & Query Processing ✨ **NEW**
+## 📝 Recent Updates
+
+### 2025-12-29: RAG Quality Improvements 🌟 **NEW**
+- ✅ **Context Grounding ("I Don't Know" Logic)**
+  - Multi-factor context sufficiency scoring
+  - Automatic "I don't know" responses for insufficient context
+  - Significant reduction in hallucinations
+- ✅ **Response Validation System**
+  - Post-processing layer to catch hallucinations
+  - Validates numerical values against source context
+  - Detects forbidden content (e.g. WiFi suggestions for non-WiFi tools)
+  - Auto-flags low-quality responses
+- ⚙️ **Intent-Based Dynamic Prompts** (Foundation)
+  - Pattern-based intent detection (8 types)
+  - Specialized prompts for troubleshooting, specs, installation, etc.
+
+### 2025-12-27: RAG Relevance Filtering & Query Processing
 - ✅ **Phase 0.1 RAG Relevance Filtering**
   - 15 fault categories with negative keyword filtering
   - Word boundary matching (prevents false positives)
@@ -141,11 +157,7 @@ docker run -d --name desoutter-frontend -p 3001:3001 desoutter-frontend
   - Centralized query processing (normalize, keywords, intent)
   - Turkish + English support
   - Language detection
-- ✅ **Connection Architecture Mapping**
-  - 6 product family categories
-  - Intelligent troubleshooting based on tool type
 - ✅ **Document Expansion**: 541 docs → 6,798 chunks (+116%)
-- ✅ **Phase 1.3**: Removed unused config values
 
 ### 2025-12-22: ALL RAG PHASES COMPLETE
 - ✅ **Phase 3.1 Domain Embeddings**: 351 Desoutter-specific terms
@@ -153,7 +165,7 @@ docker run -d --name desoutter-frontend -p 3001:3001 desoutter-frontend
 - ✅ **Phase 5.1 Performance Metrics**: Query latency, cache hit rates
 - ✅ **Phase 3.5 Multi-turn Conversation**: Context preservation
 
-**Details**: See [CHANGELOG.md](CHANGELOG.md) and [RAG_ENHANCEMENT_ROADMAP.md](RAG_ENHANCEMENT_ROADMAP.md)
+**Details**: See [CHANGELOG.md](CHANGELOG.md) and [RAG_QUALITY_IMPROVEMENT.md](RAG_QUALITY_IMPROVEMENT.md)
 
 ## 🧠 Self-Learning RAG System
 

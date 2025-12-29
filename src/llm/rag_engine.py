@@ -621,6 +621,7 @@ class RAGEngine:
             ]
             logger.info(f"Filtered {original_count - len(retrieved_docs)} excluded sources")
         
+        
         # Apply learning: boost sources from positive feedback
         boost_sources = learned_context.get("boost_sources", [])
         if boost_sources:
@@ -634,6 +635,83 @@ class RAGEngine:
             
             retrieved_docs = sorted(retrieved_docs, key=sort_key)
             logger.info(f"Boosted {len(boost_sources)} learned sources")
+        
+        # NEW: Check context sufficiency (Priority 1 - Response Grounding)
+        from config.ai_settings import (
+            ENABLE_CONTEXT_GROUNDING, 
+            CONTEXT_SUFFICIENCY_THRESHOLD,
+            MIN_SIMILARITY_FOR_ANSWER,
+            MIN_DOCS_FOR_CONFIDENCE
+        )
+        
+        # Initialize sufficiency variable (will be populated if grounding enabled)
+        sufficiency = None
+        
+        if ENABLE_CONTEXT_GROUNDING and retrieved_docs:
+            from src.llm.context_grounding import ContextSufficiencyScorer,build_idk_response
+            
+            # Calculate average similarity
+            similarities = [doc.get("similarity", doc.get("boosted_score", 0.0)) for doc in retrieved_docs]
+            avg_similarity = sum(similarities) / len(similarities) if similarities else 0.0
+            
+            # Create scorer and check sufficiency
+            scorer = ContextSufficiencyScorer(
+                sufficiency_threshold=CONTEXT_SUFFICIENCY_THRESHOLD,
+                min_similarity=MIN_SIMILARITY_FOR_ANSWER,
+                min_docs=MIN_DOCS_FOR_CONFIDENCE
+            )
+            
+            sufficiency = scorer.calculate_sufficiency_score(
+                query=fault_description,
+                retrieved_docs=retrieved_docs,
+                avg_similarity=avg_similarity
+            )
+            
+            # If insufficient context, return "I don't know" response
+            if not sufficiency.is_sufficient:
+                response_time_ms = int((time.time() - start_time) * 1000)
+                
+                idk_response = build_idk_response(
+                    query=fault_description,
+                    product_model=product_model,
+                    reason=sufficiency.reason,
+                    language=language
+                )
+                
+                logger.warning(f"Insufficient context (score={sufficiency.score:.3f}): {sufficiency.reason}")
+                
+                # Save to diagnosis history with special confidence
+                try:
+                    diagnosis_id = feedback_engine.save_diagnosis(
+                        part_number=actual_part_number,
+                        product_model=product_model,
+                        fault_description=fault_description,
+                        suggestion=idk_response,
+                        confidence="insufficient_context",
+                        sources=[],  # No sources to cite
+                        username=username,
+                        language=language,
+                        is_retry=is_retry,
+                        retry_of=retry_of,
+                        response_time_ms=response_time_ms
+                    )
+                except Exception as e:
+                    logger.error(f"Error saving diagnosis: {e}")
+                    diagnosis_id = None
+                
+                return {
+                    "suggestion": idk_response,
+                    "confidence": "insufficient_context",
+                    "sufficiency_score": sufficiency.score,
+                    "sufficiency_factors": sufficiency.factors,
+                    "sufficiency_reason": sufficiency.reason,
+                    "product_model": product_model,
+                    "part_number": actual_part_number,
+                    "sources": [],
+                    "language": language,
+                    "diagnosis_id": diagnosis_id,
+                    "response_time_ms": response_time_ms
+                }
         
         # Phase 3.4: Optimize context window
         if retrieved_docs:
@@ -710,6 +788,54 @@ class RAGEngine:
             suggestion = "Error: Unable to generate suggestion. Please try again."
             confidence = "low"
         
+        # NEW: Validate response (Priority 2 - Response Validation)
+        validation_result = None
+        from config.ai_settings import (
+            ENABLE_RESPONSE_VALIDATION,
+            FLAG_UNCERTAINTY_PHRASES,
+            VERIFY_NUMERICAL_VALUES,
+            MIN_RESPONSE_LENGTH,
+            MAX_UNCERTAINTY_COUNT
+        )
+        
+        if ENABLE_RESPONSE_VALIDATION and suggestion:
+            from src.llm.response_validator import ResponseValidator
+            
+            validator = ResponseValidator(
+                max_uncertainty_count=MAX_UNCERTAINTY_COUNT,
+                min_response_length=MIN_RESPONSE_LENGTH,
+                flag_uncertain_responses=FLAG_UNCERTAINTY_PHRASES,
+                verify_numbers=VERIFY_NUMERICAL_VALUES
+            )
+            
+            # Get product capabilities for validation
+            capabilities = self._get_product_capabilities(product_model)
+            
+            validation_result = validator.validate_response(
+                response=suggestion,
+                query=fault_description,
+                context=context_str,
+                product_info={
+                    'model_name': product_model,
+                    'wireless': capabilities.get('wireless', False),
+                    'battery_powered': capabilities.get('battery_powered', False)
+                }
+            )
+            
+            # Adjust confidence if validation suggests
+            if validation_result.confidence_adjustment:
+                confidence = validation_result.confidence_adjustment
+                logger.info(f"Confidence adjusted to '{confidence}' based on validation")
+            
+            # Log validation results
+            if validation_result.issues:
+                logger.warning(
+                    f"Validation found {len(validation_result.issues)} issue(s), "
+                    f"severity={validation_result.severity}"
+                )
+                for issue in validation_result.issues:
+                    logger.debug(f"  - {issue.type}: {issue.description}")
+        
         # Prepare response with optimized sources if available
         if optimized_sources:
             sources_list = [
@@ -739,9 +865,37 @@ class RAGEngine:
             "product_model": product_model,
             "part_number": actual_part_number,
             "sources": sources_list,
-            "language": language
+            "language": language,
+            # NEW: Add validation metadata if available
+            "validation": {
+                "is_valid": validation_result.is_valid if validation_result else True,
+                "issues": [
+                    {
+                        "type": issue.type,
+                        "description": issue.description,
+                        "severity": issue.severity,
+                        "location": issue.location,
+                        "detected_value": issue.detected_value
+                    }
+                    for issue in (validation_result.issues if validation_result else [])
+                ],
+                "severity": validation_result.severity if validation_result else "none",
+                "should_flag": validation_result.should_flag if validation_result else False
+            }
         }
         
+        # Add sufficiency metadata if context grounding was performed
+        logger.debug(f"Sufficiency variable state: {sufficiency is not None}, value: {sufficiency if sufficiency else 'None'}")
+        if sufficiency is not None:
+            response["sufficiency_score"] = sufficiency.score
+            response["sufficiency_reason"] = sufficiency.reason
+            response["sufficiency_factors"] = sufficiency.factors
+            response["sufficiency_recommendation"] = sufficiency.recommendation
+            logger.info(f"Added sufficiency metadata to response: score={sufficiency.score}")
+        else:
+            logger.warning("Sufficiency variable is None - context grounding may not have run")
+        
+
         # Calculate response time
         response_time_ms = int((time.time() - start_time) * 1000)
         

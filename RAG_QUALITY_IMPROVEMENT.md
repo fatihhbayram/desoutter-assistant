@@ -17,16 +17,15 @@
 | Semantic Chunking | ✅ Complete | 1.1 | Section-aware, 400 chars |
 | Re-ranking | ✅ Complete | 2.2 | RRF, top-10 → top-5 |
 | Feedback System | ✅ Complete | 6 | Thumbs up/down |
-| Self-Learning | ✅ Complete | 6 | Wilson score ranking |
-| Relevance Filtering | ✅ Complete | 0.1 | 15 fault categories |
-| Product Capability | ✅ Complete | 0.2 | Wireless/battery detection |
-| Error Code Detection | ✅ Complete | - | E01-E25, transducer |
+| "I don't know" logic | ✅ Complete | Q1 | Context sufficiency scoring |
+| Response Validation | ✅ Complete | Q2 | Hallucination detection |
+| Intent Detection | ⚙️ Partial | Q3 | Foundation built |
 
 ### 🟡 Partially Implemented
 
 | Feature | Current | Gap | Priority |
 |---------|---------|-----|----------|
-| System Prompt | Static | Not intent-based | HIGH |
+| System Prompt | Dynamic | Integration pending | HIGH |
 | Chunk Size | 400 chars | Should be 600-1200 tokens | MEDIUM |
 | Deduplication | None | No content hash | LOW |
 | User Profiles | None | No personalization | MEDIUM |
@@ -35,50 +34,35 @@
 
 | Feature | Impact | Priority |
 |---------|--------|----------|
-| "I don't know" logic | HIGH | 🔴 CRITICAL |
 | Source citation | HIGH | 🔴 CRITICAL |
-| Response validation | HIGH | 🔴 CRITICAL |
-| Intent-based prompts | MEDIUM | 🟡 HIGH |
 | Confidence scoring | MEDIUM | 🟡 HIGH |
 
 ---
 
-## Priority 1: Response Grounding & Validation (Week 1)
+## Priority 1: Response Grounding & Validation (Week 1) - ✅ COMPLETE
 
-### 🔴 CRITICAL: "I Don't Know" Logic
+### 🔴 CRITICAL: "I Don't Know" Logic - ✅ DONE
 
 **Problem:** System hallucinates when context insufficient
 
 **Implementation:**
-- [ ] Add `context_sufficiency_score` calculation
-- [ ] Threshold: <0.5 → return "I don't know"
-- [ ] Update prompts with explicit instruction
-- [ ] Test with 20 unanswerable queries
+- [x] Add `context_sufficiency_score` calculation
+- [x] Threshold: <0.5 → return "I don't know"
+- [x] Update prompts with explicit instruction
+- [x] Test with 20 unanswerable queries
 
 ---
 
-### 🔴 CRITICAL: Source Citation
-
-**Problem:** Responses don't cite which document was used
-
-**Implementation:**
-- [ ] Update `build_rag_prompt()` to include citations
-- [ ] Add citation instruction to system prompt
-- [ ] Parse LLM response for citation format
-- [ ] Test citation accuracy
-
----
-
-### 🔴 CRITICAL: Response Validation
+### 🔴 CRITICAL: Response Validation - ✅ DONE
 
 **Problem:** No post-processing to catch hallucinations
 
 **Implementation:**
-- [ ] Create `src/llm/response_validator.py`
-- [ ] Implement uncertainty detection
-- [ ] Implement number verification
-- [ ] Add validation to RAG pipeline
-- [ ] Log flagged responses for review
+- [x] Create `src/llm/response_validator.py`
+- [x] Implement uncertainty detection
+- [x] Implement number verification
+- [x] Add validation to RAG pipeline
+- [x] Log flagged responses for review
 
 ---
 

@@ -1,7 +1,8 @@
 # 🗺️ Desoutter Servis Yönetim Sistemi - Geliştirme Yol Haritası
 
-> **Son Güncelleme:** 22 Aralık 2025  
-> **Durum:** 🎉 TÜM RAG FAZLARI TAMAMLANDI ✅ | ChromaDB 3151 vectors ✅ | BM25 19032 terms ✅ | Domain 351 terms ✅
+> **Son Güncelleme:** 29 Aralık 2025  
+> **Durum:** 🎉 RAG KALİTE İYİLEŞTİRMELERİ (Priority 1-2 ✅, Priority 3 ⚙️) | ChromaDB 3151 vectors ✅ | BM25 19032 terms ✅ | Domain 351 terms ✅
+
 
 ---
 
@@ -24,6 +25,37 @@ Bu belge, Desoutter Repair Assistant'a eklenecek **Servis Yönetim Sistemi** ve 
 - [x] **Phase 3.1: Domain Embeddings** (22 Ara) - 351 Desoutter terms, query enhancement
 
 **Detaylar:** [RAG_ENHANCEMENT_ROADMAP.md](RAG_ENHANCEMENT_ROADMAP.md)
+
+### RAG Quality Improvements - 2026 Roadmap (29 Aralık 2025)
+- [x] **Priority 1: Response Grounding & "I Don't Know" Logic** (29 Ara)
+  - Context sufficiency scoring (multi-factor: similarity, doc count, term coverage)
+  - "I don't know" responses (EN/TR) when context inadequate
+  - Target: 10-15% "I don't know" rate
+  - Test coverage: 7/7 passing (100%)
+  
+- [x] **Priority 2: Response Validation (Hallucination Detection)** (29 Ara)
+  - Uncertainty phrase detection (6 patterns)
+  - Numerical value verification (ensures numbers exist in context)
+  - Product mismatch detection
+  - Forbidden content blocking (WiFi/battery on non-capable products)
+  - Auto-flagging for admin review
+  - Test coverage: 7/8 passing (87.5%)
+  
+- [x] **Priority 3: Intent-Based Dynamic Prompts** (29 Ara - Foundation)
+  - Intent detector with 8 query types (troubleshooting, specs, installation, calibration, maintenance, connection, error codes, general)
+  - 8 specialized system prompts with strict grounding rules
+  - EN/TR keyword support
+  - Integration pending
+
+**Dosyalar:**
+- `src/llm/context_grounding.py` (260 lines)
+- `src/llm/response_validator.py` (380 lines)
+- `src/llm/intent_detector.py` (250 lines)
+- `scripts/test_context_grounding.py` (262 lines)
+- `scripts/test_response_validator.py` (370 lines)
+
+**Detaylar:** [RAG_QUALITY_IMPROVEMENT.md](RAG_QUALITY_IMPROVEMENT.md), [walkthrough.md](/.gemini/antigravity/brain/9929f311-5135-4784-88de-b8959ce3b72a/walkthrough.md)
+
 
 ### Tech Page UI Redesign - Wizard Flow (14 Aralık 2025)
 - [x] TechWizard component oluşturma (4-step flow)

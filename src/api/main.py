@@ -211,6 +211,13 @@ class DiagnoseResponse(BaseModel):
     language: str         # Language of the response
     diagnosis_id: Optional[str] = None  # Unique ID for feedback
     response_time_ms: Optional[int] = None  # Response time in milliseconds
+    # Priority 1: Context Grounding Metadata
+    sufficiency_score: Optional[float] = None
+    sufficiency_reason: Optional[str] = None
+    sufficiency_factors: Optional[dict] = None
+    sufficiency_recommendation: Optional[str] = None
+    # Priority 2: Response Validation Metadata
+    validation: Optional[dict] = None
 
 
 class SourceRelevanceFeedback(BaseModel):
