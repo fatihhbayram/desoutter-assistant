@@ -321,3 +321,15 @@ LOG_QUERIES = os.getenv("LOG_QUERIES", "true").lower() == "true"
 
 # Log LLM responses (useful for quality analysis)
 LOG_RESPONSES = os.getenv("LOG_RESPONSES", "true").lower() == "true"
+
+# =============================================================================
+# DEDUPLICATION CONFIGURATION (Priority 4)
+# =============================================================================
+# Prevent duplicate content (identical chunks) from bloating the vector DB
+# Uses SHA256 hash of normalized content
+
+# Enable content deduplication during ingestion
+ENABLE_DEDUPLICATION = os.getenv("ENABLE_DEDUPLICATION", "true").lower() == "true"
+
+# Log duplicate ratio to database (for analytics)
+LOG_DUPLICATE_RATIO = os.getenv("LOG_DUPLICATE_RATIO", "true").lower() == "true"

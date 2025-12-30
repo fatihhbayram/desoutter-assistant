@@ -131,9 +131,25 @@ docker run -d --name desoutter-frontend -p 3001:3001 desoutter-frontend
 
 ## 📝 Recent Updates
 
-## 📝 Recent Updates
+### 2025-12-30: RAG Quality Improvements Phase 2 🚀 **NEW**
+- ✅ **Intent Detection Integration (Priority 3)**
+  - 8 intent types with dynamic prompt selection
+  - Intent metadata in API responses
+  - Specialized prompts for each query type
+- ✅ **Content Deduplication (Priority 4)**
+  - SHA-256 hash-based duplicate detection
+  - Prevents duplicate chunks in vector DB
+  - Configurable via `ENABLE_DEDUPLICATION`
+- ✅ **Adaptive Chunk Sizing (Priority 5)**
+  - Document type-based chunk sizing
+  - Troubleshooting: 200 tokens (precision)
+  - Manuals: 400 tokens (context)
+- ✅ **Wireless Detection Bug Fix**
+  - Fixed migration script logic
+  - 80 battery tools corrected (EABS, EIBS, EPB, EAB series)
+  - System now provides accurate WiFi troubleshooting
 
-### 2025-12-29: RAG Quality Improvements 🌟 **NEW**
+### 2025-12-29: RAG Quality Improvements Phase 1 🌟
 - ✅ **Context Grounding ("I Don't Know" Logic)**
   - Multi-factor context sufficiency scoring
   - Automatic "I don't know" responses for insufficient context
@@ -143,9 +159,6 @@ docker run -d --name desoutter-frontend -p 3001:3001 desoutter-frontend
   - Validates numerical values against source context
   - Detects forbidden content (e.g. WiFi suggestions for non-WiFi tools)
   - Auto-flags low-quality responses
-- ⚙️ **Intent-Based Dynamic Prompts** (Foundation)
-  - Pattern-based intent detection (8 types)
-  - Specialized prompts for troubleshooting, specs, installation, etc.
 
 ### 2025-12-27: RAG Relevance Filtering & Query Processing
 - ✅ **Phase 0.1 RAG Relevance Filtering**

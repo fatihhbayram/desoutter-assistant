@@ -96,8 +96,8 @@ def main():
     logger.info(f"   Generated {len(embeddings)} embeddings")
     
     # Add to vector database
-    logger.info("\n💾 Storing in vector database...")
-    vectordb.add_documents(prepared_chunks, embeddings)
+    logger.info("\n💾 Storing in vector database with deduplication...")
+    vectordb.add_documents(prepared_chunks, embeddings, check_duplicates=True)
     
     # Summary
     logger.info("\n" + "=" * 80)

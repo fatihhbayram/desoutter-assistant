@@ -774,8 +774,31 @@ class RAGEngine:
             confidence = "low"
             optimized_sources = None
         
-        # Get system prompt
-        system_prompt = get_system_prompt(language)
+        # Phase 3.3: Detect Query Intent (Priority 3)
+        intent_result = None
+        try:
+            if not getattr(self, "intent_detector", None):
+                from src.llm.intent_detector import IntentDetector
+                self.intent_detector = IntentDetector()
+            
+            intent_result = self.intent_detector.detect_intent(fault_description, product_info)
+            logger.info(f"Query intent: {intent_result.intent.value} (confidence: {intent_result.confidence})")
+        except Exception as e:
+            logger.warning(f"Intent detection failed: {e}")
+            
+        # Get system prompt (enhanced with intent)
+        system_prompt = get_system_prompt(language, intent=intent_result.intent if intent_result else None)
+        
+        # Build RAG prompt with intent awareness
+        prompt = build_rag_prompt(
+            product_model=product_model,
+            part_number=actual_part_number,
+            fault_description=fault_description,
+            context=context_str,
+            language=language,
+            capabilities=capabilities,
+            intent=intent_result.intent if intent_result else None
+        )
         
         # Generate suggestion from LLM
         logger.info("Generating LLM response...")
@@ -841,6 +864,8 @@ class RAGEngine:
             sources_list = [
                 {
                     "source": src["source"],
+                    "page": src.get("page_number"),  # NEW: Page number
+                    "section": src.get("section", ""),  # NEW: Section title
                     "similarity": f"{src['similarity']:.2f}" if isinstance(src['similarity'], float) else src['similarity'],
                     "section_type": src.get("section_type", ""),
                     "is_warning": src.get("is_warning", False),
@@ -853,12 +878,18 @@ class RAGEngine:
             sources_list = [
                 {
                     "source": doc["metadata"].get("source", "Unknown"),
-                    "similarity": f"{doc['similarity']:.2f}" if isinstance(doc['similarity'], float) else str(doc['similarity']),
+                    "page": doc["metadata"].get("page_number"),  # NEW: Page number
+                    "section": doc["metadata"].get("section", ""),  # NEW: Section title
+                    "similarity": f"{doc['similarity']:.2f}" if isinstance(doc.get('similarity'), float) else str(doc.get('similarity', 0)),
                     "excerpt": doc["text"][:200] + "..." if len(doc["text"]) > 200 else doc["text"]
                 }
                 for doc in retrieved_docs
             ] if retrieved_docs else []
         
+        # Calculate response time
+        response_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Structure the response
         response = {
             "suggestion": suggestion.strip(),
             "confidence": confidence,
@@ -866,61 +897,68 @@ class RAGEngine:
             "part_number": actual_part_number,
             "sources": sources_list,
             "language": language,
-            # NEW: Add validation metadata if available
-            "validation": {
-                "is_valid": validation_result.is_valid if validation_result else True,
-                "issues": [
-                    {
-                        "type": issue.type,
-                        "description": issue.description,
-                        "severity": issue.severity,
-                        "location": issue.location,
-                        "detected_value": issue.detected_value
-                    }
-                    for issue in (validation_result.issues if validation_result else [])
-                ],
-                "severity": validation_result.severity if validation_result else "none",
-                "should_flag": validation_result.should_flag if validation_result else False
-            }
+            "diagnosis_id": None,
+            "response_time_ms": response_time_ms,
+            "intent": intent_result.intent.value if intent_result else "general",
+            "intent_confidence": intent_result.confidence if intent_result else 0.0
         }
         
-        # Add sufficiency metadata if context grounding was performed
-        logger.debug(f"Sufficiency variable state: {sufficiency is not None}, value: {sufficiency if sufficiency else 'None'}")
+        # Add grounding metadata if available (Priority 1)
         if sufficiency is not None:
             response["sufficiency_score"] = sufficiency.score
             response["sufficiency_reason"] = sufficiency.reason
             response["sufficiency_factors"] = sufficiency.factors
             response["sufficiency_recommendation"] = sufficiency.recommendation
-            logger.info(f"Added sufficiency metadata to response: score={sufficiency.score}")
-        else:
-            logger.warning("Sufficiency variable is None - context grounding may not have run")
-        
+            logger.debug(f"Added sufficiency metadata: score={sufficiency.score:.2f}")
 
-        # Calculate response time
-        response_time_ms = int((time.time() - start_time) * 1000)
-        
+        # Add validation metadata if available (Priority 2)
+        if validation_result:
+            response["validation"] = {
+                "is_valid": validation_result.is_valid,
+                "severity": validation_result.severity,
+                "should_flag": validation_result.should_flag,
+                "issues": [
+                    {
+                        "type": issue.type,
+                        "description": issue.description, 
+                        "severity": issue.severity,
+                        "location": getattr(issue, 'location', ''),
+                        "detected_value": getattr(issue, 'detected_value', '')
+                    } 
+                    for issue in validation_result.issues
+                ]
+            }
+
         # Save to diagnosis history
         try:
+            # Prepare metadata for storage
+            metadata = {
+                "sufficiency": sufficiency.__dict__ if sufficiency else None,
+                "validation": response.get("validation"),
+                "intent": response["intent"],
+                "intent_confidence": response["intent_confidence"]
+            }
+            
             diagnosis_id = feedback_engine.save_diagnosis(
                 part_number=actual_part_number,
                 product_model=product_model,
                 fault_description=fault_description,
                 suggestion=suggestion.strip(),
                 confidence=confidence,
-                sources=response["sources"],
+                sources=[s["source"] for s in sources_list],
                 username=username,
                 language=language,
                 is_retry=is_retry,
                 retry_of=retry_of,
-                response_time_ms=response_time_ms
+                response_time_ms=response_time_ms,
+                metadata=metadata
             )
             response["diagnosis_id"] = diagnosis_id
-            response["response_time_ms"] = response_time_ms
         except Exception as e:
             logger.error(f"Error saving diagnosis history: {e}")
             response["diagnosis_id"] = None
         
-        logger.info(f"✅ Generated suggestion with {confidence} confidence in {response_time_ms}ms")
+        logger.info(f"✅ Generated suggestion with {confidence} confidence in {response_time_ms}ms (Intent: {response['intent']})")
         
         # Phase 2.3: Store in response cache (only for non-retry, successful responses)
         if self.response_cache and cache_key and confidence != "low":
@@ -932,7 +970,8 @@ class RAGEngine:
                 "part_number": response["part_number"],
                 "sources": response["sources"],
                 "language": response["language"],
-                "cached_at": time.time()
+                "cached_at": time.time(),
+                "intent": response["intent"]
             }
             self.response_cache.set(cache_key, cache_entry)
             logger.info(f"✅ Cached response (key={cache_key[:50]}...)")

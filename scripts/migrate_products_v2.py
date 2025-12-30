@@ -169,49 +169,37 @@ def detect_tool_type(series_name: str, model_name: str) -> str:
 def detect_wireless_info(product: dict, family: str) -> dict:
     """
     Detect wireless capability for battery tools.
+    ONLY trust wireless_communication field from scraper.
     Returns WirelessInfo dict or None.
     """
     part_number = product.get('part_number', '')
     model_name = product.get('model_name', '')
     wireless_comm = product.get('wireless_communication', 'No')
-    description = product.get('description', '').lower()
     
-    # Method 1: Existing wireless_communication field says "Yes"
-    if wireless_comm.lower() == "yes":
-        # Check detection method
-        if re.search(r'[A-Z]+C\d+', model_name) or re.search(r'[A-Z]+C\d+', part_number):
-            method = "model_name_C"
-        else:
-            method = "existing_field"
-        
+    # Method 1: TRUST wireless_communication field (from scraper)
+    # This is the MOST RELIABLE source
+    if wireless_comm and wireless_comm.lower() == "yes":
         platforms = BATTERY_TOOL_PLATFORMS.get(family, ["CVI3", "Connect"])
         
         return {
             "capable": True,
-            "detection_method": method,
+            "detection_method": "wireless_communication_field",
             "compatible_platforms": platforms,
             "compatible_platform_ids": []
         }
     
     # Method 2: Check for "C" suffix in model (e.g., EPBC, EABC)
+    # This is a secondary indicator
     if family and re.search(rf'{family}C', model_name.replace(" ", "")):
         return {
             "capable": True,
-            "detection_method": "model_name_C",
+            "detection_method": "model_name_C_suffix",
             "compatible_platforms": BATTERY_TOOL_PLATFORMS.get(family, ["CVI3", "Connect"]),
             "compatible_platform_ids": []
         }
     
-    # Method 3: Check description for "standalone" (means NO WiFi)
-    if 'standalone' in description:
-        return {
-            "capable": False,
-            "detection_method": "standalone_text_found",
-            "compatible_platforms": [],
-            "compatible_platform_ids": []
-        }
-    
-    # Default: Battery tool without WiFi
+    # Default: NO WiFi
+    # Do NOT check description text - it's unreliable
     return {
         "capable": False,
         "detection_method": "no_wireless_indicator",

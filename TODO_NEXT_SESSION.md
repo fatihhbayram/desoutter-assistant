@@ -1,171 +1,209 @@
-# 🎯 TODO - Sonraki Oturum (28 Aralık 2025)
+# 🎯 TODO - Next Session (December 31, 2025)
 
-## 🎉 SON GÜNCELLEME: 27 Aralık 2025
+## 🎉 LAST UPDATE: December 30, 2025
 
-### ✅ Bugün Tamamlanan (27 Aralık)
+### ✅ Completed Today (December 30)
 
-| Görev | Açıklama | Commit |
-|-------|----------|--------|
-| RAG Relevance Filtering | 15 fault category, word boundary matching | e199ee4 |
-| Connection Architecture | 6 ürün ailesi, get_connection_info() | cd44ecc |
-| Document Ingestion | 541 doc, 3,651 chunk → toplam 6,798 | - |
-| Wireless Field Fix | 300 ürün güncellendi (null → false) | - |
-| RAG Prompt Enhancement | EN + TR prompt'ları güncellendi | cd44ecc |
-
----
-
-## 📊 Sistem Durumu (27 Aralık 2025)
-
-| Metrik | Değer |
-|--------|-------|
-| Toplam Ürün | 451 |
-| Wireless Capable | 71 |
-| Non-Wireless | 380 |
-| ChromaDB Chunks | 6,798 |
-| Döküman Sayısı | 541 |
-| Fault Categories | 15 |
-| Domain Terms | 351 |
+| Task | Description | Status |
+|------|-------------|--------|
+| **Intent Integration** | Integrated IntentDetector into RAG Engine, added intent metadata to API | ✅ |
+| **Content Deduplication** | SHA-256 hash-based deduplication, ChromaDB duplicate checking | ✅ |
+| **Adaptive Chunking** | Document type-based dynamic chunk sizing (200-400 tokens) | ✅ |
+| **Wireless Detection Fix** | Fixed migration script, updated 80 battery tools | ✅ |
+| **Source Citation Enhancement** | API model updated, citation formatter created, documents re-ingested | ⚙️ |
 
 ---
 
-## 🚀 Sıradaki Görevler
+## 🚀 Next Session Tasks
 
-### 🔴 Yüksek Öncelik
+### 🔴 CRITICAL Priority
 
-#### Phase 2.1: Unify Feedback Systems
-- [ ] MongoDB migration script oluştur
-- [ ] feedback_engine.py → delegation pattern
-- [ ] rag_engine.py → self_learning_engine kullan
-- [ ] API endpoint'leri güncelle
-- [x] End-to-end test
+#### 1. **Fix Confidence Calculation Bug** ⚠️ NEW
+**Status:** CRITICAL - System always returns "low" confidence
 
-#### Phase 0.2: Product-Aware Response Filtering
-- [x] Add product capability check in RAG pipeline
-- [x] Filter responses based on product features
-- [x] Update prompt with product capability context
-- [x] Test with edge cases (EPBA8 WiFi test passed)
-- Commit: d1ecdaf
+**Problem:**
+- Confidence is calculated based on chunk count only (line 768 in rag_engine.py)
+- Ignores sufficiency_score completely
+- Example: sufficiency_score=0.72 (good) but confidence="low" ❌
 
-#### Phase 0.3: Controller Capability Enhancement (NEW)
-**Problem:** Controller units (CVI3, CVIL, Connect) have manuals but no capability detection
-- [ ] Add controller detection to _get_product_capabilities()
-- [ ] Detect controller type from query/context
-- [ ] Add controller-specific warnings (e.g., CVI3 for corded tools only)
-- [ ] Test with controller queries
+**Solution:**
+```python
+# Current (WRONG):
+confidence = "high" if len(optimized_chunks) >= 3 else "medium" if optimized_chunks else "low"
 
-#### Phase 1.3: Remove Unused Config
-- [x] `EMBEDDING_CACHE_ENABLED` kaldır
-- [x] `EMBEDDING_CACHE_TTL` kaldır
-- [x] Runtime test
-- Commit: b5ed021
+# Should be:
+if sufficiency_score >= 0.7:
+    confidence = "high"
+elif sufficiency_score >= 0.5:
+    confidence = "medium"
+else:
+    confidence = "low"
+```
 
-### 🟡 Orta Öncelik
+**Tasks:**
+- [ ] Update confidence calculation to use sufficiency_score
+- [ ] Remove chunk count-based logic
+- [ ] Test with various queries
+- [ ] Verify frontend shows correct confidence
 
-#### Phase 2.2: Extract Query Processor
-- [x] `src/llm/query_processor.py` oluştur
-- [x] Query enhancement logic centralize et
-- [x] rag_engine.py entegre et
-- Commit: 1e229c2
-
-#### Phase 3.1: Config Consolidation
-- [ ] Hardcoded değerleri ai_settings.py'ye taşı
-- [ ] CHUNK_SIZE gibi conflicting defaults düzelt
-- [ ] Config dökümantasyonu
-
-### 🟢 Düşük Öncelik (Gelecek)
-
-- [ ] Phase 4.1: Unified MongoDB Collections
-- [ ] Phase 4.2: API Versioning
-- [ ] Phase 4.3: Test Coverage Audit
-- [ ] Confidence Scoring Improvement
-- [ ] Embedding Fine-tuning
+**Estimated Time:** 30 minutes
 
 ---
 
-## 📋 Yeni Özellikler (27 Aralık)
+#### 2. API Performance Optimization
+**Status:** Critical - API experiencing timeouts
 
-### RAG Relevance Filtering
-**Dosyalar:**
-- `config/relevance_filters.py`
-- `src/llm/relevance_filter.py`
-- `src/llm/rag_engine.py` (+10 satır)
+**Tasks:**
+- [ ] Investigate timeout issues with large index (10,866 chunks)
+- [ ] Optimize query performance
+- [ ] Consider result pagination or limiting
+- [ ] Profile slow queries
+- [ ] Add query caching if needed
 
-**15 Fault Category:**
-1. wifi_network
-2. motor_mechanical
-3. torque_calibration
-4. battery_power
-5. software_firmware
-6. display_screen
-7. touchscreen
-8. pset_configuration
-9. sensor
-10. error_codes
-11. sound_noise
-12. communication_protocol
-13. led_indicators
-14. button_controls
-15. cable_connector
-
-**Özellikler:**
-- Negative keyword filtering
-- Word boundary regex (false positive önleme)
-- Config-driven (ENABLE_RELEVANCE_FILTERING flag)
-- Production-safe (try-catch, max limits)
-
-### Connection Architecture Mapping
-**Dosya:** `src/llm/domain_vocabulary.py`
-
-**6 Ürün Ailesi:**
-1. CVI3 Range (corded)
-2. CVIC/CVIR/CVIL II
-3. Battery WiFi (EPBC, EABC, EABS, BLRTC, ELC)
-4. Standalone Battery (EPB, EPBA, EAB)
-5. Connect Family (W/X/D)
-6. Controller Units
+**Estimated Time:** 2-3 hours
 
 ---
 
-## 📊 API Endpoint'leri (Toplam 21+)
+### 🔴 High Priority
 
-### Performance Metrics:
-- `GET /admin/metrics/health`
-- `GET /admin/metrics/stats`
-- `GET /admin/metrics/queries`
-- `GET /admin/metrics/slow`
-- `POST /admin/metrics/reset`
+#### 3. Source Citation Final Testing
+**Status:** Partially complete, needs verification
 
-### Multi-turn Conversation:
-- `POST /conversation/start`
-- `POST /conversation/{session_id}/query`
-- `GET /conversation/{session_id}/history`
-- `DELETE /conversation/{session_id}`
+**Tasks:**
+- [ ] End-to-end API test with section metadata
+- [ ] Verify section titles appear in responses
+- [ ] Frontend integration test
+- [ ] User acceptance testing
+- [ ] Document citation format examples
 
-### Self-Learning:
-- `GET /admin/learning/stats`
-- `GET /admin/learning/top-sources`
-- `POST /admin/learning/recommendations`
-- `GET /admin/learning/training-status`
-- `POST /admin/learning/schedule-retraining`
-- `POST /admin/learning/reset`
-
-### Domain Embeddings:
-- `GET /admin/domain/stats`
-- `GET /admin/domain/vocabulary`
-- `POST /admin/domain/enhance-query`
-- `GET /admin/domain/error-codes`
-- `GET /admin/domain/product-series`
+**Estimated Time:** 1-2 hours
 
 ---
 
-## 🔧 Commit History (Son)
+#### 4. Page Number Extraction
+**Status:** Not started
 
-| Hash | Tarih | Açıklama |
-|------|-------|----------|
-| e199ee4 | 27 Ara | RAG relevance filtering (15 categories) |
-| cd44ecc | 27 Ara | Connection architecture & RAG enhancement |
-| 254d73c | 23 Ara | Product data quality fix |
+**Tasks:**
+- [ ] Enhance PDF parsing to extract page numbers
+- [ ] Update `DocumentProcessor` to track page-to-chunk mapping
+- [ ] Modify `SemanticChunker` to store page numbers
+- [ ] Re-ingest documents (if needed)
+- [ ] Test page number accuracy
+
+**Estimated Time:** 3-4 hours
 
 ---
 
-*Son güncelleme: 27 Aralık 2025, 21:15 UTC*
+#### 5. Confidence Scoring Enhancement
+**Status:** Not started (after fixing bug above)
+
+**Tasks:**
+- [ ] Combine context quality + intent confidence
+- [ ] Define confidence thresholds
+- [ ] Add confidence field to API response
+- [ ] Log low-confidence responses (<0.5)
+- [ ] Create confidence analytics dashboard
+
+**Estimated Time:** 2-3 hours
+
+---
+
+### 🟡 Medium Priority
+
+#### 6. User Personalization (Optional)
+**Status:** Not started
+
+**Tasks:**
+- [ ] Design user profiles collection (MongoDB)
+- [ ] Implement expertise level-based prompts
+- [ ] Add product preference filtering
+- [ ] Create profile management API
+- [ ] Build profile UI in frontend
+
+#### 7. Analytics Dashboard
+**Status:** Not started
+
+**Tasks:**
+- [ ] Collect metrics (relevance rate, response time)
+- [ ] Track "I don't know" rate
+- [ ] Analyze intent distribution
+- [ ] Build dashboard UI (Grafana/custom)
+- [ ] Set up alerts for anomalies
+
+#### 8. Product Data Quality
+**Status:** Ongoing
+
+**Tasks:**
+- [ ] Audit all product specifications
+- [ ] Fix missing/incorrect information
+- [ ] Improve scraper accuracy
+- [ ] Add data validation rules
+- [ ] Schedule regular data quality checks
+
+---
+
+## 📊 System Status (December 30, 2025)
+
+| Metric | Value | Status |
+|--------|-------|--------|
+| **Context Grounding** | Active | ✅ |
+| **Response Validation** | Active | ✅ |
+| **Intent Detection** | Active | ✅ |
+| **Deduplication** | Active | ✅ |
+| **Adaptive Chunking** | Active | ✅ |
+| **Source Citations** | Partial | ⚙️ |
+| **Confidence Calculation** | BROKEN | ❌ |
+| **API** | Timeout Issues | ⚠️ |
+| **Docker** | Up to date | ✅ |
+| **Vector DB** | 10,866 chunks | ✅ |
+
+---
+
+## 📋 Notes
+
+### Completed RAG Quality Improvements (Priorities 1-5)
+- ✅ Priority 1: Context Grounding & Response Validation
+- ✅ Priority 2: Intent-Based Dynamic Prompts
+- ✅ Priority 3: Intent Integration
+- ✅ Priority 4: Content Deduplication
+- ✅ Priority 5: Adaptive Chunk Sizing
+
+### Critical Issues Discovered
+- ❌ **Confidence calculation bug**: Always returns "low" regardless of sufficiency score
+- ⚠️ **API timeout**: Large queries timing out
+- ⚠️ **Inconsistent responses**: Likely due to low confidence affecting LLM behavior
+
+### Remaining Improvements
+- Source citation enhancement (partially complete - needs testing)
+- Confidence scoring (new priority - FIX BUG FIRST)
+- User personalization (optional)
+- Analytics dashboard (optional)
+- API performance optimization (critical)
+
+### Important Fixes Completed
+- Wireless detection bug fix: 80 battery tools corrected
+- Migration script logic improved
+- Frontend test: System now provides correct WiFi troubleshooting
+- Document re-ingestion: 541 docs → 10,866 chunks with section metadata
+
+### Known Issues
+- **CRITICAL:** Confidence always "low" (ignores sufficiency_score)
+- API timeout with large queries (needs investigation)
+- Page numbers not yet extracted from PDFs
+- Old chunks (pre-re-ingestion) lack section metadata
+
+---
+
+## 💡 Recommended Work Order (Tomorrow)
+
+1. **Fix Confidence Bug** (30 min - CRITICAL, easy win)
+2. **Test Confidence Fix** (30 min - verify it works)
+3. **API Performance** (2-3 hours - critical for usability)
+4. **Source Citation Test** (1-2 hours - finish what we started)
+5. **Confidence Scoring Enhancement** (2-3 hours - if time permits)
+
+**Total Estimated Time:** 6-9 hours (full day)
+
+---
+
+**Next Session Focus:** Fix confidence calculation bug, then API performance optimization

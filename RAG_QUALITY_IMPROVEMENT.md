@@ -14,28 +14,28 @@
 |---------|--------|-------|-------|
 | Hybrid Retrieval | ✅ Complete | 2.2 | BM25 + Semantic, RRF fusion |
 | Metadata Tagging | ✅ Complete | 1.1 | 14 fields per chunk |
-| Semantic Chunking | ✅ Complete | 1.1 | Section-aware, 400 chars |
+| Semantic Chunking | ✅ Complete | 1.1 | Section-aware, adaptive sizing |
 | Re-ranking | ✅ Complete | 2.2 | RRF, top-10 → top-5 |
 | Feedback System | ✅ Complete | 6 | Thumbs up/down |
 | "I don't know" logic | ✅ Complete | Q1 | Context sufficiency scoring |
 | Response Validation | ✅ Complete | Q2 | Hallucination detection |
-| Intent Detection | ⚙️ Partial | Q3 | Foundation built |
+| Intent Detection | ✅ Complete | Q3 | 8 intent types, dynamic prompts |
+| Content Deduplication | ✅ Complete | Q4 | SHA-256 hash-based |
+| Adaptive Chunking | ✅ Complete | Q5 | Document type-based sizing |
 
 ### 🟡 Partially Implemented
 
 | Feature | Current | Gap | Priority |
 |---------|---------|-----|----------|
-| System Prompt | Dynamic | Integration pending | HIGH |
-| Chunk Size | 400 chars | Should be 600-1200 tokens | MEDIUM |
-| Deduplication | None | No content hash | LOW |
 | User Profiles | None | No personalization | MEDIUM |
+| Source Citation | Basic | Needs enhancement | HIGH |
 
 ### ❌ Missing Critical Features
 
 | Feature | Impact | Priority |
 |---------|--------|----------|
-| Source citation | HIGH | 🔴 CRITICAL |
 | Confidence scoring | MEDIUM | 🟡 HIGH |
+| Advanced analytics | LOW | 🟢 LOW |
 
 ---
 
@@ -66,60 +66,54 @@
 
 ---
 
-## Priority 2: Intent-Based Dynamic Prompts (Week 2)
+## Priority 2: Intent-Based Dynamic Prompts (Week 2) - ✅ COMPLETE
 
-### 🟡 HIGH: Query Intent Detection
+### 🟡 HIGH: Query Intent Detection - ✅ DONE
 
 **Implementation:**
-- [ ] Create intent-specific prompt templates
-- [ ] Update `build_rag_prompt()` to use intent
-- [ ] Add intent-specific instructions
-- [ ] Test with 5 queries per intent
+- [x] Create `IntentDetector` with 8 intent types
+- [x] Create intent-specific prompt templates
+- [x] Update `build_rag_prompt()` to use intent
+- [x] Add intent metadata to API responses
+- [x] Test with 5 queries per intent
+
+**Date Completed:** 30 December 2025
 
 ---
 
-### 🟡 HIGH: Confidence Scoring
+## Priority 3: Content Deduplication (Week 2) - ✅ COMPLETE
+
+### 🟢 LOW: Content Deduplication - ✅ DONE
+
+**Problem:** Duplicate chunks waste storage and reduce retrieval quality
 
 **Implementation:**
-- [ ] Add confidence calculation
-- [ ] Return confidence with response
-- [ ] Display confidence in UI
-- [ ] Log low-confidence responses (<0.5)
+- [x] Add `content_hash` (SHA-256) to chunk metadata
+- [x] Check for duplicates before indexing in ChromaDB
+- [x] Add `ENABLE_DEDUPLICATION` config flag
+- [x] Log duplicate ratio for analytics
+- [x] Test deduplication logic
+
+**Date Completed:** 30 December 2025
 
 ---
 
-## Priority 3: User Personalization (Week 3)
+## Priority 4: Adaptive Chunk Sizing (Week 2) - ✅ COMPLETE
 
-### 🟡 MEDIUM: User Profile System
+### 🟢 LOW: Adaptive Chunk Size - ✅ DONE
 
-**Implementation:**
-- [ ] Add user_profiles collection to MongoDB
-- [ ] Create profile management API
-- [ ] Update prompts based on expertise_level
-- [ ] Filter chunks by primary_products
-- [ ] Add profile UI in frontend
-
----
-
-## Priority 4: Document Processing Improvements (Week 4)
-
-### 🟢 LOW: Adaptive Chunk Size
+**Problem:** Fixed chunk size doesn't suit all document types
 
 **Implementation:**
-- [ ] Analyze current chunk distribution
-- [ ] Implement adaptive chunking
-- [ ] Re-ingest documents
-- [ ] Compare retrieval quality
+- [x] Implement document type detection
+- [x] Create adaptive sizing logic:
+  - Troubleshooting guides: 200 tokens (precision)
+  - Service bulletins: 300 tokens (medium)
+  - Technical manuals: 400 tokens (context)
+- [x] Test chunk size distribution
+- [x] Verify retrieval quality improvement
 
----
-
-### 🟢 LOW: Content Deduplication
-
-**Implementation:**
-- [ ] Add content_hash to metadata
-- [ ] Check before indexing
-- [ ] Log duplicate ratio
-- [ ] Skip duplicates
+**Date Completed:** 30 December 2025
 
 ---
 

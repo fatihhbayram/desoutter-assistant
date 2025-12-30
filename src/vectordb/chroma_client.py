@@ -54,7 +54,8 @@ class ChromaDBClient:
     def add_documents(
         self,
         chunks: List[Dict],
-        embeddings: List[List[float]]
+        embeddings: List[List[float]],
+        check_duplicates: bool = False
     ) -> int:
         """
         Add documents with embeddings to collection
@@ -62,6 +63,7 @@ class ChromaDBClient:
         Args:
             chunks: List of chunk dicts with text and metadata
             embeddings: List of embedding vectors
+            check_duplicates: If True, check specifically for content duplicates before adding
             
         Returns:
             Number of documents added
@@ -72,6 +74,58 @@ class ChromaDBClient:
         if not chunks:
             logger.warning("No chunks to add")
             return 0
+            
+        # Filter duplicates if requested
+        if check_duplicates:
+            try:
+                # Get unique source filenames from chunks to narrow down search
+                sources = set(c.get("metadata", {}).get("source") for c in chunks if c.get("metadata", {}).get("source"))
+                
+                # If all chunks are from same source(s), we can query efficiently
+                existing_hashes = set()
+                
+                # Check duplication config
+                from config.ai_settings import ENABLE_DEDUPLICATION
+                if ENABLE_DEDUPLICATION:
+                    for source in sources:
+                        # Get existing chunks for this source
+                        existing = self.collection.get(
+                            where={"source": source},
+                            include=["metadatas"]
+                        )
+                        
+                        if existing and existing.get("metadatas"):
+                            for meta in existing["metadatas"]:
+                                if meta.get("content_hash"):
+                                    existing_hashes.add(meta.get("content_hash"))
+                    
+                    if existing_hashes:
+                        logger.info(f"Found {len(existing_hashes)} existing unique content hashes")
+                        
+                        # Filter chunks
+                        unique_chunks = []
+                        unique_embeddings = []
+                        skipped_count = 0
+                        
+                        for i, chunk in enumerate(chunks):
+                            content_hash = chunk.get("metadata", {}).get("content_hash")
+                            if content_hash and content_hash in existing_hashes:
+                                skipped_count += 1
+                                continue
+                            unique_chunks.append(chunk)
+                            unique_embeddings.append(embeddings[i])
+                            
+                        if skipped_count > 0:
+                            logger.info(f"Skipping {skipped_count} duplicate chunks")
+                            chunks = unique_chunks
+                            embeddings = unique_embeddings
+                            
+                        if not chunks:
+                            logger.info("All chunks were duplicates. Nothing to add.")
+                            return 0
+            except Exception as e:
+                logger.error(f"Error during deduplication check: {e}")
+                # Fallback to adding all documents if deduplication check fails
         
         try:
             # Prepare data for ChromaDB

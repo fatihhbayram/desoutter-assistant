@@ -201,13 +201,22 @@ class ConversationRequest(BaseModel):
     language: Optional[str] = "en"
 
 
+class SourceInfo(BaseModel):
+    """Source document information with citation details."""
+    source: str  # Filename
+    page: Optional[int] = None  # Page number (if available)
+    section: Optional[str] = None  # Section title
+    similarity: str  # Similarity score
+    excerpt: str  # Text excerpt
+
+
 class DiagnoseResponse(BaseModel):
     """Response body for AI diagnosis endpoint."""
     suggestion: str       # AI-generated repair suggestion
     confidence: str       # Confidence level: 'high', 'medium', or 'low'
     product_model: str    # Product model name
     part_number: str      # Product part number
-    sources: list         # Source documents used for the suggestion
+    sources: List[SourceInfo]  # Source documents with citations
     language: str         # Language of the response
     diagnosis_id: Optional[str] = None  # Unique ID for feedback
     response_time_ms: Optional[int] = None  # Response time in milliseconds
@@ -218,6 +227,9 @@ class DiagnoseResponse(BaseModel):
     sufficiency_recommendation: Optional[str] = None
     # Priority 2: Response Validation Metadata
     validation: Optional[dict] = None
+    # Priority 3: Intent Detection Metadata
+    intent: Optional[str] = None
+    intent_confidence: Optional[float] = None
 
 
 class SourceRelevanceFeedback(BaseModel):

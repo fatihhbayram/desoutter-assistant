@@ -51,6 +51,7 @@ class ChunkMetadata:
     position: float                      # 0.0-1.0 relative position in document
     page_number: Optional[int] = None    # Page number if available
     word_count: int = 0                  # Number of words in chunk
+    content_hash: str = ""               # SHA-256 hash for deduplication
 
 
 class DocumentTypeDetector:
@@ -263,6 +264,21 @@ class SemanticChunker:
         # Default for all-caps
         return 3
     
+    def _get_chunk_size_for_type(self, doc_type: DocumentType) -> Tuple[int, int]:
+        """
+        Get adaptive chunk size and overlap based on document type.
+        Target smaller chunks for problem/solution content (precision).
+        Target larger chunks for general manuals (context).
+        """
+        if doc_type == DocumentType.TROUBLESHOOTING_GUIDE:
+            return 200, 50 # Smaller chunks for precise problem/solution matching
+        elif doc_type == DocumentType.SERVICE_BULLETIN:
+            return 300, 75 # Medium chunks for technical updates
+        elif doc_type == DocumentType.SAFETY_DOCUMENT:
+            return 250, 50 # Smaller chunks for safety warnings
+        else:
+            return self.chunk_size, self.chunk_overlap # Default (e.g. 400, 100)
+
     def _chunk_paragraph(
         self,
         paragraph: str,
@@ -274,10 +290,13 @@ class SemanticChunker:
     ) -> List[Dict]:
         """Chunk a paragraph into semantic pieces"""
         
+        # Adaptive chunk sizing (Priority 5)
+        target_chunk_size, target_overlap = self._get_chunk_size_for_type(doc_type)
+
         # If paragraph is small enough, return as single chunk
         word_count = len(paragraph.split())
         
-        if word_count < self.chunk_size * 0.7:  # Less than 70% of target size
+        if word_count < target_chunk_size * 0.7:  # Less than 70% of target size
             return [self._create_chunk(
                 text=paragraph,
                 section=section,
@@ -299,7 +318,7 @@ class SemanticChunker:
             sentence_words = len(sentence.split())
             
             # Check if adding sentence would exceed chunk size
-            if current_word_count + sentence_words > self.chunk_size and current_chunk:
+            if current_word_count + sentence_words > target_chunk_size and current_chunk:
                 # Save current chunk
                 chunks.append(self._create_chunk(
                     text=current_chunk.strip(),
@@ -382,13 +401,23 @@ class SemanticChunker:
             contains_warning=contains_warning,
             contains_numbers=bool(re.search(r'\d+', text)),
             position=position,
-            word_count=word_count
+            word_count=word_count,
+            content_hash=self._calculate_content_hash(text)  # NEW: Content hash for deduplication
         )
         
         return {
             "text": text,
             "metadata": metadata.__dict__
         }
+
+    def _calculate_content_hash(self, text: str) -> str:
+        """Calculate SHA-256 hash of normalized content"""
+        import hashlib
+        
+        # Normalize text: lowercase, remove excess whitespace
+        normalized = re.sub(r'\s+', ' ', text.lower().strip())
+        
+        return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
     
     def _detect_section_type(self, text: str) -> SectionType:
         """Detect the type of section"""
