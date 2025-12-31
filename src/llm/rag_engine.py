@@ -19,6 +19,7 @@ from src.vectordb.chroma_client import ChromaDBClient
 from src.llm.ollama_client import OllamaClient
 from src.llm.prompts import get_system_prompt, build_rag_prompt, build_fallback_response
 from src.llm.context_optimizer import ContextOptimizer, optimize_context_for_rag
+from src.documents.product_extractor import ProductExtractor  # Metadata Enrichment
 from src.llm.performance_metrics import get_performance_monitor, QueryTimer, QueryMetrics
 from src.database import MongoDBClient
 from config.ai_settings import (
@@ -51,6 +52,7 @@ class RAGEngine:
         self.self_learning_engine = None  # Phase 6
         self.domain_embeddings = None  # Phase 3.1
         self.query_processor = None  # Phase 2.2
+        self.product_extractor = ProductExtractor()  # Metadata Enrichment
         self.context_optimizer = ContextOptimizer(token_budget=8000)  # Phase 3.4
         self.performance_monitor = get_performance_monitor()  # Phase 5.1
         
@@ -361,12 +363,30 @@ class RAGEngine:
             except Exception as e:
                 logger.warning(f"Domain enhancement failed: {e}")
         
+        # Metadata Enrichment: Get target product categories for filtering
+        target_categories = []
+        if part_number:
+            raw_cats = self.product_extractor.get_product_categories(part_number)
+            if raw_cats:
+                target_categories = [c.strip() for c in raw_cats.split(",")]
+                logger.info(f"Target product categories for filtering: {target_categories}")
+
         # Use hybrid search if available
         if self.hybrid_searcher:
-            return self._retrieve_with_hybrid_search(enhanced_query, top_k, original_query=query)
+            return self._retrieve_with_hybrid_search(
+                enhanced_query, 
+                top_k, 
+                original_query=query,
+                target_categories=target_categories
+            )
         
         # Fallback to standard semantic search
-        return self._retrieve_with_semantic_search(enhanced_query, part_number, top_k)
+        return self._retrieve_with_semantic_search(
+            enhanced_query, 
+            part_number, 
+            top_k,
+            target_categories=target_categories
+        )
     
     def _extract_keywords(self, text: str) -> List[str]:
         """Extract keywords from text for self-learning (Phase 6)"""
@@ -385,8 +405,14 @@ class RAGEngine:
         counter = Counter(keywords)
         return [word for word, _ in counter.most_common(10)]
     
-    def _retrieve_with_hybrid_search(self, query: str, top_k: int, original_query: str = None) -> Dict:
-        """Retrieve using hybrid search (semantic + BM25) with metadata boosting and self-learning"""
+    def _retrieve_with_hybrid_search(
+        self, 
+        query: str, 
+        top_k: int, 
+        original_query: str = None,
+        target_categories: List[str] = None
+    ) -> Dict:
+        """Retrieve using hybrid search (semantic + BM25) with metadata filtering and self-learning"""
         results = self.hybrid_searcher.search(
             query=query,
             top_k=top_k * 2,  # Get more candidates for boosting/reranking
@@ -407,6 +433,29 @@ class RAGEngine:
         
         filtered_docs = []
         for result in results:
+            meta = result.metadata or {}
+            
+            # Step 1: Metadata Filtering (Hard Filter or Heavy Demotion)
+            # If target categories exist, check for mismatch
+            if target_categories and meta.get("product_categories"):
+                doc_cats_str = meta.get("product_categories", "")
+                doc_cats = [c.strip() for c in doc_cats_str.split(",")] if isinstance(doc_cats_str, str) else doc_cats_str
+                
+                # Check for intersection
+                overlap = set(target_categories) & set(doc_cats)
+                
+                # If there's a specific product code mismatch (e.g. EPB vs ERS)
+                # We want to be strict.
+                if not overlap:
+                    # Is it a major product code mismatch?
+                    # Product codes are typically 3+ chars: EPB, ERS, CVI, CONNECT
+                    target_codes = {c for c in target_categories if len(c) >= 3 and c.isupper()}
+                    doc_codes = {c for c in doc_cats if len(c) >= 3 and c.isupper()}
+                    
+                    if target_codes and doc_codes and not (target_codes & doc_codes):
+                        logger.debug(f"Filtering out document from {meta.get('source')} due to product mismatch: {doc_codes} vs {target_codes}")
+                        continue # Skip this result entirely
+            
             base_score = result.similarity if result.similarity > 0 else result.score
             
             # Apply metadata-based boosting (Phase 4.1)
@@ -463,9 +512,10 @@ class RAGEngine:
         self, 
         query: str, 
         part_number: Optional[str],
-        top_k: int
+        top_k: int,
+        target_categories: List[str] = None
     ) -> Dict:
-        """Fallback: retrieve using standard semantic search"""
+        """Fallback: retrieve using standard semantic search with product filtering"""
         
         # Generate query embedding
         query_embedding = self.embeddings.generate_embedding(query)
@@ -502,6 +552,19 @@ class RAGEngine:
         
         filtered_docs = []
         for doc, meta, dist in zip(documents, metadatas, distances):
+            # Step 1: Metadata Filtering (Hard Filter) 
+            if target_categories and meta.get("product_categories"):
+                doc_cats_str = meta.get("product_categories", "")
+                doc_cats = [c.strip() for c in doc_cats_str.split(",")] if isinstance(doc_cats_str, str) else doc_cats_str
+                
+                overlap = set(target_categories) & set(doc_cats)
+                
+                target_codes = {c for c in target_categories if len(c) >= 3 and c.isupper()}
+                doc_codes = {c for c in doc_cats if len(c) >= 3 and c.isupper()}
+                
+                if target_codes and doc_codes and not (target_codes & doc_codes):
+                    continue # Strict mismatch skip
+                    
             # Skip if distance is too high (not similar enough)
             if dist > distance_threshold:
                 similarity_score = max(0, 1 - dist/2)

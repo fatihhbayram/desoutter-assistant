@@ -65,9 +65,21 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - `chunk_10000` (Wireshark Guide) -> Page 11 ✅
 - Test query: "What are the safety instructions?" -> Citation: Page 12 ✅
 
+### 🆕 Smart Product Recognition (Metadata Enrichment) ✅ **NEW**
+
+**Problem:** Search results were mixed (e.g., retrieving battery tool info for a controller query) because documents lacked product metadata.
+
+**Solution:**
+1. **`ProductExtractor` Module:** Automatically identifies product families (EPB, CVI, Connect-W) from filenames and content.
+2. **Integration:** Populates `product_categories` metadata during ingestion.
+3. **Tagging:** 
+   - `EPB_...pdf` -> `[BATTERY_TOOL, EPB]`
+   - `CVI3_...pdf` -> `[CONTROLLER, CVI3]`
+
 ### 📝 Modified Files
-- `src/documents/document_processor.py`: `clean_text` logic.
-- `src/documents/semantic_chunker.py`: Regex update.
+- `src/documents/document_processor.py`: `clean_text` logic & `ProductExtractor` integration.
+- `src/documents/semantic_chunker.py`: Regex update & Metadata propagation.
+- `src/documents/product_extractor.py`: **NEW** (Product detection logic).
 - `README.md`: Metrics updated.
 - `RAG_QUALITY_IMPROVEMENT.md`: Status update.
 

@@ -14,6 +14,7 @@
 |---------|--------|-------|-------|
 | Hybrid Retrieval | ✅ Complete | 2.2 | BM25 + Semantic, RRF fusion |
 | Metadata Tagging | ✅ Complete | 1.1 | 14 fields per chunk |
+| Metadata Enrichment (Automatic Tagging) | ✅ Complete | 1.2 | Automatic product tagging & filtering |
 | Semantic Chunking | ✅ Complete | 1.1 | Section-aware, adaptive sizing |
 | Re-ranking | ✅ Complete | 2.2 | RRF, top-10 → top-5 |
 | Feedback System | ✅ Complete | 6 | Thumbs up/down |

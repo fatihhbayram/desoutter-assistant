@@ -166,7 +166,8 @@ class SemanticChunker:
         self,
         text: str,
         source_filename: str,
-        doc_type: Optional[DocumentType] = None
+        doc_type: Optional[DocumentType] = None,
+        product_categories: Optional[str] = None  # NEW: Comma-sep string or list
     ) -> List[Dict]:
         """
         Chunk document with semantic structure preservation
@@ -231,7 +232,8 @@ class SemanticChunker:
                 position=position_ratio,
                 source=source_filename,
                 doc_type=doc_type,
-                page_number=current_page  # Pass page number to chunks
+                page_number=current_page,  # Pass page number to chunks
+                product_categories=product_categories  # Pass product categories
             )
             
             chunks.extend(para_chunks)
@@ -337,7 +339,8 @@ class SemanticChunker:
         position: float,
         source: str,
         doc_type: DocumentType,
-        page_number: Optional[int] = None  # NEW: Page number from PDF
+        page_number: Optional[int] = None,  # NEW: Page number from PDF
+        product_categories: Optional[str] = None
     ) -> List[Dict]:
         """Chunk a paragraph into semantic pieces"""
         
@@ -356,7 +359,8 @@ class SemanticChunker:
                 source=source,
                 doc_type=doc_type,
                 word_count=word_count,
-                page_number=page_number  # Pass page number
+                page_number=page_number,  # Pass page number
+                product_categories=product_categories
             )]
         
         # Split into sentences
@@ -380,7 +384,8 @@ class SemanticChunker:
                     source=source,
                     doc_type=doc_type,
                     word_count=current_word_count,
-                    page_number=page_number  # Pass page number
+                    page_number=page_number,  # Pass page number
+                    product_categories=product_categories
                 ))
                 
                 # Start new chunk (with overlap)
@@ -400,7 +405,8 @@ class SemanticChunker:
                 source=source,
                 doc_type=doc_type,
                 word_count=current_word_count,
-                page_number=page_number  # Pass page number
+                page_number=page_number,  # Pass page number
+                product_categories=product_categories
             ))
         
         return chunks
@@ -425,7 +431,8 @@ class SemanticChunker:
         source: str,
         doc_type: DocumentType,
         word_count: int,
-        page_number: Optional[int] = None  # NEW: Page number from PDF
+        page_number: Optional[int] = None,  # NEW: Page number from PDF
+        product_categories: Optional[str] = None
     ) -> Dict:
         """Create a chunk with metadata"""
         
@@ -449,7 +456,7 @@ class SemanticChunker:
             heading_level=heading_level,
             section_type=section_type.value,
             doc_type=doc_type.value,
-            product_categories=[],  # Could be extracted from text
+            product_categories=product_categories.split(", ") if product_categories else [],
             fault_keywords=fault_keywords,
             importance_score=importance,
             is_procedure=self._is_procedure(text),

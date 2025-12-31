@@ -91,7 +91,8 @@ class FeedbackLearningEngine:
         language: str = "en",
         is_retry: bool = False,
         retry_of: Optional[str] = None,
-        response_time_ms: Optional[int] = None
+        response_time_ms: Optional[int] = None,
+        metadata: Optional[Dict] = None
     ) -> str:
         """
         Save diagnosis to history
@@ -112,7 +113,8 @@ class FeedbackLearningEngine:
             language=language,
             is_retry=is_retry,
             retry_of=retry_of,
-            response_time_ms=response_time_ms
+            response_time_ms=response_time_ms,
+            metadata=metadata
         )
         
         if is_retry and retry_of:

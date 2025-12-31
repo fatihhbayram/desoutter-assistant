@@ -57,6 +57,7 @@ except ImportError:
 
 # Semantic chunking for Phase 1-2 enhancement
 from src.documents.semantic_chunker import SemanticChunker, DocumentType, ChunkMetadata
+from src.documents.product_extractor import ProductExtractor
 
 logger = setup_logger(__name__)
 
@@ -81,7 +82,12 @@ class DocumentProcessor:
             chunk_overlap=100,
             max_recursion_depth=3
         )
+        
+        # Initialize product extractor for Metadata Enrichment
+        self.product_extractor = ProductExtractor()
+        
         logger.info(f"  - Semantic chunking: ENABLED (Phase 1-2 enhancement)")
+        logger.info(f"  - Product recognition: ENABLED")
     
     # =========================================================================
     # PDF PROCESSING
@@ -421,7 +427,8 @@ class DocumentProcessor:
                 chunks = self.semantic_chunker.chunk_document(
                     text=text,
                     source_filename=file_path.name,
-                    doc_type=doc_type
+                    doc_type=doc_type,
+                    product_categories=metadata.get("product_categories", "")
                 )
                 chunk_count = len(chunks)
                 logger.info(f"  Semantic chunking: Created {chunk_count} chunks")
@@ -479,7 +486,9 @@ class DocumentProcessor:
         metadata = {
             "source": file_path.name,
             "type": self._infer_document_type(file_path),
-            "format": file_path.suffix.lower().replace('.', '')
+            "format": file_path.suffix.lower().replace('.', ''),
+            # Metadata Enrichment: Smart Product Recognition
+            "product_categories": self.product_extractor.get_product_categories(file_path.name, text[:1000])
         }
         
         # Try to extract product references from filename and text

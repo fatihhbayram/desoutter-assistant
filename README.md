@@ -2,7 +2,7 @@
 
 AI-powered repair assistant for Desoutter industrial tools. Uses RAG (Retrieval Augmented Generation) with **self-learning capabilities** to provide intelligent repair suggestions based on technical manuals and service bulletins.
 
-**Repository**: https://github.com/fatihhbayramm/desoutter-assistant
+**Repository**: https://github.com/fatihhbayram/desoutter-assistant
 
 ## 🎯 Key Features
 
@@ -132,6 +132,7 @@ docker run -d --name desoutter-frontend -p 3001:3001 desoutter-frontend
 ## 📝 Recent Updates
 
 ### 2025-12-31: Source Citation Enhancement (Critical Fix) 🎯 **NEW**
+- **2025-12-31:** Smart Product Recognition (Metadata Enrichment for precision filtering). 🎯 **NEW**
 - ✅ **Fixed Page Number Extraction**
   - Refactored `clean_text` to preserve paragraph structure
   - Improved regex for robust page marker detection
