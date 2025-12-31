@@ -765,7 +765,19 @@ class RAGEngine:
                 capabilities=capabilities
             )
             
-            confidence = "high" if len(optimized_chunks) >= 3 else "medium" if optimized_chunks else "low"
+            
+            # Calculate confidence based on sufficiency score (FIXED: was using chunk count)
+            # This is critical for response quality - LLM performs better with accurate confidence
+            logger.info(f"DEBUG: sufficiency={sufficiency}, score={sufficiency.score if sufficiency else 'None'}")
+            if sufficiency and sufficiency.score >= 0.7:
+                confidence = "high"
+                logger.info(f"Confidence set to HIGH (score={sufficiency.score:.3f})")
+            elif sufficiency and sufficiency.score >= 0.5:
+                confidence = "medium"
+                logger.info(f"Confidence set to MEDIUM (score={sufficiency.score:.3f})")
+            else:
+                confidence = "low"
+                logger.info(f"Confidence set to LOW (score={sufficiency.score if sufficiency else 'None'})")
         else:
             # No relevant context found - use fallback
             logger.warning("No relevant context found in manuals")

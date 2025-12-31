@@ -143,9 +143,10 @@ class ResponseValidator:
             len([i for i in issues if i.type == "uncertainty"]) > self.max_uncertainty_count
         )
         
-        # Suggest confidence adjustment
+        # Suggest confidence adjustment ONLY for HIGH severity issues
+        # Don't override sufficiency-based confidence for minor issues
         confidence_adjustment = None
-        if len(issues) > 0 and severity in ["medium", "high"]:
+        if severity == "high":
             confidence_adjustment = "low"
         
         is_valid = len(issues) == 0 or severity == "low"
