@@ -193,8 +193,20 @@ class SemanticChunker:
         current_section = "Introduction"
         section_heading_level = 0
         position_ratio = 0.0
+        current_page = None  # Track current page number
         
         for para_idx, paragraph in enumerate(paragraphs):
+            # Extract page number from markers at start of paragraph
+            # Format: "--- Page X ---\n[content]" or just "--- Page X ---"
+            page_match = re.match(r'^---\s*Page\s+(\d+)\s*---\s*\n?', paragraph)
+            if page_match:
+                current_page = int(page_match.group(1))
+                # Remove the page marker from paragraph
+                paragraph = paragraph[page_match.end():]
+                # If paragraph is now empty, skip it
+                if not paragraph.strip():
+                    continue
+            
             # Detect section heading
             if self._is_heading(paragraph):
                 current_section = paragraph.strip()
@@ -210,7 +222,8 @@ class SemanticChunker:
                 heading_level=section_heading_level,
                 position=position_ratio,
                 source=source_filename,
-                doc_type=doc_type
+                doc_type=doc_type,
+                page_number=current_page  # Pass page number to chunks
             )
             
             chunks.extend(para_chunks)
@@ -286,7 +299,8 @@ class SemanticChunker:
         heading_level: int,
         position: float,
         source: str,
-        doc_type: DocumentType
+        doc_type: DocumentType,
+        page_number: Optional[int] = None  # NEW: Page number from PDF
     ) -> List[Dict]:
         """Chunk a paragraph into semantic pieces"""
         
@@ -304,7 +318,8 @@ class SemanticChunker:
                 position=position,
                 source=source,
                 doc_type=doc_type,
-                word_count=word_count
+                word_count=word_count,
+                page_number=page_number  # Pass page number
             )]
         
         # Split into sentences
@@ -327,7 +342,8 @@ class SemanticChunker:
                     position=position,
                     source=source,
                     doc_type=doc_type,
-                    word_count=current_word_count
+                    word_count=current_word_count,
+                    page_number=page_number  # Pass page number
                 ))
                 
                 # Start new chunk (with overlap)
@@ -346,7 +362,8 @@ class SemanticChunker:
                 position=position,
                 source=source,
                 doc_type=doc_type,
-                word_count=current_word_count
+                word_count=current_word_count,
+                page_number=page_number  # Pass page number
             ))
         
         return chunks
@@ -370,7 +387,8 @@ class SemanticChunker:
         position: float,
         source: str,
         doc_type: DocumentType,
-        word_count: int
+        word_count: int,
+        page_number: Optional[int] = None  # NEW: Page number from PDF
     ) -> Dict:
         """Create a chunk with metadata"""
         
@@ -401,6 +419,7 @@ class SemanticChunker:
             contains_warning=contains_warning,
             contains_numbers=bool(re.search(r'\d+', text)),
             position=position,
+            page_number=page_number,  # Store page number
             word_count=word_count,
             content_hash=self._calculate_content_hash(text)  # NEW: Content hash for deduplication
         )
