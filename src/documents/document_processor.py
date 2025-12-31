@@ -442,20 +442,28 @@ class DocumentProcessor:
         }
     
     def clean_text(self, text: str) -> str:
-        """Clean and normalize extracted text"""
-        # Remove excessive whitespace
-        text = re.sub(r'\s+', ' ', text)
+        """
+        Clean and normalize extracted text while preserving structure
+        """
+        # 1. Normalize line endings
+        text = text.replace('\r\n', '\n').replace('\r', '\n')
         
-        # Remove page numbers (basic)
-        text = re.sub(r'Page\s+\d+\s+of\s+\d+', '', text, flags=re.IGNORECASE)
+        # 2. Preserve paragraph breaks (double newlines)
+        # Split by double newlines to get paragraphs
+        paragraphs = re.split(r'\n\s*\n', text)
         
-        # Remove common PDF artifacts
-        text = re.sub(r'\x00', '', text)
-        
-        # Normalize line breaks
-        text = re.sub(r'\n\s*\n', '\n\n', text)
-        
-        return text.strip()
+        cleaned_paragraphs = []
+        for p in paragraphs:
+            if not p.strip():
+                continue
+            # For each paragraph, replace single newlines with spaces (unwrap text)
+            # but keep the paragraph itself as a unit
+            # Normalize internal whitespace
+            cleaned_p = re.sub(r'\s+', ' ', p).strip()
+            cleaned_paragraphs.append(cleaned_p)
+            
+        # 3. Rejoin with double newlines
+        return '\n\n'.join(cleaned_paragraphs)
     
     def extract_metadata(self, file_path: Path, text: str) -> Dict:
         """

@@ -198,13 +198,21 @@ class SemanticChunker:
         for para_idx, paragraph in enumerate(paragraphs):
             # Extract page number from markers at start of paragraph
             # Format: "--- Page X ---\n[content]" or just "--- Page X ---"
-            page_match = re.match(r'^---\s*Page\s+(\d+)\s*---\s*\n?', paragraph)
-            if page_match:
+            # Use search and check start position to be more robust against leading whitespace/BOMs
+            page_match = re.search(r'---\s*Page\s+(\d+)\s*---', paragraph)
+            if page_match and page_match.start() < 10:
                 current_page = int(page_match.group(1))
-                # Remove the page marker from paragraph
-                paragraph = paragraph[page_match.end():]
-                # If paragraph is now empty, skip it
-                if not paragraph.strip():
+                logger.debug(f"Parsed page number: {current_page} from marker at pos {page_match.start()}")
+                # Remove the page marker and any surrounding whitespace/newlines
+                # We remove from the start of the match to the end of the line it's on
+                marker_line_end = paragraph.find('\n', page_match.end())
+                if marker_line_end != -1:
+                    paragraph = paragraph[marker_line_end:].strip()
+                else:
+                    paragraph = paragraph[page_match.end():].strip()
+                
+                # If paragraph is now empty, it was just a page marker
+                if not paragraph:
                     continue
             
             # Detect section heading
@@ -244,17 +252,46 @@ class SemanticChunker:
     def _is_heading(self, text: str) -> bool:
         """Check if text is a heading"""
         
+        text_stripped = text.strip()
+        if not text_stripped or len(text_stripped) < 2:
+            return False
+        
         # Markdown-style headings
-        if re.match(r'^#+\s', text):
+        if re.match(r'^#+\s', text_stripped):
             return True
         
-        # All caps headings
-        if text.isupper() and len(text) < 100 and not any(char.isdigit() for char in text):
+        # Special markers (>>, •, -, etc.)
+        if re.match(r'^(>>|•|►|→)\s*[A-Z]', text_stripped):
             return True
         
         # Numbered section headings (e.g., "3.2 Troubleshooting")
-        if re.match(r'^\d+(\.\d+)*\s+', text):
+        if re.match(r'^\d+(\.\d+)*\s+[A-Z]', text_stripped):
             return True
+        
+        # ALL CAPS headings (relaxed length limit for PDFs)
+        # Allow up to 150 chars and allow some digits (for product names)
+        if text_stripped.isupper() and len(text_stripped) < 150:
+            # Must have at least 2 words
+            words = text_stripped.split()
+            if len(words) >= 2:
+                return True
+        
+        # Short lines that look like headings (common in PDFs)
+        # Must be < 60 chars, start with capital, no ending punctuation
+        if len(text_stripped) < 60 and text_stripped[0].isupper():
+            # No ending punctuation (except :)
+            if not text_stripped[-1] in '.!?,;' or text_stripped.endswith(':'):
+                # Contains heading keywords
+                heading_keywords = [
+                    'introduction', 'overview', 'benefits', 'features',
+                    'installation', 'configuration', 'operation', 'maintenance',
+                    'troubleshooting', 'specifications', 'safety', 'warning',
+                    'caution', 'note', 'important', 'description', 'procedure',
+                    'assembly', 'disassembly', 'repair', 'replacement'
+                ]
+                text_lower = text_stripped.lower()
+                if any(keyword in text_lower for keyword in heading_keywords):
+                    return True
         
         return False
     

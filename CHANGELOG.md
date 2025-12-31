@@ -1,12 +1,12 @@
-# 📅 Desoutter Repair Assistant - Geliştirme Günlüğü (Changelog)
+# 📅 Desoutter Repair Assistant - Development Log (Changelog)
 
 Bu dosya projenin günlük geliştirme sürecini takip eder.
 
 ---
 
-## 📋 Yapılacaklar (TODO)
+## 📋 To-Do List (TODO)
 
-### 🔴 Yüksek Öncelik (Tamamlanan)
+### 🔴 High Priority (Completed)
 - [x] **Feedback Sistemi**: Kullanıcı geri bildirimi ile self-learning RAG ✅ (9 Ara)
 - [x] **Dashboard**: Arıza istatistikleri ve trend analizi ✅ (9 Ara)
 - [x] **Tech Page Wizard**: 4-step wizard-style UI ✅ (14 Ara)
@@ -28,16 +28,16 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - [x] **Phase 6 Self-Learning Feedback Loop**: Source ranking, keyword mappings, training data ✅ (22 Ara)
 - [x] **Phase 3.1 Domain Embeddings**: Domain vocabulary, term weighting, query enhancement ✅ (22 Ara)
 
-### 🟠 Devam Eden (22 Aralık)
+### 🟠 In Progress (22 Dec)
 - [ ] **Scrape Missing Series**: Rate limit nedeniyle atlanan 11 seri
 - [ ] **Document Re-ingest**: 487 döküman (484 bulletin + 3 manual) ChromaDB'ye
 
-### 🟡 Orta Öncelik (Next Sprint)
+### 🟡 Medium Priority (Next Sprint)
 - [ ] **Embedding Fine-tuning**: Domain modeli eğit (100+ contrastive pair gerekli)
 - [ ] **TechWizard Entegrasyonu**: App.jsx'e entegre et
 - [ ] **Admin Page Redesign**: Layout basitleştir, UX iyileştir
 
-### 🟢 Uzun Vadeli (Future Phases)
+### 🟢 Long Term (Future Phases)
 - [ ] **Vision AI**: Fotoğraftan arıza tespiti
 - [ ] **Mobil PWA**: Progressive Web App
 - [ ] **SAP Entegrasyonu**: Otomatik yedek parça siparişi
@@ -46,59 +46,84 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 
 ---
 
+## 📆 31 December 2025 (Tuesday) - Source Citation Enhancement (Critical Fix)
+
+### 🆕 Metadata & Page Number Extraction Fix ✅ **CRITICAL**
+
+**Problem:** Page numbers could not be cited in RAG responses because the `clean_text` function was destroying text structure.
+
+**Solutions:**
+1. **`clean_text` Refactor:** Rewritten to preserve paragraph structure (`\n\n`).
+2. **Regex Improvement:** Used more flexible regex for page number detection (`--- Page X ---`).
+3. **Full Re-Ingestion:** 
+   - Database cleared.
+   - 541 documents re-processed.
+   - **Result:** ~22,889 chunks (Precise splitting due to increased granularity).
+
+**Verification:**
+- `chunk_0` (EPB Guide) -> Page 1 ✅
+- `chunk_10000` (Wireshark Guide) -> Page 11 ✅
+- Test query: "What are the safety instructions?" -> Citation: Page 12 ✅
+
+### 📝 Modified Files
+- `src/documents/document_processor.py`: `clean_text` logic.
+- `src/documents/semantic_chunker.py`: Regex update.
+- `README.md`: Metrics updated.
+- `RAG_QUALITY_IMPROVEMENT.md`: Status update.
+
 ## 📆 27 Aralık 2025 (Cuma) - RAG Relevance Filtering & System Updates
 
 ### 🆕 Phase 0.1: RAG Relevance Filtering ✅
-**Yeni Dosyalar:** 
+**New Files:** 
 - `config/relevance_filters.py` (197 satır)
 - `src/llm/relevance_filter.py` (220 satır)
 
-**Özellikler:**
+**Features:**
 - 15 fault category (WiFi, motor, torque, battery, display, touchscreen, pset, sensor, error codes, sound, communication, LED, button, cable, software)
 - Negative keyword filtering ile alakasız dökümanları exclude etme
 - Word boundary regex matching (false positive önleme - 'led' in 'failed' gibi)
 - Production-safe: Config-driven, try-catch, max exclusion limits
 - Test sonucu: 10/10 passed
 
-**Etki:** %70-80 irrelevant result azalması bekleniyor
+**Impact:** %70-80 irrelevant result azalması bekleniyor
 
 ### 🆕 Connection Architecture Mapping ✅
-**Dosya:** `src/llm/domain_vocabulary.py` (+184 satır)
+**File:** `src/llm/domain_vocabulary.py` (+184 satır)
 
-- 6 ürün ailesi kategorisi:
+- 6 product family categories:
   - CVI3 Range (corded tools)
   - CVIC/CVIR/CVIL II families
   - Battery WiFi tools (EPBC, EABC, EABS, BLRTC, ELC, QShield)
   - Standalone battery tools (EPB, EPBA, EAB)
   - Connect family units
-- `get_connection_info()` metodu ile model bazlı bağlantı bilgisi
+- `get_connection_info()` method for model-based connection info
 - Regex pattern matching (ExBC → EPBC/EABC)
 
 ### 🆕 Document Ingestion ✅
-- 541 döküman işlendi (121 PDF + 420 Word)
-- 3,651 yeni semantic chunk oluşturuldu
-- ChromaDB toplam: 6,798 chunk (%116 artış)
-- Başarı oranı: %98.7 (539/546)
+- 541 documents processed (121 PDF + 420 Word)
+- 3,651 new semantic chunks created
+- ChromaDB total: 6,798 chunks (116% increase)
+- Success rate: 98.7% (539/546)
 
 ### 🆕 RAG Prompt Enhancement ✅
-**Dosya:** `src/llm/prompts.py` (+50 satır)
+**File:** `src/llm/prompts.py` (+50 satır)
 
-- İngilizce ve Türkçe sistem prompt'ları güncellendi
-- 4 bağlantı kategorisi detaylandırıldı
-- Controller unit açıklamaları eklendi
+- English and Turkish system prompts updated
+- 4 connection categories detailed
+- Controller unit descriptions added
 
-### 🔧 Wireless Field Düzeltmesi
-- 300 ürün güncellendi (null → false)
-- Son durum: 71 wireless, 380 non-wireless, 0 null
+### 🔧 Wireless Field Fix
+- 300 products updated (null → false)
+- Final state: 71 wireless, 380 non-wireless, 0 null
 
-### 📝 Değiştirilen Dosyalar
+### 📝 Modified Files
 - `config/relevance_filters.py` (NEW)
 - `src/llm/relevance_filter.py` (NEW)
 - `src/llm/rag_engine.py` (+10 satır)
 - `src/llm/domain_vocabulary.py` (+184 satır)
 - `src/llm/prompts.py` (+50 satır)
 
-### ✅ Commit'ler
+### ✅ Commits
 - `cd44ecc`: Connection architecture & RAG system enhancement
 - `e199ee4`: RAG relevance filtering (15 categories)
 
@@ -106,25 +131,25 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 
 ## 📆 23 Aralık 2025 (Pazartesi) - Product Data Quality Fix
 
-### ✅ Tamamlanan
-- **Torque Parsing Fix**: Model kodlarının (M20, M10) torque olarak algılanması düzeltildi
-  - 3-stratejili yaklaşım: "to" keyword, dash with both Nm, single value with validation
-  - Negative lookbehind pattern ile model kodları exclude edildi
-  - Torque range validation eklendi (0.01-500 Nm)
-  - Örnek: ECSF2 artık doğru 0.45-1.8 Nm gösteriyor (önceden M20'den 20 Nm alıyordu)
-- **Wireless Detection Fix**: Model kod bazlı wireless detection
-  - Connected modeller (EPBC, EABC, ELC 'C' suffix) wireless olarak işaretlendi
-  - Standalone battery modeller (EPB, EPBA, EAB) wireless değil olarak işaretlendi
-  - Generic text search yerine specific model code patterns kullanıldı
-- **Full Product Re-scrape**: 451 ürün yeniden scrape edildi (60 dakika)
-  - Battery Tightening Tools: 151 ürün
-  - Cable Tightening Tools: 272 ürün
-  - Electric Drilling Tools: 28 ürün
-- **MongoDB Update**: 451 ürün güncellendi, 0 hata
-  - Tüm torque değerleri artık doğru
-  - Wireless field'ları model koduna göre düzeltildi
+### ✅ Completed
+- **Torque Parsing Fix**: Fixed model codes (M20, M10) being wrongly parsed as torque
+  - 3-strategy approach: "to" keyword, dash with both Nm, single value with validation
+  - Negative lookbehind pattern to exclude model codes
+  - Torque range validation added (0.01-500 Nm)
+  - Example: ECSF2 now correctly shows 0.45-1.8 Nm (previously parsing 20 Nm from M20)
+- **Wireless Detection Fix**: Model code-based wireless detection
+  - Connected models (EPBC, EABC, ELC 'C' suffix) marked as wireless
+  - Standalone battery models (EPB, EPBA, EAB) marked as non-wireless
+  - Used specific model code patterns instead of generic text search
+- **Full Product Re-scrape**: 451 products re-scraped (60 minutes)
+  - Battery Tightening Tools: 151 products
+  - Cable Tightening Tools: 272 products
+  - Electric Drilling Tools: 28 products
+- **MongoDB Update**: 451 products updated, 0 errors
+  - All torque values now correct
+  - Wireless fields corrected based on model code
 
-### 📝 Değiştirilen Dosyalar
+### 📝 Modified Files
 - `src/scraper/parsers.py`: Torque extraction ve wireless detection fix
 - `README.md`: Ürün sayısı 237+ → 451 güncellendi
 - `task.md`: Product Data Quality Fix section eklendi
@@ -135,9 +160,9 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 ## 📆 22 Aralık 2025 (Pazar) - Phase 5 & Phase 3.5 & Phase 6 & Phase 3.1 Complete
 
 ### 🆕 Phase 3.1: Domain Embeddings ✅
-**Dosya:** `src/llm/domain_embeddings.py` (800+ satır)
+**File:** `src/llm/domain_embeddings.py` (800+ satır)
 
-**Bileşenler:**
+**Components:**
 1. **DomainVocabulary**: Desoutter teknik terminolojisi
    - 8 tool tipi, 25+ ürün serisi
    - 30+ hata kodu (E01-E99)
@@ -160,7 +185,7 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
    - Anchor-positive-negative triplets
    - Feedback'ten otomatik toplama
 
-**Yeni API Endpoint'leri:**
+**New API Endpoints:**
 - `GET /admin/domain/stats` - Domain istatistikleri
 - `GET /admin/domain/vocabulary` - Vocabulary bilgisi
 - `POST /admin/domain/enhance-query` - Sorgu zenginleştirme test
@@ -170,9 +195,9 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 ---
 
 ### 🆕 Phase 6: Self-Learning Feedback Loop ✅
-**Dosya:** `src/llm/self_learning.py` (600+ satır)
+**File:** `src/llm/self_learning.py` (600+ satır)
 
-**Bileşenler:**
+**Components:**
 1. **FeedbackSignalProcessor**: Feedback sinyallerini işler
    - Explicit signals (positive/negative click)
    - Implicit signals (retry = dissatisfaction)
@@ -199,7 +224,7 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - `retraining_data`: Embedding eğitim verileri
 - `retraining_history`: Eğitim geçmişi
 
-**Yeni API Endpoint'leri:**
+**New API Endpoints:**
 - `GET /admin/learning/stats` - Öğrenme istatistikleri
 - `GET /admin/learning/top-sources` - En iyi kaynaklar
 - `POST /admin/learning/recommendations` - Keyword önerileri
@@ -218,7 +243,7 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 
 **Yeni Dosya:** `src/llm/performance_metrics.py` (400+ satır)
 
-**Özellikler:**
+**Features:**
 - Query latency tracking (retrieval, LLM, total)
 - Cache hit/miss rate monitoring
 - P95 and P99 latency percentiles
@@ -226,7 +251,7 @@ Bu dosya projenin günlük geliştirme sürecini takip eder.
 - User feedback accuracy tracking
 - Health status monitoring
 
-**Yeni API Endpoint'leri:**
+**New API Endpoints:**
 ```
 GET  /admin/metrics/health   - System health status
 GET  /admin/metrics/stats    - Aggregated statistics (1h, 24h)
@@ -239,14 +264,14 @@ POST /admin/metrics/reset    - Reset metrics
 
 **Yeni Dosya:** `src/llm/conversation.py` (350+ satır)
 
-**Özellikler:**
+**Features:**
 - Conversation session management
 - Context preservation across turns
 - Reference resolution (it, this, that → actual product/error)
 - Automatic session timeout (30 min)
 - History-aware prompts
 
-**Yeni API Endpoint'leri:**
+**New API Endpoints:**
 ```
 POST   /conversation/start       - Start/continue conversation
 GET    /conversation/{id}        - Get conversation history
@@ -260,14 +285,14 @@ GET    /admin/conversations/stats - Conversation statistics
 
 ### 🆕 ProductModel Schema v2 ✅ **YENİ**
 
-**Amaç:** Ürünleri daha iyi kategorize etmek için kapsamlı schema güncellemesi.
+**Goal:** Comprehensive schema update for better product categorization.
 
-**Yeni Alanlar:**
+**New Fields:**
 ```python
-# Tool Category (URL'den otomatik tespit)
+# Tool Category (Auto-detect from URL)
 tool_category: str  # battery_tightening, cable_tightening, electric_drilling
 
-# Wireless Info (Model adından otomatik tespit)
+# Wireless Info (Auto-detect from model name)
 wireless_info: WirelessInfo
   - is_wifi_capable: bool      # True if model has "C" (EPBC, EABC, etc.)
   - detection_method: str      # model_name_C, description_wireless, standalone_battery
@@ -291,18 +316,18 @@ tool_type: str        # pistol, angle_head, inline, straight, fixtured, etc.
 ```
 
 **Files Created:**
-- `src/scraper/product_categorizer.py` - Tüm detection helper fonksiyonları
+- `src/scraper/product_categorizer.py` - All detection helper functions
 
 ---
 
 ### 🆕 Smart Upsert Logic ✅ **YENİ**
 
-**Problem:** Yeni scrape mevcut verileri (özellikle görselleri) placeholder ile üzerine yazıyordu.
+**Problem:** New scrape was overwriting existing data (especially images) with placeholders.
 
-**Solution:** `smart_upsert_product()` fonksiyonu:
-- Mevcut değerleri korur (boş olmayan alanlar)
-- Sadece yeni veya daha iyi verileri günceller
-- Placeholder değerleri kabul etmez
+**Solution:** `smart_upsert_product()` function:
+- Preserves existing values (non-empty fields)
+- Updates only new or better data
+- Rejects placeholder values
 
 ```python
 # mongo_client.py

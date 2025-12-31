@@ -114,12 +114,12 @@ docker run -d --name desoutter-frontend -p 3001:3001 desoutter-frontend
 - **Feedback System**: 👍/👎 buttons for self-learning
 - **Source Document Viewer**: Open related documents directly from results
 
-## 📊 System Metrics (27 Aralık 2025)
+## 📊 System Metrics (31 Aralık 2025)
 
 | Metrik | Değer |
 |--------|-------|
 | Toplam Ürün | 451 (71 wireless, 380 non-wireless) |
-| ChromaDB Chunks | 6,798 semantic chunks |
+| ChromaDB Chunks | ~22,889 semantic chunks (Improved Granularity) |
 | Dökümanlar | 541 (121 PDF + 420 Word) |
 | Fault Categories | 15 (relevance filtering) |
 | Domain Terms | 351 Desoutter-specific |
@@ -130,6 +130,18 @@ docker run -d --name desoutter-frontend -p 3001:3001 desoutter-frontend
 | Response Cache | LRU + TTL (~100,000x speedup) |
 
 ## 📝 Recent Updates
+
+### 2025-12-31: Source Citation Enhancement (Critical Fix) 🎯 **NEW**
+- ✅ **Fixed Page Number Extraction**
+  - Refactored `clean_text` to preserve paragraph structure
+  - Improved regex for robust page marker detection
+- ✅ **Full Re-Ingestion Complete**
+  - Database purged and rebuilt
+  - 100% of documents (541) re-processed
+  - **Chunk count increased to ~22,889** due to better granularity (paragraph-level splitting)
+- ✅ **Verified Metadata**
+  - All chunks now possess valid `page_number` and `section` tags
+  - RAG responses now provide accurate citations (e.g., "Page 12")
 
 ### 2025-12-30: RAG Quality Improvements Phase 2 🚀 **NEW**
 - ✅ **Intent Detection Integration (Priority 3)**

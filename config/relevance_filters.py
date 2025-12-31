@@ -135,7 +135,8 @@ RELEVANCE_FILTER_RULES = {
         ],
         "exclude_if_contains": [],  # Don't exclude anything - error codes can relate to any system
         "require_at_least_one": [
-            "error", "fault", "alarm", "warning", "code", "alert", "transducer"
+            "error", "fault", "alarm", "warning", "code", "alert", "transducer",
+            "symptom", "issue", "problem", "solution"
         ]
     },
     
