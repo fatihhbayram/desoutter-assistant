@@ -28,7 +28,9 @@ from config.ai_settings import (
     HYBRID_RRF_K, ENABLE_QUERY_EXPANSION,
     USE_CACHE, CACHE_TTL,
     ENABLE_METADATA_BOOST, SERVICE_BULLETIN_BOOST, PROCEDURE_BOOST,
-    WARNING_BOOST, IMPORTANCE_BOOST_FACTOR
+    WARNING_BOOST, IMPORTANCE_BOOST_FACTOR,
+    ENABLE_DOMAIN_EMBEDDINGS, ENABLE_FAULT_FILTERING,
+    LLM_TIMEOUT_SECONDS, CHROMADB_TIMEOUT_SECONDS
 )
 from src.utils.logger import setup_logger
 
@@ -37,6 +39,17 @@ logger = setup_logger(__name__)
 
 class RAGEngine:
     """RAG Engine for repair suggestions with self-learning capabilities"""
+    
+    # Turkish language indicators
+    TURKISH_CHARS = set('çğışöüÇĞİŞÖÜ')
+    TURKISH_WORDS = [
+        'nedir', 'nasıl', 'neden', 'hangi', 'kaç',
+        'hata', 'kodu', 'arıza', 'sorun', 'çözüm', 'onarım',
+        'bakım', 'kalibrasyon', 'bağlantı', 'kurulum',
+        'çalışmıyor', 'çalışmaz', 'durdu', 'bozuk', 'bozuldu',
+        'alet', 'motor', 'tork', 'hız', 'güç', 'kontrol', 'ayar',
+        'için', 'ile', 'veya', 'ama', 'fakat', 'mı', 'mi', 'mu', 'mü'
+    ]
     
     def __init__(self):
         """Initialize RAG engine"""
@@ -55,6 +68,7 @@ class RAGEngine:
         self.product_extractor = ProductExtractor()  # Metadata Enrichment
         self.context_optimizer = ContextOptimizer(token_budget=8000)  # Phase 3.4
         self.performance_monitor = get_performance_monitor()  # Phase 5.1
+        self.intent_detector = None  # Lazy initialized
         
         # Initialize hybrid search if enabled
         if USE_HYBRID_SEARCH:
@@ -67,8 +81,11 @@ class RAGEngine:
         # Initialize self-learning engine (Phase 6)
         self._init_self_learning()
         
-        # Initialize domain embeddings (Phase 3.1)
-        self._init_domain_embeddings()
+        # Initialize domain embeddings (Phase 3.1) - ONLY if enabled
+        if ENABLE_DOMAIN_EMBEDDINGS:
+            self._init_domain_embeddings()
+        else:
+            logger.info("⏭️ Domain embeddings DISABLED (ENABLE_DOMAIN_EMBEDDINGS=false)")
         
         # Initialize query processor (Phase 2.2)
         self._init_query_processor()
@@ -133,6 +150,90 @@ class RAGEngine:
             logger.warning(f"Failed to initialize query processor: {e}")
             self.query_processor = None
     
+    def _detect_language(self, query: str) -> str:
+        """
+        Auto-detect query language (Turkish vs English).
+        
+        Detection based on:
+        1. Turkish-specific characters (ş, ğ, ı, ö, ü, ç)
+        2. Common Turkish words (hata, nedir, nasıl, etc.)
+        
+        Args:
+            query: User query text
+            
+        Returns:
+            "tr" for Turkish, "en" for English (default)
+        """
+        # Check for Turkish characters first (most reliable)
+        if any(c in self.TURKISH_CHARS for c in query):
+            logger.debug(f"[LANG] Detected Turkish via special characters")
+            return "tr"
+        
+        # Check for Turkish words
+        query_lower = query.lower()
+        for word in self.TURKISH_WORDS:
+            if word in query_lower:
+                logger.debug(f"[LANG] Detected Turkish via keyword: '{word}'")
+                return "tr"
+        
+        # Default to English
+        return "en"
+    
+    def _filter_by_product_capabilities(self, docs: List[Dict], capabilities: Dict) -> List[Dict]:
+        """
+        Filter documents based on product capabilities.
+        Excludes wireless/battery content for non-wireless/non-battery tools.
+        
+        Args:
+            docs: List of retrieved documents
+            capabilities: Product capabilities dict
+            
+        Returns:
+            Filtered documents list
+        """
+        if not capabilities or not capabilities.get('product_found'):
+            return docs
+        
+        is_wireless = capabilities.get('wireless', False)
+        is_battery = capabilities.get('battery_powered', False)
+        
+        # Patterns to exclude for non-wireless tools
+        wireless_patterns = ['wifi', 'wi-fi', 'wireless', 'access point', 'connect unit', 'pairing']
+        
+        # Patterns to exclude for non-battery tools
+        battery_patterns = ['battery charging', 'battery replacement', 'charger', 'charge level', 'low battery']
+        
+        filtered = []
+        excluded_count = 0
+        
+        for doc in docs:
+            content = doc.get('text', '').lower()
+            should_exclude = False
+            
+            # Check wireless content for non-wireless tools
+            if not is_wireless:
+                for pattern in wireless_patterns:
+                    if content.count(pattern) >= 2:  # Pattern appears multiple times = main topic
+                        should_exclude = True
+                        break
+            
+            # Check battery content for non-battery tools
+            if not is_battery and not should_exclude:
+                for pattern in battery_patterns:
+                    if content.count(pattern) >= 2:
+                        should_exclude = True
+                        break
+            
+            if should_exclude:
+                excluded_count += 1
+            else:
+                filtered.append(doc)
+        
+        if excluded_count > 0:
+            logger.info(f"[CAPABILITY_FILTER] Excluded {excluded_count} docs (wireless={is_wireless}, battery={is_battery})")
+        
+        return filtered
+
     def _apply_metadata_boost(self, base_score: float, metadata: Dict) -> float:
         """
         Apply metadata-based score boosting (Phase 4.1)
@@ -307,7 +408,7 @@ class RAGEngine:
                 capabilities['corded'] = any(model_upper.startswith(p) for p in corded_patterns)
                 
                 # 3. Standalone vs Controller-required (from connection architecture)
-                if self.domain_embeddings:
+                if ENABLE_DOMAIN_EMBEDDINGS and self.domain_embeddings:
                     try:
                         from src.llm.domain_vocabulary import DomainVocabulary
                         connection_info = DomainVocabulary.get_connection_info(product_model)
@@ -352,9 +453,9 @@ class RAGEngine:
         """
         logger.info(f"Retrieving context for query: {query[:50]}...")
         
-        # Phase 3.1: Enhance query with domain knowledge
+        # Phase 3.1: Enhance query with domain knowledge (ONLY if enabled)
         enhanced_query = query
-        if self.domain_embeddings:
+        if ENABLE_DOMAIN_EMBEDDINGS and self.domain_embeddings:
             try:
                 enhancement = self.domain_embeddings.enhance_query(query)
                 enhanced_query = enhancement.get("enhanced", query)
@@ -421,14 +522,17 @@ class RAGEngine:
             min_similarity=RAG_SIMILARITY_THRESHOLD
         )
         
-        # Phase 0.1: Apply relevance filtering (production-safe, can be disabled via config)
+        # Phase 0.1: Apply relevance filtering (ONLY if enabled - can be slow)
         # Filters out documents that don't match query intent (e.g., WiFi query → transducer docs)
-        try:
-            from src.llm.relevance_filter import filter_irrelevant_results
-            results = filter_irrelevant_results(query, results)
-        except Exception as e:
-            logger.warning(f"Relevance filtering failed, using original results: {e}")
-            # Continue with original results if filter fails (safety-first)
+        if ENABLE_FAULT_FILTERING:
+            try:
+                from src.llm.relevance_filter import filter_irrelevant_results
+                results = filter_irrelevant_results(query, results)
+            except Exception as e:
+                logger.warning(f"Relevance filtering failed, using original results: {e}")
+                # Continue with original results if filter fails (safety-first)
+        else:
+            logger.debug("Fault filtering DISABLED (ENABLE_FAULT_FILTERING=false)")
 
         
         filtered_docs = []
@@ -614,7 +718,7 @@ class RAGEngine:
         Args:
             part_number: Product part number
             fault_description: Description of the fault
-            language: Language code ('en' or 'tr')
+            language: Language code ('en' or 'tr') - auto-detected if empty or 'auto'
             username: User requesting the diagnosis
             excluded_sources: Sources to exclude (for retry)
             is_retry: Whether this is a retry request
@@ -625,6 +729,16 @@ class RAGEngine:
         """
         start_time = time.time()
         logger.info(f"Generating repair suggestion for {part_number} (retry={is_retry})")
+        
+        # =====================================================================
+        # AUTO-DETECT LANGUAGE if not specified or set to 'auto'
+        # =====================================================================
+        if not language or language == "auto":
+            language = self._detect_language(fault_description)
+            logger.info(f"[LANG] Auto-detected: {language} (query: '{fault_description[:40]}...')")
+        elif language not in ("en", "tr"):
+            logger.warning(f"[LANG] Unknown language '{language}', defaulting to 'en'")
+            language = "en"
         
         # Phase 2.3: Check response cache (skip for retry requests)
         cache_key = None
@@ -666,6 +780,11 @@ class RAGEngine:
         enhanced_query = f"{product_model} {actual_part_number} {fault_description}"
         logger.info(f"Enhanced retrieval query: {enhanced_query[:80]}...")
         
+        # Get product capabilities EARLY for filtering
+        capabilities = self._get_product_capabilities(product_model)
+        if capabilities.get('product_found'):
+            logger.info(f"[CAPABILITIES] wireless={capabilities.get('wireless')}, battery={capabilities.get('battery_powered')}")
+        
         # Retrieve relevant context (always try RAG even if product not found)
         context_result = self.retrieve_context(
             query=enhanced_query,
@@ -673,6 +792,12 @@ class RAGEngine:
         )
         
         retrieved_docs = context_result["documents"]
+        
+        # =====================================================================
+        # FILTER BY PRODUCT CAPABILITIES (Priority 2 - Prevent Hallucination)
+        # =====================================================================
+        if capabilities.get('product_found'):
+            retrieved_docs = self._filter_by_product_capabilities(retrieved_docs, capabilities)
         
         # Apply learning: filter out excluded sources (for retry)
         all_excluded = set(excluded_sources or []) | set(learned_context.get("exclude_sources", []))
@@ -730,8 +855,9 @@ class RAGEngine:
                 avg_similarity=avg_similarity
             )
             
-            # If insufficient context, return "I don't know" response
-            if not sufficiency.is_sufficient:
+            # SIMPLE CHECK: Only refuse if NO documents found at all
+            # Let the system try to answer if there's any context
+            if not sufficiency.is_sufficient and len(retrieved_docs) == 0:
                 response_time_ms = int((time.time() - start_time) * 1000)
                 
                 idk_response = build_idk_response(
@@ -848,6 +974,8 @@ class RAGEngine:
             prompt = f"{fault_description}\n\n{context_str}"
             confidence = "low"
             optimized_sources = None
+            # Get capabilities for fallback path as well
+            capabilities = self._get_product_capabilities(product_model)
         
         # Phase 3.3: Detect Query Intent (Priority 3)
         intent_result = None
@@ -964,10 +1092,46 @@ class RAGEngine:
         # Calculate response time
         response_time_ms = int((time.time() - start_time) * 1000)
         
+        # =================================================================
+        # ADVANCED CONFIDENCE SCORING (replaces simple threshold)
+        # =================================================================
+        try:
+            from src.llm.confidence_scorer import ConfidenceScorer
+            scorer = ConfidenceScorer()
+            
+            # Calculate average similarity from sources
+            avg_sim = 0.0
+            if optimized_sources:
+                sims = [s.get('similarity', 0) for s in optimized_sources if isinstance(s.get('similarity'), (int, float))]
+                avg_sim = sum(sims) / len(sims) if sims else 0.0
+            elif retrieved_docs:
+                sims = [d.get('similarity', 0) for d in retrieved_docs if isinstance(d.get('similarity'), (int, float))]
+                avg_sim = sum(sims) / len(sims) if sims else 0.0
+            
+            confidence_result = scorer.calculate_confidence(
+                sources=optimized_sources or retrieved_docs or [],
+                intent=intent_result.intent.value if intent_result else None,
+                intent_confidence=intent_result.confidence if intent_result else 0.0,
+                response_text=suggestion,
+                sufficiency_score=sufficiency.score if sufficiency else None,
+                avg_similarity=avg_sim
+            )
+            
+            confidence = confidence_result.level
+            confidence_numeric = confidence_result.score
+            confidence_factors = confidence_result.factors
+            logger.info(f"Advanced confidence: {confidence} (score={confidence_numeric:.3f}, factors={confidence_factors})")
+            
+        except Exception as e:
+            logger.warning(f"Advanced confidence scoring failed: {e}, using fallback")
+            confidence_numeric = 0.3 if confidence == "low" else 0.6 if confidence == "medium" else 0.8
+            confidence_factors = {}
+        
         # Structure the response
         response = {
             "suggestion": suggestion.strip(),
             "confidence": confidence,
+            "confidence_numeric": confidence_numeric,
             "product_model": product_model,
             "part_number": actual_part_number,
             "sources": sources_list,

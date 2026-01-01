@@ -333,3 +333,40 @@ ENABLE_DEDUPLICATION = os.getenv("ENABLE_DEDUPLICATION", "true").lower() == "tru
 
 # Log duplicate ratio to database (for analytics)
 LOG_DUPLICATE_RATIO = os.getenv("LOG_DUPLICATE_RATIO", "true").lower() == "true"
+
+# =============================================================================
+# PERFORMANCE OPTIMIZATION FLAGS (NEW)
+# =============================================================================
+# Disable slow features for faster response times
+# Use these to test baseline performance and identify bottlenecks
+
+# Domain embeddings: 351 Desoutter terms for query expansion
+# Impact: ~50-100ms per query, may or may not improve retrieval
+# Set to False to disable and test baseline performance
+ENABLE_DOMAIN_EMBEDDINGS = os.getenv("ENABLE_DOMAIN_EMBEDDINGS", "false").lower() == "true"
+
+# Fault filtering: 15 category rules to exclude irrelevant docs
+# Impact: ~30ms per query, may over-filter in some cases
+# Set to False to disable filtering
+ENABLE_FAULT_FILTERING = os.getenv("ENABLE_FAULT_FILTERING", "false").lower() == "true"
+
+# Adaptive chunking: Varies chunk size based on document type
+# Impact: Affects ingestion, not query time directly
+# Set to False to use fixed chunk size (FIXED_CHUNK_SIZE)
+ENABLE_ADAPTIVE_CHUNKING = os.getenv("ENABLE_ADAPTIVE_CHUNKING", "false").lower() == "true"
+
+# Fixed chunk size when adaptive chunking is disabled (characters)
+FIXED_CHUNK_SIZE = int(os.getenv("FIXED_CHUNK_SIZE", "600"))
+
+# =============================================================================
+# TIMEOUT CONFIGURATION (NEW)
+# =============================================================================
+# Prevent slow operations from blocking responses
+
+# LLM generation timeout in seconds
+# If LLM takes longer, return error instead of waiting
+LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "10"))
+
+# ChromaDB query timeout in seconds
+# If vector search takes longer, return error
+CHROMADB_TIMEOUT_SECONDS = int(os.getenv("CHROMADB_TIMEOUT_SECONDS", "3"))

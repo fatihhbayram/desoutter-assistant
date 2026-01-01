@@ -1,25 +1,28 @@
 """
 Query Intent Detection Module
+=============================
 Classifies user queries into specific intent categories to enable
 context-appropriate response generation.
 
 Intent Types:
+- ERROR_CODE: E01, E02, error code lookup (highest priority)
 - TROUBLESHOOTING: Error, fault, problem diagnosis
 - SPECIFICATIONS: Torque, speed, dimensions, technical specs
-- INSTALLATION: Setup, assembly, configuration
 - CALIBRATION: Calibrate, adjust, zero setting
 - MAINTENANCE: Clean, lubricate, replace parts
 - CONNECTION: WiFi, ethernet, network, pairing
-- ERROR_CODE: E01, E02, error code lookup
+- INSTALLATION: Setup, assembly, configuration
 - GENERAL: Default for unclear intent
+
+Version: 2.0 - Simplified keyword-based matching for reliability
 """
 from typing import Optional, Dict, List
 from dataclasses import dataclass
 from enum import Enum
 import re
-from src.utils.logger import setup_logger
+import logging
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class QueryIntent(str, Enum):
@@ -45,116 +48,134 @@ class IntentResult:
 
 class IntentDetector:
     """
-    Detect user query intent from patterns and keywords
+    Simple, reliable keyword-based intent detection.
     
-    Uses multi-level detection:
-    1. Explicit pattern matching (error codes, spec keywords)
-    2. Contextual analysis (product type context)
-    3. Query structure (question vs statement)
+    Uses pattern matching to classify query intent for proper routing
+    and response generation.
+    
+    Priority Order (highest to lowest):
+    1. error_code - Most specific (regex patterns)
+    2. troubleshooting - Problem diagnosis
+    3. specifications - Technical data requests
+    4. calibration - Adjustment procedures
+    5. maintenance - Service procedures
+    6. connection - Network/connectivity
+    7. installation - Setup procedures
+    8. general - Default fallback
     """
     
-    # Intent-specific keyword patterns
-    INTENT_PATTERNS = {
-        QueryIntent.ERROR_CODE: {
-            'patterns': [
-                r'\bE\d{2,3}\b',  # E01, E018, etc.
-                r'\berror\s+code\b',
-                r'\bfault\s+code\b',
-                r'\balarm\s+\d+\b',
-                r'\btransducer\s+error\b'
-            ],
-            'weight': 1.0  # Highest priority
-        },
-        
-        QueryIntent.TROUBLESHOOTING: {
-            'patterns': [
-                r'\bnot\s+working\b',
-                r'\b(problem|issue|fault|error)\b',
-                r'\b(broken|damaged|failed)\b',
-                r"\bdoesn['\"]?t\s+(work|start|run)\b",
-                r'\b(stopped|stuck|jammed)\b',
-                r'\b(noise|vibration|smell)\b',
-                r'\b(overheating|overheat)\b',
-                r'\bçalışmıyor\b',  # Turkish: not working
-                r'\bsorun\b',  # Turkish: problem
-                r'\barıza\b'  # Turkish: fault
-            ],
-            'weight': 0.9
-        },
-        
-        QueryIntent.SPECIFICATIONS: {
-            'patterns': [
-                r'\b(torque|tork)\b',
-                r'\b(speed|hız|rpm)\b',
-                r'\b(weight|ağırlık|kg|grams?)\b',
-                r'\b(dimensions?|boyutlar|size)\b',
-                r'\b(capacity|kapasite)\b',
-                r'\b(specification|özellik|spec)\b',
-                r'\b(how\s+much|ne\s+kadar)\b',
-                r'\bwhat\s+(is|are)\s+the\b',
-                r'\b(power|güç|watt|voltage|volt)\b',
-                r'\b(range|aralık|min|max)\b'
-            ],
-            'weight': 0.95
-        },
-        
-        QueryIntent.INSTALLATION: {
-            'patterns': [
-                r'\b(install|kurulum|setup|set\s+up)\b',
-                r'\b(assembly|montaj|assemble)\b',
-                r'\b(configuration|configure|ayarla)\b',
-                r'\b(connect|bağla|connection\s+setup)\b',
-                r'\bhow\s+to\s+(install|setup|configure)\b',
-                r'\b(mounting|mount|tak)\b',
-                r'\b(initialization|initialize)\b'
-            ],
-            'weight': 0.85
-        },
-        
-        QueryIntent.CALIBRATION: {
-            'patterns': [
-                r'\b(calibrat(e|ion)|kalibr(e|asyon))\b',
-                r'\b(adjust|ayarla|tune)\b',
-                r'\b(zero|sıfırla|reset)\b',
-                r'\b(accuracy|doğruluk)\b',
-                r'\b(torque\s+setting)\b',
-                r'\bhow\s+to\s+(calibrate|adjust)\b'
-            ],
-            'weight': 0.9
-        },
-        
-        QueryIntent.MAINTENANCE: {
-            'patterns': [
-                r'\b(maintenance|bakım|service)\b',
-                r'\b(clean|temizle|cleaning)\b',
-                r'\b(lubricate|yağla|oil)\b',
-                r'\b(replace|değiştir|replacement)\b',
-                r'\b(inspect|kontrol|inspection)\b',
-                r'\b(preventive|önleyici)\b',
-                r'\bhow\s+often\b'
-            ],
-            'weight': 0.8
-        },
-        
-        QueryIntent.CONNECTION: {
-            'patterns': [
-                r'\b(wifi|wi-fi|wireless|kablosuz)\b',
-                r'\b(network|ağ|ethernet)\b',
-                r'\b(connection|bağlantı|connectivity)\b',
-                r'\b(access\s+point|AP)\b',
-                r'\b(pairing|eşleşme)\b',
-                r'\b(connect\s+unit)\b',
-                r'\b(IP\s+address|network\s+settings)\b',
-                r'\b(cannot\s+connect|bağlanamıyor)\b'
-            ],
-            'weight': 0.9
-        }
-    }
-
-    
     def __init__(self):
-        """Initialize intent detector"""
-        logger.info("IntentDetector initialized")
+        """Initialize intent detector with keyword patterns"""
+        
+        # Error code patterns (highest priority - regex based)
+        self.error_patterns = [
+            r'\be\d{2,4}\b',           # E01, E804, E4502
+            r'error\s*code',            # "error code" or "errorcode"
+            r'error\s+\d+',             # "error 123"
+            r'fault\s*code',            # "fault code"
+            r'fault\s+\d+',             # "fault 123"
+            r'hata\s*kodu',             # Turkish: error code
+            r'alarm\s+\d+',             # "alarm 47"
+        ]
+        
+        # Intent keyword lists - using simple substring matching
+        # Order in dict determines tie-breaker priority
+        self.intent_keywords = {
+            'troubleshooting': [
+                # English - Operation issues
+                'stop', 'stops', 'stopped', 'stopping',
+                'not working', "won't", "wont", "doesn't", "doesnt",
+                'not start', 'not run', 'not turn',
+                'broken', 'break', 'broke',
+                'fail', 'fails', 'failed', 'failure',
+                'problem', 'issue', 'trouble',
+                'turn off', 'turns off', 'turned off', 'shut down', 'shuts down',
+                'random', 'randomly', 'intermittent', 'sometimes',
+                'malfunction', 'defect', 'defective',
+                'overheat', 'overheating', 'hot', 'heating',
+                'noise', 'noisy', 'grinding', 'vibrat', 'vibration',
+                'stuck', 'jam', 'jammed',
+                'slow', 'weak', 'low power',
+                # Turkish
+                'calismiyor', 'calışmıyor', 'çalışmıyor',
+                'sorun', 'ariza', 'arıza', 'bozuk',
+                'durdu', 'duruyor',
+            ],
+            
+            'specifications': [
+                # English
+                'torque', 'rpm', 'speed',
+                'power', 'watt', 'voltage', 'volt', 'amp', 'amperage',
+                'weight', 'dimension', 'size', 'length', 'width', 'height',
+                'capacity', 'specification', 'specs', 'spec',
+                'what is the', 'what are the',
+                'how much', 'how many', 'how heavy', 'how fast',
+                'maximum', 'minimum', 'max', 'min',
+                'rated', 'nominal', 'range',
+                # Turkish
+                'tork', 'hiz', 'hız', 'guc', 'güç', 'agirlik', 'ağırlık', 'boyut',
+                'ne kadar', 'kac', 'kaç',
+            ],
+            
+            'calibration': [
+                # English
+                'calibrat', 'calibration', 'calibrate',
+                'adjust', 'adjustment', 'adjusting',
+                'zero', 'zeroing', 'offset',
+                'accuracy', 'accurate',
+                'tune', 'tuning',
+                'how to calibrate', 'how to adjust',
+                # Turkish
+                'kalibr', 'kalibrasyon', 'ayarla', 'sifirla', 'sıfırla',
+            ],
+            
+            'maintenance': [
+                # English
+                'maintain', 'maintenance',
+                'service', 'servicing',
+                'clean', 'cleaning',
+                'lubricat', 'lubrication', 'lubricate', 'oil', 'grease',
+                'replace', 'replacement', 'replacing',
+                'inspect', 'inspection',
+                'schedule', 'interval', 'period', 'periyod',
+                'preventive', 'routine', 'regular', 'periodic',
+                'how often', 'when should',
+                # Turkish
+                'bakim', 'bakım', 'servis', 'temizl', 'yagla', 'yağla',
+                'bakim periyodu', 'bakım periyodu',
+            ],
+            
+            'connection': [
+                # English
+                'wifi', 'wi-fi', 'wireless',
+                'network', 'ethernet', 'lan',
+                'connect', 'connection', 'connectivity', 'disconnect',
+                'cable', 'wire', 'wiring',
+                'plug', 'socket', 'port',
+                'communication', 'signal',
+                'pair', 'pairing', 'link',
+                'ip address', 'network setting',
+                'cannot connect',
+                # Turkish
+                'baglanti', 'bağlantı', 'kablosuz', 'kablo', 'ag', 'ağ',
+            ],
+            
+            'installation': [
+                # English
+                'install', 'installation', 'installing',
+                'setup', 'set up', 'set-up',
+                'mount', 'mounting', 'mounted',
+                'assemble', 'assembly', 'assembling',
+                'configure', 'configuration', 'configuring',
+                'initial', 'initialize', 'initialization',
+                'how to install', 'how to setup', 'how to mount',
+                'first time', 'getting started',
+                # Turkish
+                'kurulum', 'montaj', 'tak', 'yerlestir', 'yerleştir',
+            ],
+        }
+        
+        logger.info("IntentDetector initialized (v2.0 - keyword-based)")
     
     def detect_intent(
         self,
@@ -162,69 +183,102 @@ class IntentDetector:
         product_info: Optional[Dict] = None
     ) -> IntentResult:
         """
-        Detect query intent using pattern matching
+        Detect query intent using keyword pattern matching.
         
         Args:
             query: User query text
-            product_info: Optional product information for context
+            product_info: Optional product information for context (not used in v2)
         
         Returns:
             IntentResult with detected intent and confidence
+            
+        Example:
+            >>> detector = IntentDetector()
+            >>> result = detector.detect_intent("Motor stops during operation")
+            >>> result.intent.value
+            'troubleshooting'
         """
         query_lower = query.lower()
+        logger.debug(f"[INTENT] Analyzing query: '{query}'")
         
-        # Score each intent
-        intent_scores = {}
-        matched_patterns_by_intent = {}
+        # =====================================================================
+        # Priority 1: Check for error codes (most specific - regex patterns)
+        # =====================================================================
+        for pattern in self.error_patterns:
+            match = re.search(pattern, query_lower, re.IGNORECASE)
+            if match:
+                logger.info(f"[INTENT] Detected: error_code (matched pattern: {pattern}, found: '{match.group()}')")
+                return IntentResult(
+                    intent=QueryIntent.ERROR_CODE,
+                    confidence=0.95,
+                    matched_patterns=[pattern],
+                    secondary_intent=None
+                )
         
-        for intent, config in self.INTENT_PATTERNS.items():
-            score = 0.0
-            matched = []
+        # =====================================================================
+        # Priority 2: Check all other intents by keyword matching
+        # =====================================================================
+        intent_scores: Dict[str, Dict] = {}
+        
+        for intent_name, keywords in self.intent_keywords.items():
+            matches = []
+            for keyword in keywords:
+                if keyword in query_lower:
+                    matches.append(keyword)
             
-            for pattern in config['patterns']:
-                if re.search(pattern, query_lower, re.IGNORECASE):
-                    score += config['weight']
-                    matched.append(pattern)
-            
-            # Normalize score (0-1 range)
-            if matched:
-                intent_scores[intent] = min(score, 1.0)
-                matched_patterns_by_intent[intent] = matched
+            if matches:
+                intent_scores[intent_name] = {
+                    'count': len(matches),
+                    'keywords': matches,
+                    # Bonus for longer keyword matches (more specific)
+                    'specificity': sum(len(k) for k in matches)
+                }
+                logger.debug(f"[INTENT] {intent_name}: {len(matches)} matches -> {matches}")
         
-        # If no patterns matched, default to GENERAL
-        if not intent_scores:
-            logger.info(f"No specific intent detected, defaulting to GENERAL")
+        # =====================================================================
+        # Determine winner based on match count, then specificity
+        # =====================================================================
+        if intent_scores:
+            # Sort by: 1) match count (desc), 2) specificity (desc)
+            best_intent = max(
+                intent_scores.keys(),
+                key=lambda k: (intent_scores[k]['count'], intent_scores[k]['specificity'])
+            )
+            match_info = intent_scores[best_intent]
+            
+            # Calculate confidence based on match count
+            confidence = min(0.5 + (match_info['count'] * 0.15), 0.95)
+            
+            # Find secondary intent
+            secondary = None
+            remaining = {k: v for k, v in intent_scores.items() if k != best_intent}
+            if remaining:
+                secondary_name = max(remaining.keys(), key=lambda k: remaining[k]['count'])
+                if remaining[secondary_name]['count'] >= 1:
+                    secondary = QueryIntent(secondary_name)
+            
+            logger.info(
+                f"[INTENT] Detected: {best_intent} "
+                f"(confidence={confidence:.2f}, "
+                f"matches={match_info['count']}: {match_info['keywords']})"
+            )
+            
             return IntentResult(
-                intent=QueryIntent.GENERAL,
-                confidence=0.5,
-                matched_patterns=[],
-                secondary_intent=None
+                intent=QueryIntent(best_intent),
+                confidence=confidence,
+                matched_patterns=match_info['keywords'],
+                secondary_intent=secondary
             )
         
-        # Get primary intent (highest score)
-        primary_intent = max(intent_scores, key=intent_scores.get)
-        primary_score = intent_scores[primary_intent]
-        
-        # Get secondary intent if exists
-        remaining_intents = {k: v for k, v in intent_scores.items() if k != primary_intent}
-        secondary_intent = None
-        if remaining_intents:
-            secondary_intent = max(remaining_intents, key=remaining_intents.get)
-            # Only keep if score is significant
-            if remaining_intents[secondary_intent] < 0.5:
-                secondary_intent = None
-        
-        logger.info(
-            f"Intent detected: {primary_intent.value} "
-            f"(confidence={primary_score:.2f}, "
-            f"patterns={len(matched_patterns_by_intent[primary_intent])})"
-        )
-        
+        # =====================================================================
+        # Default: GENERAL (no keywords matched)
+        # =====================================================================
+        logger.info("[INTENT] Detected: general (no specific keywords matched)")
         return IntentResult(
-            intent=primary_intent,
-            confidence=primary_score,
-            matched_patterns=matched_patterns_by_intent[primary_intent],
-            secondary_intent=secondary_intent
+            intent=QueryIntent.GENERAL,
+            confidence=0.5,
+            matched_patterns=[],
+            secondary_intent=None
         )
     
     def get_intent_description(self, intent: QueryIntent) -> str:
@@ -248,3 +302,58 @@ class IntentDetector:
             QueryIntent.GENERAL: "General inquiry"
         }
         return descriptions.get(intent, "Unknown intent")
+
+
+# =============================================================================
+# QUICK TEST (run with: python -m src.llm.intent_detector)
+# =============================================================================
+if __name__ == "__main__":
+    detector = IntentDetector()
+    
+    test_cases = [
+        ("Motor won't start", "troubleshooting"),
+        ("Motor stops during operation", "troubleshooting"),
+        ("Tool turns off randomly", "troubleshooting"),
+        ("Grinding noise from the tool", "troubleshooting"),
+        ("Tool overheating during operation", "troubleshooting"),
+        ("What is the maximum torque?", "specifications"),
+        ("Error code E804", "error_code"),
+        ("E047 hata kodu ne anlama geliyor?", "error_code"),
+        ("How to calibrate torque settings?", "calibration"),
+        ("Cable connection between tool and CVI3", "connection"),
+        ("WiFi connection issues", "connection"),
+        ("How to install the tool on workstation?", "installation"),
+        ("How often should I lubricate?", "maintenance"),
+        ("Bakım periyodu ne kadar?", "maintenance"),
+        ("Tell me about this tool", "general"),
+    ]
+    
+    print("=" * 70)
+    print("INTENT DETECTOR v2.0 - VALIDATION TEST")
+    print("=" * 70)
+    
+    passed = 0
+    failed = 0
+    
+    for query, expected in test_cases:
+        result = detector.detect_intent(query)
+        detected = result.intent.value
+        is_correct = detected == expected
+        
+        if is_correct:
+            passed += 1
+            status = "✅"
+        else:
+            failed += 1
+            status = "❌"
+        
+        print(f'{status} "{query}"')
+        print(f'   Expected: {expected}, Got: {detected} (conf: {result.confidence:.2f})')
+        if result.matched_patterns:
+            print(f'   Matched: {result.matched_patterns[:3]}')
+        print()
+    
+    print("=" * 70)
+    print(f"Results: {passed}/{len(test_cases)} passed ({passed/len(test_cases)*100:.0f}%)")
+    print(f"Target: >=90% (>={int(len(test_cases)*0.9)}/{len(test_cases)})")
+    print("=" * 70)

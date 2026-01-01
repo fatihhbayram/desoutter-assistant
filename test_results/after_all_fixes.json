@@ -1,0 +1,342 @@
+{
+  "timestamp": "2026-01-01T21:52:12.490916",
+  "summary": {
+    "total_tests": 25,
+    "passed": 12,
+    "failed": 13,
+    "errors": 0,
+    "pass_rate": 48.0
+  },
+  "timing": {
+    "total_time_ms": 334182,
+    "avg_response_time_ms": 13366.72,
+    "min_response_time_ms": 53,
+    "max_response_time_ms": 34650
+  },
+  "by_intent": {
+    "troubleshooting": {
+      "total": 5,
+      "passed": 0,
+      "failed": 5
+    },
+    "error_code": {
+      "total": 4,
+      "passed": 1,
+      "failed": 3
+    },
+    "specifications": {
+      "total": 3,
+      "passed": 2,
+      "failed": 1
+    },
+    "connection": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "maintenance": {
+      "total": 2,
+      "passed": 0,
+      "failed": 2
+    },
+    "calibration": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0
+    },
+    "general": {
+      "total": 5,
+      "passed": 4,
+      "failed": 1
+    },
+    "installation": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1
+    }
+  },
+  "by_category": {
+    "basic": {
+      "total": 19,
+      "passed": 9,
+      "failed": 10
+    },
+    "language": {
+      "total": 3,
+      "passed": 0,
+      "failed": 3
+    },
+    "edge_case": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "failed_tests": [
+    "TROUBLE_001",
+    "TROUBLE_002",
+    "TROUBLE_003",
+    "TROUBLE_004",
+    "TROUBLE_005",
+    "ERROR_001",
+    "ERROR_003",
+    "ERROR_004",
+    "SPEC_002",
+    "MAINT_001",
+    "MAINT_002",
+    "GEN_002",
+    "INSTALL_001"
+  ],
+  "results": [
+    {
+      "query_id": "TROUBLE_001",
+      "passed": false,
+      "response_time_ms": 19457,
+      "confidence": "high",
+      "intent": "troubleshooting",
+      "failure_reasons": [
+        "Contains forbidden terms: ['battery']"
+      ]
+    },
+    {
+      "query_id": "TROUBLE_002",
+      "passed": false,
+      "response_time_ms": 153,
+      "confidence": "insufficient_context",
+      "intent": null,
+      "failure_reasons": [
+        "Intent mismatch: expected 'troubleshooting', got 'None'",
+        "Confidence too low: expected >=0.5, got insufficient_context (0.0)",
+        "Missing required terms: ['temperature', 'cool']",
+        "Got 'I don't know' response but expected answer"
+      ]
+    },
+    {
+      "query_id": "TROUBLE_003",
+      "passed": false,
+      "response_time_ms": 17520,
+      "confidence": "high",
+      "intent": "troubleshooting",
+      "failure_reasons": [
+        "Missing required terms: ['bearing']"
+      ]
+    },
+    {
+      "query_id": "TROUBLE_004",
+      "passed": false,
+      "response_time_ms": 150,
+      "confidence": "insufficient_context",
+      "intent": null,
+      "failure_reasons": [
+        "Intent mismatch: expected 'troubleshooting', got 'None'",
+        "Confidence too low: expected >=0.5, got insufficient_context (0.0)",
+        "Got 'I don't know' response but expected answer"
+      ]
+    },
+    {
+      "query_id": "TROUBLE_005",
+      "passed": false,
+      "response_time_ms": 21057,
+      "confidence": "high",
+      "intent": "troubleshooting",
+      "failure_reasons": [
+        "Missing required terms: ['connection']"
+      ]
+    },
+    {
+      "query_id": "ERROR_001",
+      "passed": false,
+      "response_time_ms": 144,
+      "confidence": "insufficient_context",
+      "intent": null,
+      "failure_reasons": [
+        "Intent mismatch: expected 'error_code', got 'None'",
+        "Confidence too low: expected >=0.6, got insufficient_context (0.0)",
+        "Got 'I don't know' response but expected answer"
+      ]
+    },
+    {
+      "query_id": "ERROR_002",
+      "passed": true,
+      "response_time_ms": 5670,
+      "confidence": "high",
+      "intent": "error_code",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "ERROR_003",
+      "passed": false,
+      "response_time_ms": 139,
+      "confidence": "insufficient_context",
+      "intent": null,
+      "failure_reasons": [
+        "Intent mismatch: expected 'error_code', got 'None'",
+        "Confidence too low: expected >=0.5, got insufficient_context (0.0)",
+        "Got 'I don't know' response but expected answer"
+      ]
+    },
+    {
+      "query_id": "ERROR_004",
+      "passed": false,
+      "response_time_ms": 114,
+      "confidence": "insufficient_context",
+      "intent": null,
+      "failure_reasons": [
+        "Intent mismatch: expected 'error_code', got 'None'",
+        "Confidence too low: expected >=0.5, got insufficient_context (0.0)",
+        "Got 'I don't know' response but expected answer"
+      ]
+    },
+    {
+      "query_id": "SPEC_001",
+      "passed": true,
+      "response_time_ms": 19659,
+      "confidence": "high",
+      "intent": "specifications",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "SPEC_002",
+      "passed": false,
+      "response_time_ms": 25760,
+      "confidence": "high",
+      "intent": "specifications",
+      "failure_reasons": [
+        "Got 'I don't know' response but expected answer"
+      ]
+    },
+    {
+      "query_id": "SPEC_003",
+      "passed": true,
+      "response_time_ms": 29748,
+      "confidence": "high",
+      "intent": "specifications",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "CONN_001",
+      "passed": true,
+      "response_time_ms": 34650,
+      "confidence": "high",
+      "intent": "connection",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "CONN_002",
+      "passed": true,
+      "response_time_ms": 31040,
+      "confidence": "high",
+      "intent": "connection",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "CONN_003",
+      "passed": true,
+      "response_time_ms": 29583,
+      "confidence": "high",
+      "intent": "connection",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "MAINT_001",
+      "passed": false,
+      "response_time_ms": 131,
+      "confidence": "insufficient_context",
+      "intent": null,
+      "failure_reasons": [
+        "Intent mismatch: expected 'maintenance', got 'None'",
+        "Confidence too low: expected >=0.5, got insufficient_context (0.0)",
+        "Missing required terms: ['lubrication', 'maintenance']",
+        "Got 'I don't know' response but expected answer"
+      ]
+    },
+    {
+      "query_id": "MAINT_002",
+      "passed": false,
+      "response_time_ms": 53,
+      "confidence": "insufficient_context",
+      "intent": null,
+      "failure_reasons": [
+        "Intent mismatch: expected 'maintenance', got 'None'",
+        "Confidence too low: expected >=0.5, got insufficient_context (0.0)",
+        "Got 'I don't know' response but expected answer"
+      ]
+    },
+    {
+      "query_id": "CALIB_001",
+      "passed": true,
+      "response_time_ms": 28672,
+      "confidence": "high",
+      "intent": "calibration",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "CALIB_002",
+      "passed": true,
+      "response_time_ms": 22269,
+      "confidence": "high",
+      "intent": "calibration",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "GEN_001",
+      "passed": true,
+      "response_time_ms": 31814,
+      "confidence": "high",
+      "intent": "general",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "GEN_002",
+      "passed": false,
+      "response_time_ms": 118,
+      "confidence": "insufficient_context",
+      "intent": null,
+      "failure_reasons": [
+        "Intent mismatch: expected 'general', got 'None'",
+        "Confidence too low: expected >=0.3, got insufficient_context (0.0)",
+        "Got 'I don't know' response but expected answer"
+      ]
+    },
+    {
+      "query_id": "IDK_001",
+      "passed": true,
+      "response_time_ms": 119,
+      "confidence": "insufficient_context",
+      "intent": null,
+      "failure_reasons": [
+        "Intent mismatch: expected 'general', got 'None'"
+      ]
+    },
+    {
+      "query_id": "IDK_002",
+      "passed": true,
+      "response_time_ms": 145,
+      "confidence": "insufficient_context",
+      "intent": null,
+      "failure_reasons": [
+        "Intent mismatch: expected 'general', got 'None'"
+      ]
+    },
+    {
+      "query_id": "IDK_003",
+      "passed": true,
+      "response_time_ms": 100,
+      "confidence": "insufficient_context",
+      "intent": null,
+      "failure_reasons": [
+        "Intent mismatch: expected 'general', got 'None'"
+      ]
+    },
+    {
+      "query_id": "INSTALL_001",
+      "passed": false,
+      "response_time_ms": 15903,
+      "confidence": "high",
+      "intent": "installation",
+      "failure_reasons": [
+        "Missing required terms: ['mount']"
+      ]
+    }
+  ]
+}

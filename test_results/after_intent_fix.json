@@ -1,0 +1,340 @@
+{
+  "timestamp": "2026-01-01T20:34:49.161165",
+  "summary": {
+    "total_tests": 25,
+    "passed": 8,
+    "failed": 16,
+    "errors": 1,
+    "pass_rate": 32.0
+  },
+  "timing": {
+    "total_time_ms": 601367,
+    "avg_response_time_ms": 25049.541666666668,
+    "min_response_time_ms": 5183,
+    "max_response_time_ms": 52219
+  },
+  "by_intent": {
+    "troubleshooting": {
+      "total": 5,
+      "passed": 2,
+      "failed": 3
+    },
+    "error_code": {
+      "total": 4,
+      "passed": 2,
+      "failed": 2
+    },
+    "specifications": {
+      "total": 3,
+      "passed": 0,
+      "failed": 3
+    },
+    "connection": {
+      "total": 3,
+      "passed": 0,
+      "failed": 3
+    },
+    "maintenance": {
+      "total": 2,
+      "passed": 1,
+      "failed": 1
+    },
+    "calibration": {
+      "total": 2,
+      "passed": 0,
+      "failed": 2
+    },
+    "general": {
+      "total": 5,
+      "passed": 2,
+      "failed": 3
+    },
+    "installation": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  "by_category": {
+    "basic": {
+      "total": 19,
+      "passed": 8,
+      "failed": 11
+    },
+    "language": {
+      "total": 3,
+      "passed": 0,
+      "failed": 3
+    },
+    "edge_case": {
+      "total": 3,
+      "passed": 0,
+      "failed": 3
+    }
+  },
+  "failed_tests": [
+    "TROUBLE_001",
+    "TROUBLE_004",
+    "TROUBLE_005",
+    "ERROR_003",
+    "ERROR_004",
+    "SPEC_001",
+    "SPEC_002",
+    "SPEC_003",
+    "CONN_001",
+    "CONN_002",
+    "CONN_003",
+    "MAINT_002",
+    "CALIB_001",
+    "CALIB_002",
+    "IDK_001",
+    "IDK_002",
+    "IDK_003"
+  ],
+  "results": [
+    {
+      "query_id": "TROUBLE_001",
+      "passed": false,
+      "response_time_ms": 19548,
+      "confidence": "high",
+      "intent": "general",
+      "failure_reasons": [
+        "Intent mismatch: expected 'troubleshooting', got 'general'",
+        "Contains forbidden terms: ['battery']"
+      ]
+    },
+    {
+      "query_id": "TROUBLE_002",
+      "passed": true,
+      "response_time_ms": 23665,
+      "confidence": "high",
+      "intent": "troubleshooting",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "TROUBLE_003",
+      "passed": true,
+      "response_time_ms": 15012,
+      "confidence": "medium",
+      "intent": "troubleshooting",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "TROUBLE_004",
+      "passed": false,
+      "response_time_ms": 49782,
+      "confidence": "medium",
+      "intent": "troubleshooting",
+      "failure_reasons": [
+        "Response too slow: 49782ms > 30000ms"
+      ]
+    },
+    {
+      "query_id": "TROUBLE_005",
+      "passed": false,
+      "response_time_ms": 37477,
+      "confidence": "low",
+      "intent": "general",
+      "failure_reasons": [
+        "Intent mismatch: expected 'troubleshooting', got 'general'",
+        "Confidence too low: expected >=0.5, got low (0.3)",
+        "Missing required terms: ['connection']",
+        "Response too slow: 37477ms > 30000ms"
+      ]
+    },
+    {
+      "query_id": "ERROR_001",
+      "passed": true,
+      "response_time_ms": 14002,
+      "confidence": "high",
+      "intent": "error_code",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "ERROR_002",
+      "passed": true,
+      "response_time_ms": 5183,
+      "confidence": "high",
+      "intent": "error_code",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "ERROR_003",
+      "passed": false,
+      "response_time_ms": 13621,
+      "confidence": "high",
+      "intent": "error_code",
+      "failure_reasons": [
+        "Missing required terms: ['fault']"
+      ]
+    },
+    {
+      "query_id": "ERROR_004",
+      "passed": false,
+      "response_time_ms": 52219,
+      "confidence": "low",
+      "intent": "error_code",
+      "failure_reasons": [
+        "Confidence too low: expected >=0.5, got low (0.3)",
+        "Response too slow: 52219ms > 30000ms"
+      ]
+    },
+    {
+      "query_id": "SPEC_001",
+      "passed": false,
+      "response_time_ms": 19694,
+      "confidence": "high",
+      "intent": "specifications",
+      "failure_reasons": [
+        "Missing required terms: ['Nm']"
+      ]
+    },
+    {
+      "query_id": "SPEC_002",
+      "passed": false,
+      "response_time_ms": 21790,
+      "confidence": "low",
+      "intent": "specifications",
+      "failure_reasons": [
+        "Confidence too low: expected >=0.5, got low (0.3)"
+      ]
+    },
+    {
+      "query_id": "SPEC_003",
+      "passed": false,
+      "response_time_ms": 29818,
+      "confidence": "low",
+      "intent": "specifications",
+      "failure_reasons": [
+        "Confidence too low: expected >=0.5, got low (0.3)"
+      ]
+    },
+    {
+      "query_id": "CONN_001",
+      "passed": false,
+      "response_time_ms": 23113,
+      "confidence": "high",
+      "intent": "installation",
+      "failure_reasons": [
+        "Intent mismatch: expected 'connection', got 'installation'"
+      ]
+    },
+    {
+      "query_id": "CONN_002",
+      "passed": false,
+      "response_time_ms": 159,
+      "confidence": null,
+      "intent": null,
+      "failure_reasons": []
+    },
+    {
+      "query_id": "CONN_003",
+      "passed": false,
+      "response_time_ms": 31905,
+      "confidence": "high",
+      "intent": "connection",
+      "failure_reasons": [
+        "Response too slow: 31905ms > 30000ms"
+      ]
+    },
+    {
+      "query_id": "MAINT_001",
+      "passed": true,
+      "response_time_ms": 19513,
+      "confidence": "medium",
+      "intent": "maintenance",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "MAINT_002",
+      "passed": false,
+      "response_time_ms": 46168,
+      "confidence": "medium",
+      "intent": "specifications",
+      "failure_reasons": [
+        "Intent mismatch: expected 'maintenance', got 'specifications'",
+        "Missing required terms: ['bak\u0131m']",
+        "Response too slow: 46168ms > 30000ms"
+      ]
+    },
+    {
+      "query_id": "CALIB_001",
+      "passed": false,
+      "response_time_ms": 28009,
+      "confidence": "low",
+      "intent": "calibration",
+      "failure_reasons": [
+        "Confidence too low: expected >=0.5, got low (0.3)"
+      ]
+    },
+    {
+      "query_id": "CALIB_002",
+      "passed": false,
+      "response_time_ms": 21319,
+      "confidence": "low",
+      "intent": "calibration",
+      "failure_reasons": [
+        "Confidence too low: expected >=0.5, got low (0.3)"
+      ]
+    },
+    {
+      "query_id": "GEN_001",
+      "passed": true,
+      "response_time_ms": 23523,
+      "confidence": "low",
+      "intent": "general",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "GEN_002",
+      "passed": true,
+      "response_time_ms": 19853,
+      "confidence": "low",
+      "intent": "general",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "IDK_001",
+      "passed": false,
+      "response_time_ms": 20491,
+      "confidence": "medium",
+      "intent": "specifications",
+      "failure_reasons": [
+        "Intent mismatch: expected 'general', got 'specifications'",
+        "Missing required terms: [\"don't know\", 'cannot', 'no information']",
+        "Expected 'I don't know' response but got answer"
+      ]
+    },
+    {
+      "query_id": "IDK_002",
+      "passed": false,
+      "response_time_ms": 25756,
+      "confidence": "low",
+      "intent": "general",
+      "failure_reasons": [
+        "Missing required terms: [\"don't know\", 'cannot']",
+        "Expected 'I don't know' response but got answer"
+      ]
+    },
+    {
+      "query_id": "IDK_003",
+      "passed": false,
+      "response_time_ms": 21185,
+      "confidence": "medium",
+      "intent": "troubleshooting",
+      "failure_reasons": [
+        "Intent mismatch: expected 'general', got 'troubleshooting'",
+        "Missing required terms: [\"don't know\", 'cannot', 'no information']",
+        "Expected 'I don't know' response but got answer"
+      ]
+    },
+    {
+      "query_id": "INSTALL_001",
+      "passed": true,
+      "response_time_ms": 18543,
+      "confidence": "high",
+      "intent": "installation",
+      "failure_reasons": []
+    }
+  ]
+}
