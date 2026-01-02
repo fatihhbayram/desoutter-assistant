@@ -109,7 +109,7 @@ STANDARD_TEST_QUERIES: List[Dict] = [
     {
         "id": "TROUBLE_005",
         "query": "Tool stops randomly during use",
-        "product": "6159326000",
+        "product": "6159326910",
         "language": "en",
         "expected_intent": "troubleshooting",
         "min_confidence": 0.5,
@@ -155,7 +155,7 @@ STANDARD_TEST_QUERIES: List[Dict] = [
     {
         "id": "ERROR_003",
         "query": "CVI3 shows fault code 47",
-        "product": "6159326000",
+        "product": "6159326910",
         "language": "en",
         "expected_intent": "error_code",
         "min_confidence": 0.5,
@@ -233,7 +233,7 @@ STANDARD_TEST_QUERIES: List[Dict] = [
     {
         "id": "CONN_001",
         "query": "How to connect tool to controller?",
-        "product": "6159326000",
+        "product": "6159326910",
         "language": "en",
         "expected_intent": "connection",
         "min_confidence": 0.5,
@@ -261,7 +261,7 @@ STANDARD_TEST_QUERIES: List[Dict] = [
     {
         "id": "CONN_003",
         "query": "Cable connection between tool and CVI3",
-        "product": "6159326000",
+        "product": "6159326910",
         "language": "en",
         "expected_intent": "connection",
         "min_confidence": 0.5,
@@ -325,7 +325,7 @@ STANDARD_TEST_QUERIES: List[Dict] = [
     {
         "id": "CALIB_002",
         "query": "Calibration procedure for CVI3",
-        "product": "6159326000",
+        "product": "6159326910",
         "language": "en",
         "expected_intent": "calibration",
         "min_confidence": 0.5,

@@ -283,6 +283,91 @@ class RAGEngine:
             logger.info(f"[CAPABILITY_FILTER] Excluded {excluded_count} docs (wireless={is_wireless}, battery={is_battery})")
         
         return filtered
+    
+    def _filter_by_product_strict(self, docs: List[Dict], product_info: Dict) -> List[Dict]:
+        """
+        STRICT product-specific filtering (Priority 1 - Production Quality).
+        Prevents cross-product contamination (e.g., CVIL2 docs for ERS6 queries).
+        
+        Args:
+            docs: List of retrieved documents
+            product_info: Product info from MongoDB
+            
+        Returns:
+            Filtered documents list (only matching product or general docs)
+        """
+        if not product_info:
+            return docs
+        
+        # Extract product identifiers for matching
+        target_family = product_info.get('product_family', '').upper()  # e.g., 'EAD', 'ERS'
+        target_series = product_info.get('series_name', '').lower()     # e.g., 'ead - transducerized...'
+        target_model = product_info.get('model_name', '').upper()       # e.g., 'EAD20-1300'
+        target_part = product_info.get('part_number', '')               # e.g., '6151656060'
+        target_category = product_info.get('tool_category', '')         # e.g., 'cable_tightening'
+        
+        # Known product family prefixes that are mutually exclusive
+        PRODUCT_FAMILIES = {
+            'EAD', 'EPD', 'EFD', 'ERS', 'ECS', 'EPB', 'EPBC', 'EABC', 'EABS',
+            'CVI', 'CVIL', 'CVIR', 'CVIC', 'DVT', 'QST', 'PF', 'CONNECT',
+            'ELC', 'ELS', 'ELB', 'BLRT', 'XPB', 'EM', 'ERAL', 'EME', 'EMEL'
+        }
+        
+        filtered = []
+        excluded_count = 0
+        
+        for doc in docs:
+            metadata = doc.get('metadata', {})
+            content = doc.get('text', '').upper()
+            source = metadata.get('source', '').upper()
+            
+            # Extract product family from document
+            doc_family = metadata.get('product_family', '')
+            doc_categories = metadata.get('product_categories', '')
+            
+            # Check if document mentions a DIFFERENT product family
+            is_other_product = False
+            detected_family = None
+            
+            # Method 1: Check metadata product_family
+            if doc_family and doc_family.upper() != target_family:
+                if doc_family.upper() in PRODUCT_FAMILIES:
+                    is_other_product = True
+                    detected_family = doc_family.upper()
+            
+            # Method 2: Check content for other product families
+            if not is_other_product and target_family:
+                for family in PRODUCT_FAMILIES:
+                    if family == target_family:
+                        continue
+                    # Check if document is PRIMARILY about another product
+                    # (appears in source name or 3+ times in content)
+                    if family in source or content.count(family) >= 3:
+                        # But also check target family presence
+                        target_mentions = content.count(target_family) if target_family else 0
+                        other_mentions = content.count(family)
+                        
+                        if other_mentions > target_mentions + 2:
+                            is_other_product = True
+                            detected_family = family
+                            break
+            
+            if is_other_product:
+                excluded_count += 1
+                logger.debug(
+                    f"[PRODUCT_FILTER] Excluded: {source[:50]} "
+                    f"(detected {detected_family}, target {target_family})"
+                )
+            else:
+                filtered.append(doc)
+        
+        if excluded_count > 0:
+            logger.info(
+                f"[PRODUCT_FILTER] Excluded {excluded_count} docs for "
+                f"{target_family}/{target_model} (cross-product contamination)"
+            )
+        
+        return filtered
 
     def _apply_metadata_boost(self, base_score: float, metadata: Dict) -> float:
         """
@@ -874,6 +959,13 @@ class RAGEngine:
         )
         
         retrieved_docs = context_result["documents"]
+        
+        # =====================================================================
+        # STRICT PRODUCT FILTERING (Priority 1 - Production Quality)
+        # Prevents cross-product contamination (CVIL2 docs for ERS6 queries)
+        # =====================================================================
+        if product_info:
+            retrieved_docs = self._filter_by_product_strict(retrieved_docs, product_info)
         
         # =====================================================================
         # FILTER BY PRODUCT CAPABILITIES (Priority 2 - Prevent Hallucination)

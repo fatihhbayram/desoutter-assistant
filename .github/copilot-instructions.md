@@ -1,497 +1,562 @@
-# VS Code Copilot Meta Prompt - 60% to 80% Pass Rate
+# VS Code Copilot Meta Prompt - Production Quality Improvements
 
-## 🎉 Current Achievement: 60% Pass Rate!
+## 🎉 Current Achievement: 96% Pass Rate (24/25)
 
-**Major Wins:**
-- ✅ Performance optimized (3ms average, from 25s)
-- ✅ Specifications: 100% (3/3) - was 0%
-- ✅ Connection: 100% (3/3)
-- ✅ Calibration: 100% (2/2)
-- ✅ Zero timeout failures
+**System Status: PRODUCTION-READY**
+- ✅ Core RAG working
+- ✅ Intent detection stable
+- ✅ Confidence scoring reliable
+- ✅ Off-topic detection active
+- ✅ Performance acceptable
 
-**Remaining Issues: 10 failures**
-
----
-
-## 🎯 Priority Roadmap (60% → 80%)
-
-### Priority 1: Fix "I Don't Know" Logic (3 failures) ⭐⭐⭐
-
-**Impact:** 3 tests → +12% pass rate (60% → 72%)
-
-**Problem:**
-```
-❌ IDK_001: Query about Mars usage
-   Expected: "I don't know / no information"
-   Actual: Gives specifications answer
-   
-❌ IDK_002: Query about impossible scenario
-   Expected: "I don't know"
-   Actual: Gives connection answer
-   
-❌ IDK_003: Query about nonsense
-   Expected: "I don't know"
-   Actual: Gives troubleshooting answer
-```
-
-**Root Cause:** Context sufficiency check not working properly.
-
-#### Copilot Command 1.1: Fix Context Grounding
-
-```
-@workspace Fix "I don't know" logic in src/llm/rag_engine.py:
-
-Problem: System answers queries it shouldn't answer (Mars, impossible scenarios).
-
-Current context sufficiency threshold is too low (0.25), allowing irrelevant chunks to pass.
-
-Implement stricter grounding check:
-
-async def generate_response(self, query: str, ...):
-    # ... retrieval logic ...
-    
-    # STRICT context quality check
-    context_quality = self._evaluate_context_quality(chunks, query)
-    
-    # If quality is very low, don't even call LLM
-    if context_quality['score'] < 0.4:  # Raised from 0.25
-        logger.warning(f"[GROUNDING] Insufficient context: {context_quality}")
-        return {
-            'response': "I don't have enough information in the documentation to answer this question accurately. Please contact technical support or rephrase your question.",
-            'confidence_level': 'insufficient_context',
-            'sources': [],
-            'context_quality': context_quality,
-            'intent': intent
-        }
-    
-    # Also check query similarity to retrieved chunks
-    if not self._has_semantic_overlap(query, chunks):
-        logger.warning("[GROUNDING] No semantic overlap with retrieved docs")
-        return {
-            'response': "I cannot find relevant information for this query in the technical documentation.",
-            'confidence_level': 'no_relevant_docs',
-            'sources': [],
-            'intent': intent
-        }
-    
-    # Proceed with LLM generation
-    ...
-
-def _has_semantic_overlap(self, query: str, chunks: List[Dict]) -> bool:
-    """
-    Check if query has meaningful overlap with retrieved chunks.
-    Prevents answering completely unrelated queries.
-    """
-    query_words = set(query.lower().split())
-    # Remove common words
-    stop_words = {'the', 'a', 'an', 'is', 'how', 'what', 'why', 'when', 'where'}
-    query_words = query_words - stop_words
-    
-    if not query_words:
-        return False
-    
-    # Check each chunk
-    for chunk in chunks[:5]:
-        chunk_words = set(chunk['content'].lower().split())
-        overlap = query_words & chunk_words
-        
-        # If >30% of query words in chunk, we have overlap
-        if len(overlap) / len(query_words) > 0.3:
-            return True
-    
-    return False
-```
-
-**Expected:** IDK_001-003 pass → 60% → 72%
+**Focus Shift:** Test passing → Production quality
 
 ---
 
-### Priority 2: Fix Hallucination (1 failure) ⭐⭐⭐
+## 🎯 Production Quality Roadmap
 
-**Impact:** 1 test → +4% pass rate (72% → 76%)
+### Priority 1: Product-Specific Retrieval Filtering ⭐⭐⭐
 
-**Problem:**
-```
-❌ TROUBLE_001: Non-wireless tool getting battery suggestions
-   Product: 6151659770 (DVT - non-wireless)
-   Forbidden: ['battery', 'wireless', 'charging']
-   Actual: Response contains 'battery'
-```
+**Problem:** Cross-product contamination (CVIL2 docs appearing for ERS6 queries)
 
-#### Copilot Command 2.1: Add Wireless Filtering
+**Impact:** User gets wrong instructions, potentially dangerous for industrial tools
+
+**Root Cause:** Product metadata not strictly enforced during retrieval
+
+#### Copilot Command 1.1: Add Strict Product Filtering
 
 ```
-@workspace Add product-aware filtering to prevent hallucination in src/llm/rag_engine.py:
+@workspace Add strict product-specific filtering to src/llm/rag_engine.py:
 
-Problem: TROUBLE_001 fails - non-wireless tool getting battery suggestions.
-
-When product_number is provided:
-1. Fetch product info from MongoDB
-2. If product.wireless == False:
-   - Add metadata filter to exclude wireless/battery docs
-   - Add explicit warning to LLM prompt
-3. Log filtering decisions
+Problem: Queries about product A returning docs for product B (e.g., CVIL2 vs ERS6).
 
 Implementation:
 
 async def generate_response(self, query: str, product_number: str = None, ...):
-    # Fetch product metadata
+    # Get product info from MongoDB
     product_info = None
+    product_filters = {}
+    
     if product_number:
-        try:
-            product_info = await self.db.products.find_one(
-                {"part_number": product_number}
-            )
-            if product_info:
-                logger.info(f"[PRODUCT] {product_number}: wireless={product_info.get('wireless', False)}")
-        except Exception as e:
-            logger.error(f"[PRODUCT] Error fetching: {e}")
-    
-    # Build metadata filters
-    metadata_filters = {}
-    product_context = ""
-    
-    if product_info:
-        is_wireless = product_info.get('wireless', False)
+        product_info = await self.db.products.find_one(
+            {"part_number": product_number}
+        )
         
-        if not is_wireless:
-            # Exclude wireless-related documents
-            metadata_filters['exclude_tags'] = [
-                'battery', 'wireless', 'wifi', 'bluetooth', 'charging'
-            ]
-            logger.info("[FILTER] Excluding wireless docs for non-wireless tool")
+        if product_info:
+            product_name = product_info.get('name', '')
+            product_series = product_info.get('series', '')
             
-            # Add strong warning to prompt
-            product_context = """
-⚠️ CRITICAL: This is a WIRED (non-wireless) tool.
-DO NOT suggest:
-- Battery charging or replacement
-- Wireless connectivity issues
-- WiFi/Bluetooth problems
-- Any battery-related solutions
-
-Only suggest solutions related to:
-- Power cable connections
-- Wired power supply
-- Physical/mechanical issues
-"""
+            logger.info(f"[PRODUCT] {product_number}: {product_name} (series: {product_series})")
+            
+            # STRICT: Only retrieve docs for THIS product
+            product_filters = {
+                "$or": [
+                    {"product_number": product_number},
+                    {"product_name": product_name},
+                    {"product_series": product_series},
+                    {"applies_to": {"$in": [product_number, product_name]}}
+                ]
+            }
+            
+            logger.info(f"[FILTER] Restricting to product: {product_number}")
     
-    # Pass filters to retrieval
+    # Pass strict filters to ChromaDB
     chunks = await self.hybrid_search.search(
         query=query,
-        filters=metadata_filters
+        where=product_filters,  # ChromaDB metadata filter
+        top_k=10
     )
     
-    # Build prompt with product context
-    prompt = f"""
-{product_context}
-
-Context documents:
-{context}
-
-Question: {query}
-
-Answer:
-"""
-    
-    response = await self.llm.generate(prompt)
-    
-    # Post-validation: Check for forbidden terms
-    if product_info and not product_info.get('wireless'):
-        forbidden_terms = ['battery', 'wireless', 'wifi', 'bluetooth', 'charging']
-        response_lower = response.lower()
+    # Validate: Ensure retrieved docs match product
+    if product_number and chunks:
+        filtered_chunks = []
+        for chunk in chunks:
+            chunk_product = chunk['metadata'].get('product_number')
+            if chunk_product == product_number or not chunk_product:
+                # Keep if matches or no product specified (general doc)
+                filtered_chunks.append(chunk)
+            else:
+                logger.warning(
+                    f"[FILTER] Excluded {chunk_product} doc for {product_number} query"
+                )
         
-        found_forbidden = [term for term in forbidden_terms if term in response_lower]
-        
-        if found_forbidden:
-            logger.error(f"[VALIDATION] Forbidden terms in response: {found_forbidden}")
-            # Regenerate without those terms
-            response = response.replace('battery', 'power supply')
-            response = response.replace('charging', 'power connection')
-            # Or reject and return error
+        chunks = filtered_chunks
+        logger.info(f"[FILTER] After product filter: {len(chunks)} chunks")
     
     return result
 ```
 
-**Expected:** TROUBLE_001 passes → 72% → 76%
+**Expected Impact:** Eliminates cross-product contamination, improves accuracy
 
 ---
 
-### Priority 3: Turkish Language Support (2 failures) ⭐⭐
+### Priority 2: Enhance Document Metadata Quality ⭐⭐⭐
 
-**Impact:** 2 tests → +8% pass rate (76% → 84%)
+**Problem:** Many chunks lack proper product/category metadata
 
-**Problem:**
-```
-❌ ERROR_004: Turkish query expects Turkish response
-   Query: "E047 hata kodu ne anlama geliyor?"
-   Expected: Contains ['hata', 'E047']
-   Actual: English response, missing Turkish keywords
-   
-❌ MAINT_002: Turkish maintenance query
-   Query: Turkish question
-   Expected: Contains ['bakım']
-   Actual: English response
-```
+**Solution:** Enrich metadata during indexing
 
-#### Copilot Command 3.1: Add Language Detection and Response
+#### Copilot Command 2.1: Add Metadata Enrichment
 
 ```
-@workspace Add Turkish language support in src/llm/rag_engine.py:
+@workspace Add metadata enrichment to src/documents/document_processor.py:
 
-Problem: Turkish queries get English responses, missing Turkish keywords.
+Problem: Chunks lack product_number, category metadata.
 
-Add language detection and Turkish response capability:
+When processing documents:
 
-async def generate_response(self, query: str, language: str = None, ...):
-    # Auto-detect language if not provided
-    if not language:
-        language = self._detect_language(query)
-        logger.info(f"[LANG] Detected: {language}")
+def process_document(self, file_path: str) -> List[Dict]:
+    """Process document and enrich metadata"""
     
-    # ... retrieval logic ...
+    # Extract content
+    content = self._extract_content(file_path)
     
-    # Build language-aware prompt
+    # Detect product from filename and content
+    product_info = self._detect_product_info(file_path, content)
+    
+    # Create chunks
+    chunks = self._chunk_document(content)
+    
+    # Enrich each chunk with metadata
+    enriched_chunks = []
+    for chunk in chunks:
+        enriched_chunk = {
+            'content': chunk['text'],
+            'metadata': {
+                'source': file_path,
+                'product_number': product_info.get('product_number'),
+                'product_name': product_info.get('product_name'),
+                'product_series': product_info.get('series'),
+                'doc_type': self._classify_doc_type(chunk['text']),
+                'has_numbers': self._contains_numbers(chunk['text']),
+                'language': self._detect_language(chunk['text']),
+                'chunk_index': chunk['index'],
+                'timestamp': datetime.now().isoformat()
+            }
+        }
+        enriched_chunks.append(enriched_chunk)
+    
+    return enriched_chunks
+
+def _detect_product_info(self, filename: str, content: str) -> Dict:
+    """
+    Detect product from filename and content.
+    
+    Examples:
+    - "CVIL2_manual.pdf" → product_number: CVIL2
+    - Content: "ERS6 Controller" → product_name: ERS6
+    """
+    product_info = {}
+    
+    # Check filename
+    filename_lower = filename.lower()
+    
+    # Common Desoutter product patterns
+    product_patterns = [
+        r'cvil\d+',
+        r'ers\d+',
+        r'dvt',
+        r'qst',
+        r'pf\d+',  # PowerFocus
+    ]
+    
+    for pattern in product_patterns:
+        match = re.search(pattern, filename_lower)
+        if match:
+            product_info['product_number'] = match.group(0).upper()
+            break
+    
+    # Check content (first 500 chars)
+    content_preview = content[:500].lower()
+    if not product_info.get('product_number'):
+        for pattern in product_patterns:
+            match = re.search(pattern, content_preview)
+            if match:
+                product_info['product_number'] = match.group(0).upper()
+                break
+    
+    return product_info
+```
+
+**Expected Impact:** Better retrieval accuracy, fewer irrelevant results
+
+---
+
+### Priority 3: Enforce Turkish Response Language ⭐⭐
+
+**Problem:** Turkish queries sometimes get English responses
+
+**Solution:** Strict language enforcement in prompts
+
+#### Copilot Command 3.1: Enforce Turkish Responses
+
+```
+@workspace Enforce Turkish responses in src/llm/prompts.py:
+
+Problem: Turkish queries (language=tr) getting English responses.
+
+Update prompt templates:
+
+def get_prompt_for_language(language: str, context: str, query: str) -> str:
+    """Language-specific prompts with strict enforcement"""
+    
     if language == "tr":
-        prompt = f"""
-SEN BİR TEKNİK DESTEK ASİSTANISIN.
+        return f"""
+SEN BİR DESOUTTER TEKNİK DESTEK ASİSTANISIN.
+
+KRİTİK: Cevabını SADECE TÜRKÇE ver. İngilizce cevap verme.
 
 KURALLAR:
-1. Cevabı TÜRKÇE ver
-2. Teknik terimleri Türkçe'ye çevir
-3. Sadece verilen dökümanlardan bilgi ver
-4. Emin değilsen "Bu bilgiyi bulamadım" de
+1. Cevabı %100 Türkçe yaz
+2. Teknik terimleri Türkçe karşılıklarıyla ver
+3. Sayılar ve birimler aynen kullan (5.2 Nm → 5.2 Nm)
+4. Sadece verilen dökümanlardan bilgi ver
 
 BAĞLAM DÖKÜMANLARI:
 {context}
 
-SORU: {query}
+KULLANICI SORUSU:
+{query}
 
-TÜRKÇE CEVAP:
+TÜRKÇE CEVAP (sadece Türkçe, İngilizce kullanma):
 """
-    else:
-        prompt = f"""
-You are a technical support assistant.
+    
+    else:  # English
+        return f"""
+You are a Desoutter technical support assistant.
+
+CRITICAL: Respond ONLY in ENGLISH.
 
 RULES:
-1. Answer in ENGLISH
-2. Only use information from context documents
-3. If unsure, say "I don't have this information"
+1. Answer in English only
+2. Use exact technical terms from documents
+3. Only use information from context documents
+4. If unsure, say "I don't have this information"
 
 CONTEXT DOCUMENTS:
 {context}
 
-QUESTION: {query}
+USER QUESTION:
+{query}
 
-ANSWER:
+ENGLISH ANSWER:
 """
+```
+
+**Expected Impact:** Consistent language in responses, better user experience
+
+---
+
+### Priority 4: Feedback UI Enhancement ⭐⭐
+
+**Problem:** Only 39 feedbacks collected, need 200+ for good learning
+
+**Solution:** Make feedback more prominent and easier
+
+#### Copilot Command 4.1: Enhance Feedback Collection
+
+**Frontend (React):**
+
+```jsx
+// components/FeedbackWidget.jsx
+import { ThumbsUp, ThumbsDown, MessageCircle } from 'lucide-react';
+
+export function FeedbackWidget({ messageId, onFeedback }) {
+  const [rating, setRating] = useState(null);
+  const [showComment, setShowComment] = useState(false);
+
+  const handleFeedback = async (isPositive) => {
+    setRating(isPositive ? 1 : -1);
     
-    response = await self.llm.generate(prompt)
+    await onFeedback({
+      message_id: messageId,
+      rating: isPositive ? 1 : -1,
+      timestamp: new Date().toISOString()
+    });
     
-    return {
-        'response': response,
-        'language': language,
-        ...
+    // Auto-show comment box for negative feedback
+    if (!isPositive) {
+      setShowComment(true);
     }
+  };
 
-def _detect_language(self, query: str) -> str:
-    """
-    Simple language detection based on character patterns.
-    """
-    # Turkish-specific characters
-    turkish_chars = ['ş', 'ğ', 'ı', 'ö', 'ü', 'ç']
-    turkish_words = [
-        'hata', 'nedir', 'nasıl', 'anlam', 'kodu', 
-        'bakım', 'onarım', 'sorun', 'çözüm'
-    ]
+  return (
+    <div className="feedback-widget">
+      {!rating && (
+        <div className="feedback-prompt">
+          <span className="prompt-text">Bu cevap yardımcı oldu mu?</span>
+          <div className="feedback-buttons">
+            <button 
+              onClick={() => handleFeedback(true)}
+              className="btn-positive"
+              title="Evet, yardımcı oldu"
+            >
+              <ThumbsUp size={18} />
+              Evet
+            </button>
+            <button 
+              onClick={() => handleFeedback(false)}
+              className="btn-negative"
+              title="Hayır, yardımcı olmadı"
+            >
+              <ThumbsDown size={18} />
+              Hayır
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {rating && (
+        <div className="feedback-thanks">
+          {rating > 0 ? '✅ Teşekkürler!' : '📝 Geri bildiriminiz kaydedildi'}
+        </div>
+      )}
+      
+      {showComment && (
+        <div className="feedback-comment">
+          <textarea
+            placeholder="Ne yanlış gitti? (isteğe bağlı)"
+            onChange={(e) => {
+              onFeedback({
+                message_id: messageId,
+                comment: e.target.value
+              });
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+**Backend API:**
+
+```python
+# src/api/main.py
+@app.post("/feedback")
+async def submit_feedback(feedback: FeedbackRequest):
+    """Enhanced feedback with source relevance tracking"""
     
-    query_lower = query.lower()
+    # Store main feedback
+    await db.feedback.insert_one({
+        "message_id": feedback.message_id,
+        "rating": feedback.rating,
+        "comment": feedback.comment,
+        "timestamp": datetime.now(),
+        "query": feedback.query,
+        "response": feedback.response,
+        "sources": feedback.sources
+    })
     
-    # Check for Turkish characters
-    if any(char in query_lower for char in turkish_chars):
-        return "tr"
+    # Track source relevance (for self-learning)
+    if feedback.source_ratings:
+        for source_id, relevance in feedback.source_ratings.items():
+            await db.source_relevance.update_one(
+                {"source_id": source_id},
+                {
+                    "$inc": {
+                        "total_ratings": 1,
+                        "positive_ratings": 1 if relevance > 0 else 0
+                    }
+                },
+                upsert=True
+            )
     
-    # Check for Turkish words
-    if any(word in query_lower for word in turkish_words):
-        return "tr"
+    return {"status": "success"}
+```
+
+**Expected Impact:** 200+ feedbacks per month, better self-learning
+
+---
+
+### Priority 5: Clean Low-Quality Chunks (Optional) ⭐
+
+**Problem:** Some chunks too short/meaningless
+
+**Solution:** Post-process existing chunks
+
+#### Copilot Command 5.1: Chunk Quality Filter
+
+```bash
+# One-time cleanup script
+# scripts/clean_low_quality_chunks.py
+
+import asyncio
+from src.vectordb.chroma_client import ChromaClient
+
+async def clean_chunks():
+    client = ChromaClient()
+    collection = client.get_collection()
     
-    # Default to English
-    return "en"
+    # Get all chunks
+    all_chunks = collection.get()
+    
+    low_quality = 0
+    kept = 0
+    
+    for i, (doc, metadata, id) in enumerate(zip(
+        all_chunks['documents'],
+        all_chunks['metadatas'],
+        all_chunks['ids']
+    )):
+        # Quality checks
+        is_low_quality = (
+            len(doc) < 50 or  # Too short
+            doc.count(' ') < 5 or  # Too few words
+            not any(c.isalpha() for c in doc) or  # No letters
+            doc.count('\n') > len(doc) / 10  # Too many newlines
+        )
+        
+        if is_low_quality:
+            # Delete from ChromaDB
+            collection.delete(ids=[id])
+            low_quality += 1
+            print(f"Deleted: {doc[:50]}...")
+        else:
+            kept += 1
+    
+    print(f"\nCleanup complete:")
+    print(f"  Deleted: {low_quality}")
+    print(f"  Kept: {kept}")
+
+if __name__ == "__main__":
+    asyncio.run(clean_chunks())
 ```
 
-**Expected:** ERROR_004, MAINT_002 pass → 76% → 84%
+**Run once:**
+```bash
+python scripts/clean_low_quality_chunks.py
+```
+
+**Expected Impact:** Better retrieval quality, fewer irrelevant chunks
 
 ---
 
-### Priority 4: Missing Terms - Relax or Fix (4 failures) ⭐
+## 📋 Implementation Priority Order
 
-**Impact:** 2-4 tests → +8-16% pass rate (84% → 92-100%)
+### Week 1: Core Quality (High Impact)
+- [ ] Priority 1: Product-specific filtering (2 hours)
+- [ ] Priority 2: Metadata enrichment (3 hours)
+- [ ] Priority 3: Turkish enforcement (1 hour)
+- [ ] Test and validate
 
-**Problem:**
-```
-❌ TROUBLE_003: Missing ['bearing']
-❌ TROUBLE_005: Missing ['connection']
-❌ ERROR_003: Missing ['fault']
-❌ INSTALL_001: Missing ['mount']
-```
+### Week 2: User Experience
+- [ ] Priority 4: Enhanced feedback UI (2 hours)
+- [ ] Priority 5: Chunk cleanup (1 hour)
+- [ ] Monitor and iterate
 
-**Analysis Needed:** Are these legitimate failures or overly strict tests?
-
-#### Copilot Command 4.1: Analyze Missing Terms
-
-```
-@workspace Debug missing terms failures:
-
-For each failing test (TROUBLE_003, TROUBLE_005, ERROR_003, INSTALL_001):
-1. Run the query
-2. Check if the CONCEPT is in the response (even if exact word isn't)
-3. Determine if test expectation is too strict
-
-Example:
-- Test expects: 'bearing'
-- Response might say: 'ball joint' or 'rotating component'
-- Concept is there, just different wording
-
-Show analysis for all 4 tests.
-```
-
-#### Options:
-
-**Option A: Relax Tests (if expectations too strict)**
-```
-@workspace Update tests/fixtures/standard_queries.py:
-
-For tests with missing terms, check if synonyms are acceptable:
-
-TROUBLE_003:
-  OLD: must_contain: ['bearing']
-  NEW: must_contain_any_of: [['bearing', 'ball joint', 'rotating']]
-
-TROUBLE_005:
-  OLD: must_contain: ['connection']
-  NEW: must_contain_any_of: [['connection', 'cable', 'wire', 'plug']]
-```
-
-**Option B: Improve LLM Prompt (if responses actually missing info)**
-```
-@workspace Update prompt to include specific terminology:
-
-When intent is troubleshooting, add to prompt:
-
-"When describing solutions, use specific technical terms:
-- For rotating parts, use 'bearing'
-- For electrical issues, use 'connection'
-- For errors, use 'fault code'
-- For installation, use 'mount'"
-```
-
-**Expected:** 2-4 tests pass → 84% → 92-100%
+### Week 3+: Advanced (Optional)
+- [ ] LLM fine-tuning (Desoutter terminology)
+- [ ] Advanced context optimization
+- [ ] Multi-turn conversation improvements
 
 ---
 
-## 📋 Implementation Order
+## ✅ Success Metrics
 
-### Step 1: Fix "I Don't Know" (30 min)
-- [ ] Raise context sufficiency threshold to 0.4
-- [ ] Add semantic overlap check
-- [ ] Test IDK_001-003
-- [ ] Expected: 60% → 72%
-
-### Step 2: Fix Hallucination (20 min)
-- [ ] Add product metadata fetching
-- [ ] Add wireless filtering
-- [ ] Add product context to prompt
-- [ ] Test TROUBLE_001
-- [ ] Expected: 72% → 76%
-
-### Step 3: Turkish Support (30 min)
-- [ ] Add language detection
-- [ ] Add Turkish prompt template
-- [ ] Test ERROR_004, MAINT_002
-- [ ] Expected: 76% → 84%
-
-### Step 4: Analyze Missing Terms (20 min)
-- [ ] Debug each failing test
-- [ ] Decide: relax test or improve prompt
-- [ ] Implement fix
-- [ ] Expected: 84% → 88-92%
-
-**Total Time: ~2 hours**
-**Target: 80-90% pass rate**
+| Metric | Current | Target (1 Month) |
+|--------|---------|------------------|
+| Test Pass Rate | 96% | 98%+ |
+| User Feedback | 39 | 200+ |
+| Positive Feedback % | 28% | 60%+ |
+| Cross-Product Errors | Unknown | <5% |
+| Turkish Response Rate | ~67% | 95%+ |
+| Avg Response Time | 25s | <5s (production) |
 
 ---
 
-## ✅ Success Criteria
+## 🚀 Quick Start Commands
 
-| Metric | Current | Target | Status |
-|--------|---------|--------|--------|
-| Pass Rate | 60% | 80%+ | 🎯 In Progress |
-| "I Don't Know" Tests | 0/3 | 3/3 | 🔴 Priority 1 |
-| Hallucination | 0/1 | 1/1 | 🔴 Priority 2 |
-| Turkish Tests | 0/2 | 2/2 | 🟡 Priority 3 |
-| Missing Terms | Variable | TBD | 🟡 Priority 4 |
-
----
-
-## 🚀 Start Commands
-
-### Command 1: Fix "I Don't Know"
+### Command 1: Product Filtering
 ```
-@workspace Fix context grounding in src/llm/rag_engine.py:
+@workspace Add strict product-specific filtering to src/llm/rag_engine.py:
 
-Problem: System answers queries about Mars, impossible scenarios (should say "I don't know").
+When product_number provided:
+1. Fetch product info from MongoDB
+2. Create metadata filter for ChromaDB (product_number, series)
+3. Post-filter chunks to ensure they match product
+4. Log filtering decisions
 
-Raise context sufficiency threshold from 0.25 to 0.4.
-Add semantic overlap check (>30% query words in chunks).
-Return "I don't have information" for low-quality contexts.
-
-Show complete implementation of:
-- Updated _evaluate_context_quality()
-- New _has_semantic_overlap()
-- Updated grounding check in generate_response()
+Show complete implementation with MongoDB query and ChromaDB filtering.
 ```
 
-### Command 2: Fix Hallucination
+### Command 2: Metadata Enrichment
 ```
-@workspace Add wireless product filtering in src/llm/rag_engine.py:
+@workspace Add metadata enrichment to src/documents/document_processor.py:
 
-Problem: TROUBLE_001 - non-wireless tool getting battery suggestions.
+For each chunk, detect and add:
+- product_number (from filename/content)
+- product_name
+- product_series  
+- doc_type (manual, troubleshooting, specs)
+- language (tr/en auto-detect)
 
-When product is non-wireless:
-1. Fetch wireless status from MongoDB
-2. Exclude docs with tags: battery, wireless, wifi, charging
-3. Add warning to LLM prompt about non-wireless tool
-4. Post-validate response doesn't contain forbidden terms
-
-Show complete implementation.
+Show _detect_product_info() and enrichment logic.
 ```
 
-### Command 3: Add Turkish
+### Command 3: Turkish Enforcement
 ```
-@workspace Add Turkish language support in src/llm/rag_engine.py:
+@workspace Add strict Turkish response enforcement in src/llm/prompts.py:
 
-Auto-detect language (Turkish vs English).
-For Turkish queries, use Turkish prompt template.
-Include Turkish keywords in responses.
+For language="tr":
+- Prompt must say "SADECE TÜRKÇE" multiple times
+- No English allowed
+- Post-validate response is Turkish
 
-Show:
-- _detect_language() method
-- Turkish prompt template
-- Language-aware response generation
+Show Turkish and English prompt templates.
 ```
 
 ---
 
-## 🎯 Next Session Goal
+## 🎯 Production Readiness Checklist
 
-**Target: 80-90% pass rate within 2 hours**
+### Core Functionality
+- [x] RAG pipeline working (96% pass rate)
+- [x] Intent detection stable
+- [x] Confidence scoring reliable
+- [x] Off-topic detection active
+- [ ] Product-specific filtering ← Next
+- [ ] Turkish responses consistent ← Next
 
-Then focus on:
-- Edge case improvements
-- Production deployment prep
-- Monitoring and logging
-- User documentation
+### Data Quality
+- [x] 22K chunks indexed
+- [ ] Metadata enriched ← Next
+- [ ] Low-quality chunks removed ← Next
+- [ ] Product mapping verified
+
+### User Experience
+- [x] Feedback collection working
+- [ ] Feedback UI prominent ← Next
+- [ ] Response time optimized
+- [ ] Mobile-friendly interface
+
+### Monitoring & Ops
+- [ ] Logging comprehensive
+- [ ] Metrics dashboard
+- [ ] Error alerting
+- [ ] Backup strategy
+
+### Documentation
+- [ ] API documentation
+- [ ] Deployment guide
+- [ ] User manual (TR/EN)
+- [ ] Troubleshooting guide
 
 ---
 
-**You're at 60% - excellent progress! Let's push to 80%+ 🚀**
+## 💡 Next Session Goal
+
+**Target:** Implement Priority 1-3 (Product filtering + Metadata + Turkish)
+
+**Time:** 4-6 hours
+
+**Expected Result:**
+- Cross-product contamination eliminated
+- Turkish response rate >90%
+- Test pass rate maintained at 96%+
+- System ready for pilot deployment
+
+---
+
+**You're at 96% - focus on production quality now! 🚀**
