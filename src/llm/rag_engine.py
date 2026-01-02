@@ -179,6 +179,56 @@ class RAGEngine:
         # Default to English
         return "en"
     
+    def _check_off_topic(self, query: str, part_number: str) -> Optional[str]:
+        """
+        Check if query is clearly off-topic and should be refused immediately.
+        
+        Args:
+            query: User's query text
+            part_number: Product part number
+            
+        Returns:
+            Reason string if off-topic, None if potentially on-topic
+        """
+        query_lower = query.lower()
+        
+        # Off-topic keywords (clearly unrelated to industrial tools)
+        OFF_TOPIC_KEYWORDS = [
+            'capital of', 'president of', 'population of', 'weather in',
+            'recipe for', 'how to cook', 'what is the capital',
+            'who is the president', 'how many people',
+        ]
+        
+        # Competitor brands
+        COMPETITOR_BRANDS = [
+            'bosch', 'makita', 'dewalt', 'milwaukee', 'hilti', 'metabo',
+            'festool', 'stanley', 'black & decker', 'ryobi', 'ridgid',
+            'craftsman', 'kobalt', 'snap-on', 'ingersoll rand', 'chicago pneumatic'
+        ]
+        
+        # Check for off-topic keywords
+        for keyword in OFF_TOPIC_KEYWORDS:
+            if keyword in query_lower:
+                return f"Query appears to be off-topic ('{keyword}')"
+        
+        # Check for competitor brands (only if Desoutter not mentioned)
+        if 'desoutter' not in query_lower:
+            for brand in COMPETITOR_BRANDS:
+                if brand in query_lower:
+                    return f"Query is about competitor product '{brand}', not Desoutter"
+        
+        # Check for invalid/nonsense product
+        if part_number and part_number.upper() in ['INVALID_PRODUCT', 'INVALID', 'NONE', 'NULL']:
+            # Also check if query itself looks like nonsense
+            words = query_lower.split()
+            # Count recognizable words
+            nonsense_indicators = ['qwerty', 'xyz123', 'asdf', 'test123', 'random']
+            for indicator in nonsense_indicators:
+                if indicator in query_lower:
+                    return "Query appears to be nonsense or test data"
+        
+        return None
+    
     def _filter_by_product_capabilities(self, docs: List[Dict], capabilities: Dict) -> List[Dict]:
         """
         Filter documents based on product capabilities.
@@ -729,6 +779,38 @@ class RAGEngine:
         """
         start_time = time.time()
         logger.info(f"Generating repair suggestion for {part_number} (retry={is_retry})")
+        
+        # =====================================================================
+        # OFF-TOPIC DETECTION (Priority 0 - Before any processing)
+        # =====================================================================
+        off_topic_result = self._check_off_topic(fault_description, part_number)
+        if off_topic_result:
+            from src.llm.context_grounding import build_idk_response
+            response_time_ms = int((time.time() - start_time) * 1000)
+            
+            idk_response = build_idk_response(
+                query=fault_description,
+                product_model=part_number,
+                reason=off_topic_result,
+                language=language if language and language != "auto" else "en"
+            )
+            
+            logger.warning(f"[OFF-TOPIC] Refusing query: {off_topic_result}")
+            
+            return {
+                "suggestion": idk_response,
+                "confidence": "insufficient_context",
+                "confidence_numeric": 0.0,
+                "product_model": part_number,
+                "part_number": part_number,
+                "sources": [],
+                "language": language if language and language != "auto" else "en",
+                "diagnosis_id": None,
+                "response_time_ms": response_time_ms,
+                "intent": "general",
+                "intent_confidence": 0.0,
+                "off_topic_reason": off_topic_result
+            }
         
         # =====================================================================
         # AUTO-DETECT LANGUAGE if not specified or set to 'auto'

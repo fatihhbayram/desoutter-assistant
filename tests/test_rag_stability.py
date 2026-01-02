@@ -296,9 +296,9 @@ def run_single_test(test_query: Dict) -> TestResult:
         
         # 6. IDK Expectation Check
         expect_idk = test_query.get("expect_idk", False)
-        is_idk_response = any(phrase in suggestion for phrase in [
-            "don't know", "cannot", "no information", "bilmiyorum", 
-            "insufficient", "unable to", "i'm sorry"
+        is_idk_response = any(phrase in suggestion.lower() for phrase in [
+            "don't know", "don't have", "cannot", "no information", "bilmiyorum", 
+            "insufficient", "unable to", "i'm sorry", "off-topic", "not related"
         ])
         result.idk_correct = (expect_idk == is_idk_response)
         if not result.idk_correct:
