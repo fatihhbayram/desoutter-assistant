@@ -20,6 +20,10 @@ bcrypt==4.1.2
 # Logging
 coloredlogs==15.0.1
 
+# PDF Processing (for ticket attachments)
+pdfplumber==0.10.3
+PyPDF2==3.0.1
+
 # Testing (optional)
 pytest==7.4.3
 pytest-asyncio==0.21.1

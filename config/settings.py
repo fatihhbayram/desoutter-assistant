@@ -106,3 +106,22 @@ PART_NUMBER_PATTERNS = [
     r'\b(1462[0-9]{6})\b',  # 1462 series (drilling)
     r'\b(1465[0-9]{6})\b',  # 1465 series
 ]
+
+# =============================================================================
+# FRESHDESK SUPPORT PORTAL SETTINGS (Ticket Scraping)
+# =============================================================================
+
+# Freshdesk credentials (set via environment variables)
+FRESHDESK_BASE_URL = os.getenv("FRESHDESK_BASE_URL", "https://support.desouttertools.com")
+FRESHDESK_EMAIL = os.getenv("FRESHDESK_EMAIL", "")
+FRESHDESK_PASSWORD = os.getenv("FRESHDESK_PASSWORD", "")
+
+# Ticket scraping settings
+TICKET_REQUEST_DELAY = float(os.getenv("TICKET_REQUEST_DELAY", "0.5"))  # Delay between requests
+TICKET_MAX_PAGES = int(os.getenv("TICKET_MAX_PAGES", "1675"))  # Total pages available
+TICKET_CHECKPOINT_EVERY = int(os.getenv("TICKET_CHECKPOINT_EVERY", "50"))  # Save checkpoint every N tickets
+TICKET_DOWNLOAD_PDFS = os.getenv("TICKET_DOWNLOAD_PDFS", "true").lower() == "true"
+
+# PDF processing settings
+TICKET_PDF_DIR = DATA_DIR / "ticket_pdfs"
+TICKET_PDF_DIR.mkdir(parents=True, exist_ok=True)

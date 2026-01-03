@@ -327,3 +327,173 @@ class MongoDBClient:
             logger.info("✅ Indexes created (including Schema v2)")
         except Exception as e:
             logger.error(f"❌ Error creating indexes: {e}")
+
+    # =========================================================================
+    # TICKET COLLECTION OPERATIONS
+    # =========================================================================
+    
+    def get_tickets_collection(self):
+        """Get tickets collection handle"""
+        if self.db is None:
+            raise ConnectionFailure("Database not connected")
+        return self.db["tickets"]
+    
+    def create_ticket_indexes(self):
+        """Create indexes for tickets collection"""
+        try:
+            tickets = self.get_tickets_collection()
+            tickets.create_index("ticket_id", unique=True)
+            tickets.create_index("title", background=True)
+            tickets.create_index("is_resolved")
+            tickets.create_index("related_products")
+            tickets.create_index("related_models")
+            tickets.create_index("tags")
+            tickets.create_index("scraped_at")
+            tickets.create_index("has_pdf_content")
+            logger.info("✅ Ticket indexes created")
+        except Exception as e:
+            logger.error(f"❌ Error creating ticket indexes: {e}")
+    
+    def upsert_ticket(self, ticket: Dict) -> Dict:
+        """
+        Upsert a single ticket
+        
+        Args:
+            ticket: Ticket dictionary
+            
+        Returns:
+            Result: {"action": "inserted"|"updated", "ticket_id": int}
+        """
+        tickets = self.get_tickets_collection()
+        ticket_id = ticket.get("ticket_id")
+        
+        if not ticket_id:
+            raise ValueError("Ticket must have ticket_id")
+        
+        existing = tickets.find_one({"ticket_id": ticket_id})
+        
+        if existing:
+            ticket["updated_at"] = datetime.now().isoformat()
+            tickets.update_one(
+                {"_id": existing["_id"]},
+                {"$set": ticket}
+            )
+            logger.debug(f"✏️  Updated ticket: {ticket_id}")
+            return {"action": "updated", "ticket_id": ticket_id}
+        else:
+            ticket["created_at"] = datetime.now().isoformat()
+            tickets.insert_one(ticket)
+            logger.debug(f"➕ Inserted ticket: {ticket_id}")
+            return {"action": "inserted", "ticket_id": ticket_id}
+    
+    def bulk_upsert_tickets(self, tickets: List[Dict]) -> Dict:
+        """
+        Bulk upsert tickets
+        
+        Args:
+            tickets: List of ticket dictionaries
+            
+        Returns:
+            Result statistics
+        """
+        if not tickets:
+            logger.warning("No tickets to upsert")
+            return {"inserted": 0, "updated": 0, "errors": 0, "total": 0}
+        
+        stats = {"inserted": 0, "updated": 0, "errors": 0, "total": len(tickets)}
+        
+        for ticket in tickets:
+            try:
+                result = self.upsert_ticket(ticket)
+                if result["action"] == "inserted":
+                    stats["inserted"] += 1
+                else:
+                    stats["updated"] += 1
+            except Exception as e:
+                logger.error(f"❌ Error upserting ticket {ticket.get('ticket_id', 'unknown')}: {e}")
+                stats["errors"] += 1
+        
+        logger.info(
+            f"✅ Ticket bulk upsert: {stats['inserted']} inserted, "
+            f"{stats['updated']} updated, {stats['errors']} errors"
+        )
+        return stats
+    
+    def count_tickets(self) -> int:
+        """Count total tickets"""
+        tickets = self.get_tickets_collection()
+        count = tickets.count_documents({})
+        logger.info(f"📊 Total tickets: {count}")
+        return count
+    
+    def get_tickets(
+        self, 
+        filter_dict: Dict = None, 
+        limit: int = 0,
+        resolved_only: bool = False,
+        with_pdf: bool = False
+    ) -> List[Dict]:
+        """
+        Get tickets from collection
+        
+        Args:
+            filter_dict: MongoDB filter
+            limit: Max results (0 = no limit)
+            resolved_only: Only return resolved tickets
+            with_pdf: Only return tickets with PDF content
+            
+        Returns:
+            List of tickets
+        """
+        filter_dict = filter_dict or {}
+        
+        if resolved_only:
+            filter_dict["is_resolved"] = True
+        
+        if with_pdf:
+            filter_dict["has_pdf_content"] = True
+        
+        tickets = self.get_tickets_collection()
+        cursor = tickets.find(filter_dict).limit(limit)
+        return list(cursor)
+    
+    def get_tickets_by_product(self, part_number: str) -> List[Dict]:
+        """Get tickets related to a specific product"""
+        tickets = self.get_tickets_collection()
+        return list(tickets.find({"related_products": part_number}))
+    
+    def get_tickets_by_model(self, model_name: str) -> List[Dict]:
+        """Get tickets related to a specific model"""
+        tickets = self.get_tickets_collection()
+        # Case-insensitive search
+        return list(tickets.find({
+            "related_models": {"$regex": f"^{model_name}$", "$options": "i"}
+        }))
+    
+    def search_tickets(self, query: str, limit: int = 20) -> List[Dict]:
+        """
+        Search tickets by text
+        
+        Args:
+            query: Search query
+            limit: Max results
+            
+        Returns:
+            List of matching tickets
+        """
+        tickets = self.get_tickets_collection()
+        
+        # Create text index if not exists
+        try:
+            tickets.create_index([
+                ("title", "text"),
+                ("description.content", "text"),
+                ("comments.content", "text")
+            ], name="ticket_text_search")
+        except:
+            pass  # Index might already exist
+        
+        return list(tickets.find(
+            {"$text": {"$search": query}},
+            {"score": {"$meta": "textScore"}}
+        ).sort([("score", {"$meta": "textScore"})]).limit(limit))

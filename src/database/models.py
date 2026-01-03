@@ -131,3 +131,146 @@ class ProductModel(BaseModel):
     def to_dict(self) -> dict:
         """Convert model to dictionary"""
         return self.model_dump(exclude_none=True)
+
+
+# =============================================================================
+# TICKET MODELS (FRESHDESK SUPPORT PORTAL)
+# =============================================================================
+
+class TicketComment(BaseModel):
+    """Single comment/reply on a ticket"""
+    author: str = Field(default="Unknown", description="Comment author name")
+    content: str = Field(..., description="Comment text content")
+    date: Optional[str] = Field(default=None, description="Comment date")
+    is_agent: bool = Field(default=False, description="True if from support agent")
+
+
+class TicketAttachment(BaseModel):
+    """Attachment on a ticket (PDF, images, etc.)"""
+    filename: str = Field(..., description="Original filename")
+    url: str = Field(default="", description="Download URL")
+    file_type: str = Field(default="unknown", description="File type (pdf, image, etc.)")
+    content: Optional[str] = Field(default=None, description="Extracted text content (for PDFs)")
+    local_path: Optional[str] = Field(default=None, description="Local file path after download")
+
+
+class TicketModel(BaseModel):
+    """Support ticket from Freshdesk portal"""
+    
+    # Core identification
+    ticket_id: int = Field(..., description="Unique ticket ID from Freshdesk")
+    title: str = Field(..., description="Ticket title/subject")
+    url: str = Field(..., description="Ticket URL")
+    
+    # Problem description
+    description: Optional[TicketComment] = Field(default=None, description="Original problem description")
+    
+    # Responses and solutions
+    comments: List[TicketComment] = Field(default_factory=list, description="All replies/comments")
+    
+    # Attachments with extracted content
+    attachments: List[TicketAttachment] = Field(default_factory=list, description="Attached files")
+    
+    # Metadata
+    scraped_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    is_resolved: bool = Field(default=False, description="Has agent response")
+    
+    # Product association (auto-detected from content)
+    related_products: List[str] = Field(default_factory=list, description="Detected product part numbers")
+    related_models: List[str] = Field(default_factory=list, description="Detected model names")
+    
+    # RAG-specific
+    tags: List[str] = Field(default_factory=list, description="Auto-generated tags for retrieval")
+    has_pdf_content: bool = Field(default=False, description="Has extracted PDF text")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "ticket_id": 12345,
+                "title": "CVI3 calibration error E102",
+                "url": "https://support.desouttertools.com/en/support/tickets/12345",
+                "description": {
+                    "author": "John Doe",
+                    "content": "Getting E102 error during calibration...",
+                    "date": "2025-01-02",
+                    "is_agent": False
+                },
+                "comments": [
+                    {
+                        "author": "Support Agent",
+                        "content": "Please follow these steps...",
+                        "date": "2025-01-03",
+                        "is_agent": True
+                    }
+                ],
+                "attachments": [
+                    {
+                        "filename": "calibration_guide.pdf",
+                        "url": "https://...",
+                        "file_type": "pdf",
+                        "content": "Extracted PDF text..."
+                    }
+                ],
+                "is_resolved": True,
+                "related_products": ["6151659030"],
+                "related_models": ["CVI3"],
+                "tags": ["calibration", "error_code", "CVI3"]
+            }
+        }
+    
+    def to_dict(self) -> dict:
+        """Convert model to dictionary"""
+        return self.model_dump(exclude_none=True)
+    
+    def to_rag_document(self) -> dict:
+        """Convert ticket to RAG-ready document format"""
+        parts = []
+        
+        # Title
+        parts.append(f"# Support Ticket #{self.ticket_id}: {self.title}")
+        parts.append("")
+        
+        # Problem description
+        if self.description:
+            parts.append("## Problem")
+            parts.append(f"**Reported by:** {self.description.author}")
+            if self.description.date:
+                parts.append(f"**Date:** {self.description.date}")
+            parts.append("")
+            parts.append(self.description.content)
+            parts.append("")
+        
+        # Solutions/Responses
+        agent_comments = [c for c in self.comments if c.is_agent]
+        if agent_comments:
+            parts.append("## Solution")
+            for comment in agent_comments:
+                parts.append(f"**{comment.author}** ({comment.date or 'N/A'}):")
+                parts.append(comment.content)
+                parts.append("")
+        
+        # PDF content
+        pdf_attachments = [a for a in self.attachments if a.content]
+        if pdf_attachments:
+            parts.append("## Attached Documentation")
+            for att in pdf_attachments:
+                parts.append(f"### {att.filename}")
+                parts.append(att.content[:5000])  # Limit PDF content
+                parts.append("")
+        
+        return {
+            "id": f"ticket_{self.ticket_id}",
+            "content": "\n".join(parts),
+            "metadata": {
+                "type": "support_ticket",
+                "ticket_id": self.ticket_id,
+                "title": self.title,
+                "url": self.url,
+                "is_resolved": self.is_resolved,
+                "has_pdf_content": self.has_pdf_content,
+                "related_products": self.related_products,
+                "related_models": self.related_models,
+                "tags": self.tags,
+                "source": "freshdesk"
+            }
+        }
