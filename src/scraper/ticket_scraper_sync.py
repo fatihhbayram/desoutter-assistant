@@ -194,8 +194,56 @@ class TicketScraperSync:
             logger.warning(f"Download error for {filename}: {e}")
             return None
     
+    def _decode_cid_text(self, text: str) -> str:
+        """
+        Decode CID (Character ID) codes from PDF text.
+        
+        PDFs with embedded fonts sometimes produce (cid:XX) codes instead of 
+        readable characters. This function converts them back to ASCII/Unicode.
+        
+        Common CID mappings:
+        - (cid:XX) where XX is typically the ASCII code offset by ~3
+        - Some fonts use direct ASCII mapping
+        """
+        import re
+        
+        if not text or '(cid:' not in text:
+            return text
+        
+        def cid_to_char(match):
+            cid_value = int(match.group(1))
+            # Most PDF fonts use offset mapping or direct ASCII
+            # Try multiple strategies
+            
+            # Strategy 1: Direct ASCII (most common for basic characters)
+            if 32 <= cid_value <= 126:
+                return chr(cid_value)
+            
+            # Strategy 2: Common offset for some PDF generators
+            # Some fonts offset by 29 (space=32, cid:3=space)
+            if cid_value >= 3:
+                offset_char = cid_value + 29
+                if 32 <= offset_char <= 126:
+                    return chr(offset_char)
+            
+            # Strategy 3: Unicode private use area - skip these
+            if cid_value > 126:
+                return ''
+            
+            # Fallback: return original if can't decode
+            return match.group(0)
+        
+        # Replace all (cid:XX) patterns
+        decoded = re.sub(r'\(cid:(\d+)\)', cid_to_char, text)
+        
+        # Clean up excessive whitespace from removed characters
+        decoded = re.sub(r'\s+', ' ', decoded)
+        decoded = re.sub(r'\n\s*\n', '\n\n', decoded)
+        
+        return decoded.strip()
+    
     def extract_text_from_pdf(self, filepath: Path) -> str:
-        """Extract text from PDF file"""
+        """Extract text from PDF file with CID decoding"""
         text = ""
         
         if PDF_SUPPORT:
@@ -207,8 +255,10 @@ class TicketScraperSync:
                             text += page_text + "\n\n"
                 
                 if text.strip():
+                    # Decode CID characters
+                    decoded_text = self._decode_cid_text(text)
                     self.stats["pdfs_extracted"] += 1
-                    return text.strip()
+                    return decoded_text
             except Exception as e:
                 logger.debug(f"pdfplumber error: {e}")
         
@@ -221,8 +271,10 @@ class TicketScraperSync:
                         text += page_text + "\n\n"
                 
                 if text.strip():
+                    # Decode CID characters
+                    decoded_text = self._decode_cid_text(text)
                     self.stats["pdfs_extracted"] += 1
-                    return text.strip()
+                    return decoded_text
             except Exception as e:
                 logger.debug(f"PyPDF2 error: {e}")
         

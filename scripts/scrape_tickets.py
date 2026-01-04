@@ -51,11 +51,14 @@ def main():
     # Mode selection
     mode_group = parser.add_mutually_exclusive_group(required=True)
     mode_group.add_argument("--full", action="store_true", help="Full scrape (all pages)")
-    mode_group.add_argument("--pages", type=int, help="Scrape last N pages")
+    mode_group.add_argument("--pages", type=int, help="Scrape N pages (default: last N pages)")
+    parser.add_argument("--from-start", action="store_true", help="Scrape from the first N pages (oldest tickets)")
     mode_group.add_argument("--resume", action="store_true", help="Resume from checkpoint")
     mode_group.add_argument("--test", action="store_true", help="Test mode (last 3 pages)")
     mode_group.add_argument("--ids-only", action="store_true", help="Only collect ticket IDs")
-    
+    # New: limit option for most recent N tickets
+    parser.add_argument("--limit", type=int, help="Scrape the newest N tickets (overrides --pages)")
+
     # Options
     parser.add_argument("--no-pdf", action="store_true", help="Skip PDF downloads")
     parser.add_argument("--no-save", action="store_true", help="Don't save to MongoDB")
@@ -97,16 +100,19 @@ def main():
             start_page = 1
             end_page = TICKET_MAX_PAGES
         elif args.pages:
-            start_page = max(1, TICKET_MAX_PAGES - args.pages + 1)
-            end_page = TICKET_MAX_PAGES
+            # Varsayılan olarak en yeni sayfalardan başla (1. sayfa = en yeni)
+            start_page = 1
+            end_page = min(TICKET_MAX_PAGES, args.pages)
         elif args.test:
-            start_page = max(1, TICKET_MAX_PAGES - 2)
-            end_page = TICKET_MAX_PAGES
+            # Testte de en yeni 3 sayfa
+            start_page = 1
+            end_page = min(TICKET_MAX_PAGES, 3)
         elif args.resume or args.ids_only:
             start_page = None
             end_page = None
         
         # Phase 1: Collect ticket IDs (or load from checkpoint)
+
         if args.resume:
             ticket_ids = scraper.load_ticket_ids()
         elif start_page is not None:
@@ -115,15 +121,20 @@ def main():
                 end_page=end_page,
                 delay=args.delay
             )
-        
+
+        # If --limit is set, reverse ticket_ids and take the newest N
+        if args.limit is not None and ticket_ids:
+            ticket_ids = list(reversed(ticket_ids))[:args.limit]
+            logger.info(f"Selected {len(ticket_ids)} newest ticket IDs (limit={args.limit})")
+
         if args.ids_only:
             logger.info(f"✅ Collected {len(ticket_ids)} ticket IDs")
             return
-        
+
         if not ticket_ids:
             logger.error("❌ No ticket IDs to scrape")
             sys.exit(1)
-        
+
         # Phase 2: Scrape ticket details
         tickets = scraper.scrape_tickets(
             ticket_ids=ticket_ids,

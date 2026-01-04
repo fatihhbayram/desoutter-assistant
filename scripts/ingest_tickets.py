@@ -24,6 +24,7 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 import json
+import re
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -37,6 +38,37 @@ from src.utils.logger import setup_logger
 from config.settings import DATA_DIR
 
 logger = setup_logger(__name__)
+
+
+def decode_cid_text(text: str) -> str:
+    """
+    Decode CID (Character ID) codes from PDF text.
+    
+    PDFs with embedded fonts sometimes produce (cid:XX) codes instead of 
+    readable characters. This function converts them back to ASCII/Unicode.
+    """
+    if not text or '(cid:' not in text:
+        return text
+    
+    def cid_to_char(match):
+        cid_value = int(match.group(1))
+        # Strategy 1: Direct ASCII (most common for basic characters)
+        if 32 <= cid_value <= 126:
+            return chr(cid_value)
+        # Strategy 2: Common offset for some PDF generators
+        if cid_value >= 3:
+            offset_char = cid_value + 29
+            if 32 <= offset_char <= 126:
+                return chr(offset_char)
+        # Strategy 3: Unicode private use area - skip these
+        if cid_value > 126:
+            return ''
+        return match.group(0)
+    
+    decoded = re.sub(r'\(cid:(\d+)\)', cid_to_char, text)
+    decoded = re.sub(r'\s+', ' ', decoded)
+    decoded = re.sub(r'\n\s*\n', '\n\n', decoded)
+    return decoded.strip()
 
 
 def load_tickets_from_json(filepath: Path) -> list:
@@ -94,6 +126,9 @@ def chunk_ticket_content(
         content = doc.get("content", "")
         metadata = doc.get("metadata", {})
         doc_id = doc.get("id", "unknown")
+        
+        # Decode CID characters from PDF content
+        content = decode_cid_text(content)
         
         # Short content - keep as single chunk
         if len(content) < max_chunk_size:
