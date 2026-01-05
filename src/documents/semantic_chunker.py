@@ -167,7 +167,7 @@ class SemanticChunker:
         text: str,
         source_filename: str,
         doc_type: Optional[DocumentType] = None,
-        product_categories: Optional[str] = None  # NEW: Comma-sep string or list
+        product_metadata: Optional[Dict] = None  # NEW: Full product metadata dict
     ) -> List[Dict]:
         """
         Chunk document with semantic structure preservation
@@ -176,6 +176,7 @@ class SemanticChunker:
             text: Document text
             source_filename: Source document filename
             doc_type: Optional document type (auto-detected if None)
+            product_metadata: Optional product metadata from IntelligentProductExtractor
         
         Returns:
             List of chunks with rich metadata
@@ -233,7 +234,7 @@ class SemanticChunker:
                 source=source_filename,
                 doc_type=doc_type,
                 page_number=current_page,  # Pass page number to chunks
-                product_categories=product_categories  # Pass product categories
+                product_metadata=product_metadata  # Pass full product metadata
             )
             
             chunks.extend(para_chunks)
@@ -340,7 +341,7 @@ class SemanticChunker:
         source: str,
         doc_type: DocumentType,
         page_number: Optional[int] = None,  # NEW: Page number from PDF
-        product_categories: Optional[str] = None
+        product_metadata: Optional[Dict] = None  # NEW: Full product metadata
     ) -> List[Dict]:
         """Chunk a paragraph into semantic pieces"""
         
@@ -360,7 +361,7 @@ class SemanticChunker:
                 doc_type=doc_type,
                 word_count=word_count,
                 page_number=page_number,  # Pass page number
-                product_categories=product_categories
+                product_metadata=product_metadata
             )]
         
         # Split into sentences
@@ -385,7 +386,7 @@ class SemanticChunker:
                     doc_type=doc_type,
                     word_count=current_word_count,
                     page_number=page_number,  # Pass page number
-                    product_categories=product_categories
+                    product_metadata=product_metadata
                 ))
                 
                 # Start new chunk (with overlap)
@@ -406,7 +407,7 @@ class SemanticChunker:
                 doc_type=doc_type,
                 word_count=current_word_count,
                 page_number=page_number,  # Pass page number
-                product_categories=product_categories
+                product_metadata=product_metadata
             ))
         
         return chunks
@@ -432,7 +433,7 @@ class SemanticChunker:
         doc_type: DocumentType,
         word_count: int,
         page_number: Optional[int] = None,  # NEW: Page number from PDF
-        product_categories: Optional[str] = None
+        product_metadata: Optional[Dict] = None  # NEW: Full product metadata
     ) -> Dict:
         """Create a chunk with metadata"""
         
@@ -456,7 +457,8 @@ class SemanticChunker:
             heading_level=heading_level,
             section_type=section_type.value,
             doc_type=doc_type.value,
-            product_categories=product_categories.split(", ") if product_categories else [],
+            # Product metadata - stored as ChromaDB-compatible fields
+            product_categories=[product_metadata.get("product_category", "UNKNOWN")] if product_metadata else [],
             fault_keywords=fault_keywords,
             importance_score=importance,
             is_procedure=self._is_procedure(text),
@@ -468,9 +470,24 @@ class SemanticChunker:
             content_hash=self._calculate_content_hash(text)  # NEW: Content hash for deduplication
         )
         
+        # Build return dict with additional product fields for ChromaDB filtering
+        chunk_metadata = metadata.__dict__.copy()
+        
+        # Add product-specific fields (strings for ChromaDB compatibility)
+        if product_metadata:
+            chunk_metadata["product_family"] = product_metadata.get("product_family", "UNKNOWN")
+            chunk_metadata["product_models"] = product_metadata.get("product_models", "")
+            chunk_metadata["product_category"] = product_metadata.get("product_category", "UNKNOWN")
+            chunk_metadata["is_generic"] = product_metadata.get("is_generic", False)
+        else:
+            chunk_metadata["product_family"] = "UNKNOWN"
+            chunk_metadata["product_models"] = ""
+            chunk_metadata["product_category"] = "UNKNOWN"
+            chunk_metadata["is_generic"] = True
+        
         return {
             "text": text,
-            "metadata": metadata.__dict__
+            "metadata": chunk_metadata
         }
 
     def _calculate_content_hash(self, text: str) -> str:

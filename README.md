@@ -20,6 +20,7 @@ An enterprise-grade **RAG (Retrieval-Augmented Generation)** system that provide
 | Feature | Description |
 |---------|-------------|
 | 🔍 **Hybrid Search** | BM25 keyword + Semantic vector search with RRF (Reciprocal Rank Fusion) |
+| 🎯 **Intelligent Product Filtering** | Auto-detects product family from queries, filters retrieval to relevant docs only |
 | 🧠 **Self-Learning RAG** | Learns from user feedback to improve future suggestions |
 | 🎯 **96% Test Pass Rate** | Comprehensive automated test suite with 25 scenarios |
 | 🔄 **Multi-turn Conversation** | Follow-up questions with context preservation |
@@ -380,6 +381,11 @@ curl -X POST http://localhost:8000/diagnose \
 ## 🗺️ Roadmap
 
 **Current Status:** Production-Ready RAG System with Self-Learning
+
+### Completed (Jan 2026)
+- ✅ Intelligent Product Filtering (ChromaDB where clause)
+- ✅ Pattern-based Product Extraction (no manual mappings)
+- ✅ 26,528 chunks re-ingested with product metadata
 
 ### Completed (Dec 2025)
 - ✅ Hybrid Search (BM25 + Semantic + RRF)

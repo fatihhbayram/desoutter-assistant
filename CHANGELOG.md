@@ -10,8 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### In Progress
-- Freshdesk ticket scraping and ingestion (200 tickets)
 - Controller units scraping (10 units)
+
+---
+
+## [1.6.0] - 2026-01-05
+
+### Added
+- **Intelligent Product Filtering** - Query-time ChromaDB filtering for product-specific retrieval
+  - Pattern-based `IntelligentProductExtractor` with 40+ regex patterns
+  - Automatic product family detection from filenames and content
+  - `_build_product_filter()` method builds ChromaDB `where` clause
+  - `extract_product_from_query()` for retrieval-time product detection
+- **New utility scripts**
+  - `scripts/reset_vectordb.py` - Clear ChromaDB for fresh re-ingestion
+  - `scripts/reingest_documents.py` - Re-process documents with new metadata
+  - `scripts/test_product_filtering.py` - Validate product filtering
+
+### Changed
+- **Semantic Chunker** - Added `product_family`, `product_models`, `is_generic` metadata fields
+- **Document Processor** - Uses new `get_product_metadata()` API
+- **RAG Engine** - Passes `where_filter` to hybrid search for ChromaDB filtering
+- **Full re-ingestion**: 26,528 chunks with product metadata
+- **Test pass rate**: 91.7% for product filtering tests
+
+### Fixed
+- Cross-product contamination in retrieval (e.g., CVI3 query no longer returns EPB/ERS docs)
 
 ---
 
@@ -312,6 +336,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 1.6.0 | 2026-01-05 | Intelligent product filtering, ChromaDB where clause |
 | 1.5.0 | 2026-01-04 | Freshdesk ticket integration |
 | 1.4.0 | 2025-12-31 | Source citation enhancement |
 | 1.3.0 | 2025-12-30 | Intent detection, deduplication |
@@ -330,7 +355,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.2.0...v1.3.0

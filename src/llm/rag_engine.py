@@ -19,7 +19,7 @@ from src.vectordb.chroma_client import ChromaDBClient
 from src.llm.ollama_client import OllamaClient
 from src.llm.prompts import get_system_prompt, build_rag_prompt, build_fallback_response
 from src.llm.context_optimizer import ContextOptimizer, optimize_context_for_rag
-from src.documents.product_extractor import ProductExtractor  # Metadata Enrichment
+from src.documents.product_extractor import ProductExtractor, IntelligentProductExtractor  # Metadata Enrichment
 from src.llm.performance_metrics import get_performance_monitor, QueryTimer, QueryMetrics
 from src.database import MongoDBClient
 from config.ai_settings import (
@@ -313,6 +313,18 @@ class RAGEngine:
             'ELC', 'ELS', 'ELB', 'BLRT', 'XPB', 'EM', 'ERAL', 'EME', 'EMEL'
         }
         
+        # WiFi variants map to their base family (C suffix = WiFi)
+        FAMILY_ALIASES = {
+            'EPBC': 'EPB', 'EPB': 'EPBC',  # EPB <-> EPBC (WiFi)
+            'EABC': 'EAB', 'EAB': 'EABC',  # EAB <-> EABC (WiFi)
+            'EABS': 'EAB',                  # EABS -> EAB (Standalone)
+        }
+        
+        # Get all matching families (target + aliases)
+        matching_families = {target_family}
+        if target_family in FAMILY_ALIASES:
+            matching_families.add(FAMILY_ALIASES[target_family])
+        
         filtered = []
         excluded_count = 0
         
@@ -330,7 +342,7 @@ class RAGEngine:
             detected_family = None
             
             # Method 1: Check metadata product_family
-            if doc_family and doc_family.upper() != target_family:
+            if doc_family and doc_family.upper() not in matching_families:
                 if doc_family.upper() in PRODUCT_FAMILIES:
                     is_other_product = True
                     detected_family = doc_family.upper()
@@ -338,7 +350,7 @@ class RAGEngine:
             # Method 2: Check content for other product families
             if not is_other_product and target_family:
                 for family in PRODUCT_FAMILIES:
-                    if family == target_family:
+                    if family in matching_families:
                         continue
                     # Check if document is PRIMARILY about another product
                     # (appears in source name or 3+ times in content)
@@ -568,6 +580,55 @@ class RAGEngine:
         
         return capabilities
     
+    def _build_product_filter(self, query: str, product_info: Dict = None) -> Optional[Dict]:
+        """
+        Build ChromaDB filter based on product context.
+        NEW: Applies filtering at query time for efficient retrieval.
+        
+        Args:
+            query: User's query text
+            product_info: Selected product info from database (if available)
+        
+        Returns:
+            ChromaDB where clause or None for no filtering
+        """
+        detected_family = None
+        
+        # Try to extract from product_info first (user selected a specific product)
+        if product_info and product_info.get('model_name'):
+            # Extract family from product model name using our intelligent extractor
+            model_name = product_info.get('model_name', '')
+            products = self.product_extractor.extract_from_filename(model_name)
+            if products:
+                detected_family = products[0].product_family
+                logger.info(f"[FILTER] Product family from model: {detected_family}")
+        
+        # If no product info, try to extract from query itself
+        if not detected_family:
+            query_context = self.product_extractor.extract_product_from_query(query)
+            if query_context.get('has_product_context'):
+                detected_family = query_context.get('product_family')
+                logger.info(f"[FILTER] Product family from query: {detected_family}")
+        
+        # If no product context detected, don't filter (return all results)
+        if not detected_family:
+            logger.info("[FILTER] No product context detected - searching all documents")
+            return None
+        
+        # Build ChromaDB where filter
+        # Include: matching family + GENERAL (generic docs) + UNKNOWN (unclassified)
+        where_filter = {
+            "$or": [
+                {"product_family": {"$eq": detected_family}},
+                {"product_family": {"$eq": "GENERAL"}},
+                {"product_family": {"$eq": "UNKNOWN"}},
+                {"is_generic": {"$eq": True}}
+            ]
+        }
+        
+        logger.info(f"[FILTER] Applying filter for family: {detected_family}")
+        return where_filter
+    
     def retrieve_context(
         self,
         query: str,
@@ -577,6 +638,7 @@ class RAGEngine:
         """
         Retrieve relevant context from vector database
         Uses hybrid search (semantic + BM25) when enabled
+        NEW: Applies product filtering at query time
         
         Args:
             query: Search query (fault description)
@@ -599,13 +661,20 @@ class RAGEngine:
             except Exception as e:
                 logger.warning(f"Domain enhancement failed: {e}")
         
-        # Metadata Enrichment: Get target product categories for filtering
+        # Get product info for filtering
+        product_info = None
+        if part_number:
+            product_info = self.get_product_info(part_number)
+        
+        # NEW: Build product filter for ChromaDB
+        product_filter = self._build_product_filter(query, product_info)
+        
+        # Still get target categories for client-side filtering (fallback)
         target_categories = []
         if part_number:
             raw_cats = self.product_extractor.get_product_categories(part_number)
             if raw_cats:
                 target_categories = [c.strip() for c in raw_cats.split(",")]
-                logger.info(f"Target product categories for filtering: {target_categories}")
 
         # Use hybrid search if available
         if self.hybrid_searcher:
@@ -613,7 +682,8 @@ class RAGEngine:
                 enhanced_query, 
                 top_k, 
                 original_query=query,
-                target_categories=target_categories
+                target_categories=target_categories,
+                product_filter=product_filter  # NEW: Pass filter
             )
         
         # Fallback to standard semantic search
@@ -621,7 +691,8 @@ class RAGEngine:
             enhanced_query, 
             part_number, 
             top_k,
-            target_categories=target_categories
+            target_categories=target_categories,
+            product_filter=product_filter  # NEW: Pass filter
         )
     
     def _extract_keywords(self, text: str) -> List[str]:
@@ -646,14 +717,19 @@ class RAGEngine:
         query: str, 
         top_k: int, 
         original_query: str = None,
-        target_categories: List[str] = None
+        target_categories: List[str] = None,
+        product_filter: Optional[Dict] = None  # NEW: ChromaDB where clause
     ) -> Dict:
         """Retrieve using hybrid search (semantic + BM25) with metadata filtering and self-learning"""
+        # Pass product_filter to hybrid searcher for ChromaDB filtering
+        if product_filter:
+            logger.info("[HYBRID] Product filter active, passing to ChromaDB query")
         results = self.hybrid_searcher.search(
             query=query,
             top_k=top_k * 2,  # Get more candidates for boosting/reranking
             expand_query=ENABLE_QUERY_EXPANSION,
             use_hybrid=True,
+            where_filter=product_filter,  # NEW: Pass product filter to ChromaDB
             min_similarity=RAG_SIMILARITY_THRESHOLD
         )
         
@@ -752,29 +828,35 @@ class RAGEngine:
         query: str, 
         part_number: Optional[str],
         top_k: int,
-        target_categories: List[str] = None
+        target_categories: List[str] = None,
+        product_filter: Optional[Dict] = None  # NEW: ChromaDB where clause
     ) -> Dict:
         """Fallback: retrieve using standard semantic search with product filtering"""
         
         # Generate query embedding
         query_embedding = self.embeddings.generate_embedding(query)
         
-        # Build filter
-        # Note: chroma's where operators are limited. Instead of using a non-supported
-        # operator like $contains, we fetch results and apply product filtering client-side.
-        where = None
-        query_n = top_k
-        if part_number:
-            # Request more candidates so client-side filtering still returns enough items
-            query_n = max(50, top_k * 5)
-
-        # Query vector database
-        results = self.vectordb.query(
-            query_text=query,
-            query_embedding=query_embedding,
-            n_results=query_n,
-            where=where
-        )
+        # Use product filter if available, otherwise fall back to client-side filtering
+        where = product_filter
+        query_n = top_k if product_filter else max(50, top_k * 5)
+        
+        # Query vector database with filter
+        try:
+            results = self.vectordb.query(
+                query_text=query,
+                query_embedding=query_embedding,
+                n_results=query_n,
+                where=where
+            )
+        except Exception as e:
+            # If filter fails (metadata field doesn't exist), retry without filter
+            logger.warning(f"[RETRIEVAL] Filter failed: {e}, retrying without filter")
+            results = self.vectordb.query(
+                query_text=query,
+                query_embedding=query_embedding,
+                n_results=max(50, top_k * 5),
+                where=None
+            )
         
         # Extract results
         documents = results.get("documents", [[]])[0]

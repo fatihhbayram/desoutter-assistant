@@ -20,7 +20,7 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 | Products Indexed | 451 |
 | Documents Processed | 541 |
 | Freshdesk Tickets | 2,249 |
-| Semantic Chunks | ~28,414 |
+| Semantic Chunks | ~26,528 |
 | BM25 Terms | 19,032 |
 | Domain Terms | 351 |
 
@@ -73,6 +73,12 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 ## 🔄 In Progress
 
 ### January 2026
+
+- [x] **Intelligent Product Filtering** ✅ (Jan 5)
+  - Pattern-based `IntelligentProductExtractor` (40+ regex patterns)
+  - ChromaDB `where` clause filtering at query time
+  - CVI3 query → Only CVI3 documents returned
+  - 91.7% test pass rate
 
 - [x] **Freshdesk Ticket Integration** ✅
   - Scraped 2,249 tickets from support portal
@@ -262,4 +268,4 @@ We welcome feature suggestions and contributions!
 
 ---
 
-*Last Updated: January 4, 2026*
+*Last Updated: January 5, 2026*

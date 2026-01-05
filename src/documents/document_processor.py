@@ -415,6 +415,17 @@ class DocumentProcessor:
         # Extract metadata
         metadata = self.extract_metadata(file_path, text)
         
+        # NEW: Get full product metadata from intelligent extractor
+        product_metadata = self.product_extractor.get_product_metadata(
+            filename=file_path.name,
+            content=text[:2000]
+        )
+        
+        # Log product detection
+        logger.info(f"  Product detected: {product_metadata['product_family']} "
+                    f"(confidence: {product_metadata['confidence']:.2f}, "
+                    f"generic: {product_metadata['is_generic']})")
+        
         # Phase 1-2: Apply semantic chunking if enabled
         chunks = None
         chunk_count = 0
@@ -423,12 +434,12 @@ class DocumentProcessor:
                 # Detect document type
                 doc_type = self._map_to_document_type(metadata.get("type", "unknown"))
                 
-                # Apply semantic chunking
+                # Apply semantic chunking with full product metadata
                 chunks = self.semantic_chunker.chunk_document(
                     text=text,
                     source_filename=file_path.name,
                     doc_type=doc_type,
-                    product_categories=metadata.get("product_categories", "")
+                    product_metadata=product_metadata  # NEW: Pass full metadata
                 )
                 chunk_count = len(chunks)
                 logger.info(f"  Semantic chunking: Created {chunk_count} chunks")
@@ -442,6 +453,7 @@ class DocumentProcessor:
             "file_type": ext.replace('.', ''),
             "text": text,
             "metadata": metadata,
+            "product_metadata": product_metadata,  # NEW: Include for reference
             "word_count": len(text.split()),
             "char_count": len(text),
             "chunks": chunks,  # Phase 1-2: Semantic chunks
