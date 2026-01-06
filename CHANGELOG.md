@@ -14,6 +14,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.0] - 2026-01-06
+
+### Added
+- **General RAG Quality Improvements (Phase 7.1)** - Pattern-based boosting for better bulletin prioritization
+  - `_calculate_error_code_boost_general()` - Regex-based error code detection (E06, I004, TRD-E06, etc.)
+  - `_calculate_keyword_boost()` - Two-stage phrase and keyword matching
+  - Phrase matching with bigrams/trigrams for exact query match boost
+  - Content keyword boost for problem description sections
+
+### Changed
+- **Hybrid Search Weights** - BM25 weight increased from 0.3 to 0.4 for better keyword matching
+- **Bulletin Score Boosting** - Enhanced `_apply_metadata_boost()` with query and content parameters
+- **Bulletin Preservation** - Short bulletins (<800 words) kept as single chunk
+- **Bulletin Deduplication** - `_deduplicate_bulletins()` method removes duplicate chunks from same ESDE
+
+### Removed
+- **Hardcoded Components Removed**
+  - `src/llm/symptom_mapper.py` - Replaced with general phrase matching
+  - `src/llm/error_code_matcher.py` - Replaced with regex-based pattern detection
+
+### Fixed
+- Wrong bulletin ranking for error code queries (E06 now correctly returns ESDE23029)
+- Phrase-based queries now properly boost matching documents
+- "ERS tool not detected" query now returns correct document first
+
+---
+
 ## [1.6.0] - 2026-01-05
 
 ### Added

@@ -38,7 +38,33 @@ logger = setup_logger(__name__)
 
 
 class RAGEngine:
-    """RAG Engine for repair suggestions with self-learning capabilities"""
+    """
+    RAG Engine for repair suggestions with self-learning capabilities.
+    
+    Features:
+    - Hybrid search (Semantic + BM25)
+    - Self-learning from feedback
+    - Bulletin score boosting (Phase 7)
+    - Error code direct matching
+    - Symptom synonym expansion
+    """
+    
+    # Score boosting constants for bulletin prioritization
+    SCORE_BOOSTS = {
+        'doc_type': {
+            'service_bulletin': 2.0,      # Bulletins get 2x boost
+            'troubleshooting_guide': 1.5,
+            'technical_manual': 1.0,
+            'safety_document': 1.2,
+            'user_manual': 0.9,
+        },
+        'source_prefix': {
+            'ESDE': 1.5,                   # Official ESDE bulletins get extra boost
+        },
+        'error_code_match': 2.5,           # Error code in query matches document
+        'problem_match_base': 1.5,         # Base boost for problem description match
+        'problem_match_per_word': 0.2,     # Additional boost per matching word
+    }
     
     # Turkish language indicators
     TURKISH_CHARS = set('çğışöüÇĞİŞÖÜ')
@@ -381,19 +407,23 @@ class RAGEngine:
         
         return filtered
 
-    def _apply_metadata_boost(self, base_score: float, metadata: Dict) -> float:
+    def _apply_metadata_boost(self, base_score: float, metadata: Dict, query: str = "", content: str = "") -> float:
         """
-        Apply metadata-based score boosting (Phase 4.1)
+        Apply metadata-based score boosting (Phase 4.1 + 7.1)
         
         Boosts documents based on:
         - Service bulletins (ESD/ESB) get priority
         - Procedure sections (step-by-step)
         - Warning/caution content
         - Importance score from semantic chunking
+        - Error code pattern matching (Phase 7.1)
+        - Content keyword matching (Phase 7.1)
         
         Args:
             base_score: Original similarity/relevance score
             metadata: Document metadata dictionary
+            query: User's query for pattern matching
+            content: Document content for keyword matching
             
         Returns:
             Boosted score
@@ -444,12 +474,135 @@ class RAGEngine:
             except (ValueError, TypeError):
                 pass
         
+        # 5. Error code pattern matching boost (Phase 7.1)
+        if query:
+            error_code_boost = self._calculate_error_code_boost_general(query, source, content)
+            if error_code_boost > 1.0:
+                boost *= error_code_boost
+                boost_reasons.append(f"error_code({error_code_boost:.1f}x)")
+        
+        # 6. Content keyword matching boost (Phase 7.1)
+        if query and content:
+            keyword_boost = self._calculate_keyword_boost(query, content)
+            if keyword_boost > 1.0:
+                boost *= keyword_boost
+                boost_reasons.append(f"keyword_match({keyword_boost:.1f}x)")
+        
         boosted_score = base_score * boost
         
         if boost > 1.0:
             logger.debug(f"Metadata boost applied: {base_score:.3f} → {boosted_score:.3f} ({', '.join(boost_reasons)})")
         
         return boosted_score
+    
+    def _calculate_error_code_boost_general(self, query: str, source: str, content: str) -> float:
+        """
+        General error code pattern matching - not hardcoded!
+        
+        Detects patterns like: E06, E047, I004, TRD-E06, HW Channel
+        and boosts if same pattern appears in document source/content.
+        """
+        import re
+        
+        # General error code patterns (works for ANY code)
+        error_patterns = [
+            r'\b[EI]\d{2,4}\b',           # E06, E047, I004, E018, etc.
+            r'\bTrd[-\s]?E\d+\b',          # Trd-E06, TRD E06
+            r'\bHW[-\s]?Channel\b',        # HW Channel, HW-Channel
+            r'\bSpan[-\s]?[Ff]ailure\b',   # Span Failure
+            r'\b\d{4}[-\s]?[A-Z]{2,4}\b',  # 6159-XXX patterns
+        ]
+        
+        query_upper = query.upper()
+        source_upper = source.upper() if source else ''
+        content_upper = content.upper() if content else ''
+        
+        for pattern in error_patterns:
+            matches = re.findall(pattern, query_upper, re.IGNORECASE)
+            for match in matches:
+                # Normalize for comparison
+                match_normalized = re.sub(r'[-\s]', '', match.upper())
+                source_normalized = re.sub(r'[-\s]', '', source_upper)
+                content_normalized = re.sub(r'[-\s]', '', content_upper[:2000])  # First 2000 chars
+                
+                # If error code in query also appears in document
+                if match_normalized in source_normalized:
+                    return 2.5  # Strong boost for source match
+                if match_normalized in content_normalized:
+                    return 2.0  # Good boost for content match
+        
+        return 1.0
+    
+    def _calculate_keyword_boost(self, query: str, content: str) -> float:
+        """
+        General keyword matching - boosts when query keywords appear in content.
+        
+        Two-stage matching:
+        1. Phrase matching: Exact phrases from query found in content -> Strong boost
+        2. Word matching: Individual keywords found in problem description sections
+        """
+        import re
+        
+        if not content:
+            return 1.0
+        
+        content_lower = content.lower()
+        query_lower = query.lower()
+        
+        boost = 1.0
+        
+        # Stage 1: Phrase matching in the entire content
+        # Extract meaningful phrases (2-4 words) from query
+        query_words = query_lower.split()
+        phrases_to_check = []
+        
+        # Create bigrams and trigrams
+        for i in range(len(query_words)):
+            if i + 1 < len(query_words):
+                phrases_to_check.append(' '.join(query_words[i:i+2]))
+            if i + 2 < len(query_words):
+                phrases_to_check.append(' '.join(query_words[i:i+3]))
+        
+        # Check for phrase matches
+        phrase_matches = sum(1 for phrase in phrases_to_check 
+                           if len(phrase) > 6 and phrase in content_lower)
+        
+        if phrase_matches >= 3:
+            boost *= 2.5  # Strong phrase match
+        elif phrase_matches >= 2:
+            boost *= 2.0  # Good phrase match
+        elif phrase_matches >= 1:
+            boost *= 1.5  # Some phrase match
+        
+        # Stage 2: Problem section keyword matching (original logic)
+        problem_sections = []
+        section_patterns = [
+            r'description of the issue[:\s]+([^.]{10,100})',
+            r'product impact[:\s]+([^.]{10,100})',
+            r'cause of issue[:\s]+([^.]{10,100})',
+            r'visible symptom[:\s]+([^.]{10,100})',
+            r'failure description[:\s]+([^.]{10,100})',
+        ]
+        
+        for pattern in section_patterns:
+            match = re.search(pattern, content_lower)
+            if match:
+                problem_sections.append(match.group(1))
+        
+        if problem_sections:
+            # Get meaningful query words (skip short ones and common words)
+            stop_words = {'the', 'is', 'a', 'an', 'and', 'or', 'for', 'to', 'in', 'on', 'with', 'after'}
+            meaningful_words = [w for w in query_words if len(w) >= 3 and w not in stop_words]
+            
+            combined_sections = ' '.join(problem_sections)
+            section_matches = sum(1 for w in meaningful_words if w in combined_sections)
+            
+            if section_matches >= 3:
+                boost *= 1.5  # Extra boost for problem section match
+            elif section_matches >= 2:
+                boost *= 1.3
+        
+        return min(boost, 4.0)  # Cap at 4x total boost
     
     def _get_feedback_engine(self):
         """Lazy load feedback engine"""
@@ -629,6 +782,124 @@ class RAGEngine:
         logger.info(f"[FILTER] Applying filter for family: {detected_family}")
         return where_filter
     
+    def apply_score_boost(self, base_score: float, metadata: dict, query: str) -> float:
+        """
+        Apply score boosting based on document metadata and query match.
+        
+        Boosting factors:
+        1. Document type (bulletin > manual)
+        2. ESDE prefix (official service documents)
+        3. Error code match (E06, I004, etc.)
+        4. Problem description match
+        
+        Args:
+            base_score: Original retrieval score
+            metadata: Document metadata
+            query: User's query
+            
+        Returns:
+            Boosted score
+        """
+        boost = 1.0
+        
+        # 1. Document type boost
+        doc_type = metadata.get('doc_type', 'unknown')
+        boost *= self.SCORE_BOOSTS['doc_type'].get(doc_type, 1.0)
+        
+        # 2. ESDE prefix boost (official service bulletins)
+        source = metadata.get('source', '')
+        if source.upper().startswith('ESDE'):
+            boost *= self.SCORE_BOOSTS['source_prefix']['ESDE']
+        
+        # 3. Error code direct match boost
+        error_code_boost = self._calculate_error_code_boost(query, metadata)
+        boost *= error_code_boost
+        
+        # 4. Problem description match boost
+        problem_boost = self._calculate_problem_match_boost(query, metadata)
+        boost *= problem_boost
+        
+        if boost > 1.0:
+            logger.debug(f"[BOOST] {source}: {base_score:.3f} x {boost:.2f} = {base_score * boost:.3f}")
+        
+        return base_score * boost
+    
+    def _calculate_error_code_boost(self, query: str, metadata: dict) -> float:
+        """
+        Boost documents that contain error codes mentioned in query.
+        
+        Error codes: E06, E047, I004, Trd-E06, HW Channel, etc.
+        """
+        # Extract error codes from query
+        error_patterns = [
+            r'\b[EI]\d{2,4}\b',           # E06, E047, I004
+            r'\bTrd[-\s]?E\d+\b',          # Trd-E06
+            r'\bHW\s*Channel\b',           # HW Channel
+            r'\bSpan\s*[Ff]ailure\b',      # Span Failure
+        ]
+        
+        query_upper = query.upper()
+        source = metadata.get('source', '').upper()
+        chunk_text = str(metadata.get('chunk_text', '')).upper() if metadata.get('chunk_text') else ''
+        
+        # Also check document text if available
+        doc_content = chunk_text or ''
+        
+        for pattern in error_patterns:
+            matches = re.findall(pattern, query_upper, re.IGNORECASE)
+            for match in matches:
+                match_upper = match.upper().replace(' ', '').replace('-', '')
+                # If error code in query also appears in document source or content
+                if match_upper in source.replace(' ', '').replace('-', ''):
+                    return self.SCORE_BOOSTS['error_code_match']
+                if match_upper in doc_content.replace(' ', '').replace('-', ''):
+                    return self.SCORE_BOOSTS['error_code_match']
+        
+        return 1.0
+    
+    def _calculate_problem_match_boost(self, query: str, metadata: dict) -> float:
+        """
+        Boost chunks containing explicit problem descriptions matching query.
+        
+        Patterns:
+        - "Failure description: ..."
+        - "Description of the issue: ..."
+        - "Visible symptom: ..."
+        """
+        chunk_text = str(metadata.get('chunk_text', '')) if metadata.get('chunk_text') else ''
+        if not chunk_text:
+            # Try to get from document content if not in chunk_text field
+            chunk_text = str(metadata.get('content', '')) if metadata.get('content') else ''
+        
+        if not chunk_text:
+            return 1.0
+        
+        problem_patterns = [
+            r'failure description[:\s]+([^.]+)',
+            r'description of the issue[:\s]+([^.]+)',
+            r'description of the subject[:\s]+([^.]+)',
+            r'visible symptom[:\s]+([^.]+)',
+            r'cause of issue[:\s]+([^.]+)',
+            r'cause of failure[:\s]+([^.]+)',
+        ]
+        
+        query_words = set(query.lower().split())
+        chunk_lower = chunk_text.lower()
+        
+        for pattern in problem_patterns:
+            match = re.search(pattern, chunk_lower)
+            if match:
+                problem_desc = match.group(1)
+                problem_words = set(problem_desc.split())
+                
+                # Calculate word overlap
+                overlap = len(query_words & problem_words)
+                if overlap >= 2:
+                    boost = self.SCORE_BOOSTS['problem_match_base'] + (overlap * self.SCORE_BOOSTS['problem_match_per_word'])
+                    return min(boost, 2.5)  # Cap at 2.5x
+        
+        return 1.0
+    
     def retrieve_context(
         self,
         query: str,
@@ -773,8 +1044,14 @@ class RAGEngine:
             
             base_score = result.similarity if result.similarity > 0 else result.score
             
-            # Apply metadata-based boosting (Phase 4.1)
-            boosted_score = self._apply_metadata_boost(base_score, result.metadata)
+            # Apply metadata-based boosting (Phase 4.1 + 7.1)
+            # Pass query and content for error code + keyword matching
+            boosted_score = self._apply_metadata_boost(
+                base_score, 
+                result.metadata, 
+                query=query, 
+                content=result.content or ""
+            )
             
             filtered_docs.append({
                 "text": result.content,
@@ -898,8 +1175,14 @@ class RAGEngine:
 
             similarity_score = max(0, 1 - dist/2)
             
-            # Apply metadata-based boosting (Phase 4.1)
-            boosted_score = self._apply_metadata_boost(similarity_score, meta)
+            # Apply metadata-based boosting (Phase 4.1 + 7.1)
+            # Pass query and content for error code + keyword matching
+            boosted_score = self._apply_metadata_boost(
+                similarity_score, 
+                meta, 
+                query=query, 
+                content=doc or ""
+            )
             
             filtered_docs.append({
                 "text": doc,

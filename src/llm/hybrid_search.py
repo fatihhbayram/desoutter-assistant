@@ -472,7 +472,7 @@ class HybridSearcher:
         min_similarity: float = 0.3
     ) -> List[SearchResult]:
         """
-        Perform hybrid search.
+        Perform hybrid search with symptom synonym expansion and bulletin prioritization.
         
         Args:
             query: Search query
@@ -485,7 +485,7 @@ class HybridSearcher:
         Returns:
             List of SearchResult sorted by hybrid score
         """
-        # Query expansion
+        # Query expansion with domain synonyms
         queries = [query]
         if expand_query:
             queries = self.query_expander.expand(query, max_expansions=3)
@@ -527,6 +527,9 @@ class HybridSearcher:
         # Apply metadata boosting
         combined = self.metadata_filter.boost_results(combined, query)
         
+        # NEW: Deduplicate bulletins (keep only highest-scoring chunk per ESDE bulletin)
+        combined = self._deduplicate_bulletins(combined)
+        
         # Deduplicate and limit
         seen_ids = set()
         unique_results = []
@@ -539,6 +542,42 @@ class HybridSearcher:
         
         logger.info(f"Hybrid search '{query[:50]}...' -> {len(unique_results)} results")
         return unique_results
+    
+    def _deduplicate_bulletins(self, results: List[SearchResult]) -> List[SearchResult]:
+        """
+        Remove duplicate chunks from same bulletin document.
+        Keep highest scoring chunk per ESDE bulletin.
+        
+        This prevents bulletins from appearing multiple times with different chunks.
+        """
+        seen_bulletins = {}  # source -> highest scoring result
+        non_bulletin_results = []
+        
+        for result in results:
+            source = result.metadata.get('source', '')
+            
+            # Check if this is an ESDE bulletin
+            if source.upper().startswith('ESDE'):
+                # Extract bulletin ID (e.g., "ESDE23007" from "ESDE23007 - Some title.pdf")
+                bulletin_id = source.upper().split()[0] if source else ''
+                
+                if bulletin_id in seen_bulletins:
+                    # Keep higher scoring one
+                    if result.score > seen_bulletins[bulletin_id].score:
+                        seen_bulletins[bulletin_id] = result
+                else:
+                    seen_bulletins[bulletin_id] = result
+            else:
+                non_bulletin_results.append(result)
+        
+        # Combine bulletins + non-bulletins, sort by score
+        all_results = list(seen_bulletins.values()) + non_bulletin_results
+        all_results.sort(key=lambda x: x.score, reverse=True)
+        
+        if seen_bulletins:
+            logger.debug(f"Deduplicated bulletins: kept {len(seen_bulletins)} unique bulletins")
+        
+        return all_results
     
     def _semantic_search(
         self,

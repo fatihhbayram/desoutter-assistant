@@ -21,6 +21,7 @@ An enterprise-grade **RAG (Retrieval-Augmented Generation)** system that provide
 |---------|-------------|
 | 🔍 **Hybrid Search** | BM25 keyword + Semantic vector search with RRF (Reciprocal Rank Fusion) |
 | 🎯 **Intelligent Product Filtering** | Auto-detects product family from queries, filters retrieval to relevant docs only |
+| 📈 **Pattern-Based Boosting** | Regex error code detection + phrase matching for bulletin prioritization |
 | 🧠 **Self-Learning RAG** | Learns from user feedback to improve future suggestions |
 | 🎯 **96% Test Pass Rate** | Comprehensive automated test suite with 25 scenarios |
 | 🔄 **Multi-turn Conversation** | Follow-up questions with context preservation |

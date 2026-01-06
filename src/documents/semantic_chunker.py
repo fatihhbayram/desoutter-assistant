@@ -188,6 +188,28 @@ class SemanticChunker:
         
         logger.info(f"Chunking '{source_filename}' as {doc_type.value}")
         
+        # Check if this is a service bulletin - apply special handling
+        is_bulletin = (
+            doc_type == DocumentType.SERVICE_BULLETIN or
+            source_filename.upper().startswith('ESDE') or
+            'bulletin' in source_filename.lower()
+        )
+        
+        # Extract affected products from bulletin content
+        affected_products = None
+        if is_bulletin:
+            affected_products = self._extract_affected_products(text)
+            if affected_products:
+                logger.info(f"Bulletin {source_filename}: affected products = {affected_products}")
+        
+        # For short bulletins, keep as single chunk to preserve context
+        word_count = len(text.split())
+        if is_bulletin and word_count < 800:
+            logger.info(f"Short bulletin ({word_count} words) - keeping as single chunk")
+            return [self._create_single_bulletin_chunk(
+                text, source_filename, doc_type, product_metadata, affected_products
+            )]
+        
         # Split by paragraphs first (preserve structure)
         paragraphs = self._split_by_paragraphs(text)
         
@@ -234,7 +256,8 @@ class SemanticChunker:
                 source=source_filename,
                 doc_type=doc_type,
                 page_number=current_page,  # Pass page number to chunks
-                product_metadata=product_metadata  # Pass full product metadata
+                product_metadata=product_metadata,  # Pass full product metadata
+                affected_products=affected_products  # NEW: Pass affected products for bulletins
             )
             
             chunks.extend(para_chunks)
@@ -242,6 +265,119 @@ class SemanticChunker:
         logger.info(f"Created {len(chunks)} chunks from {source_filename}")
         
         return chunks
+    
+    def _extract_affected_products(self, text: str) -> Optional[str]:
+        """
+        Extract affected products from bulletin content.
+        
+        Looks for patterns like:
+        - "Products impacted: EABS, EPBC, EABC"
+        - "Products potentially impacted: ExBx tools"
+        - "Applicable products: ERS, ERSA"
+        """
+        # Product alias expansion
+        PRODUCT_ALIASES = {
+            'ExB': ['EPB', 'EAB'],
+            'ExBC': ['EPBC', 'EABC'],
+            'ExBx': ['EABC', 'EPBC', 'EABS'],
+        }
+        
+        patterns = [
+            r'Products?\s+(?:impacted|affected|applicable|potentially\s+impacted)[:\s]+([^\n]+)',
+            r'Applicable\s+(?:to|for)[:\s]+([^\n]+)',
+            r'This\s+bulletin\s+(?:applies|concerns)[:\s]+([^\n]+)',
+        ]
+        
+        text_lower = text.lower()
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                products_text = match.group(1).strip()
+                # Clean up the text
+                products_text = re.sub(r'[^\w\s,/-]', '', products_text)
+                
+                # Extract individual product codes
+                products = []
+                
+                # Check for known product codes
+                product_patterns = [
+                    r'\bE[A-Z]{1,4}\d*\b',  # EABS, EPBC, EAB, EPB, ERS, etc.
+                    r'\bExB[xCc]?\b',       # ExB, ExBx, ExBC
+                    r'\bBLRT[Cc]?\b',       # BLRT, BLRTC
+                ]
+                
+                for prod_pattern in product_patterns:
+                    found = re.findall(prod_pattern, products_text, re.IGNORECASE)
+                    products.extend([p.upper() for p in found])
+                
+                # Expand aliases
+                expanded = []
+                for prod in products:
+                    if prod in PRODUCT_ALIASES:
+                        expanded.extend(PRODUCT_ALIASES[prod])
+                    expanded.append(prod)
+                
+                # Remove duplicates and return
+                unique_products = list(dict.fromkeys(expanded))
+                if unique_products:
+                    return ','.join(unique_products)
+        
+        return None
+    
+    def _create_single_bulletin_chunk(
+        self,
+        text: str,
+        source: str,
+        doc_type: DocumentType,
+        product_metadata: Optional[Dict],
+        affected_products: Optional[str]
+    ) -> Dict:
+        """Create a single chunk for short bulletins to preserve full context."""
+        word_count = len(text.split())
+        content_hash = self._calculate_content_hash(text)
+        fault_keywords = self.keyword_extractor.extract(text)
+        
+        # Build metadata
+        metadata = {
+            'source': source,
+            'section': 'Full Bulletin',
+            'heading_level': 0,
+            'section_type': 'procedure',
+            'doc_type': doc_type.value,
+            'product_categories': product_metadata.get('product_family', 'UNKNOWN') if product_metadata else 'UNKNOWN',
+            'fault_keywords': ', '.join(list(fault_keywords)[:5]) if fault_keywords else '',
+            'importance_score': 1.0,  # Bulletins are high importance
+            'is_procedure': True,
+            'contains_warning': bool(re.search(r'\b(warning|caution|danger|important)\b', text, re.I)),
+            'contains_numbers': bool(re.search(r'\d', text)),
+            'position': 0.0,
+            'word_count': word_count,
+            'content_hash': content_hash,
+            'is_complete_bulletin': True,  # Flag this as a complete bulletin
+        }
+        
+        # Add product metadata fields
+        if product_metadata:
+            metadata['product_family'] = str(product_metadata.get('product_family', 'UNKNOWN'))
+            metadata['product_models'] = str(product_metadata.get('product_models', ''))
+            metadata['product_category'] = str(product_metadata.get('product_category', 'UNKNOWN'))
+            metadata['is_generic'] = product_metadata.get('is_generic', False)
+        else:
+            metadata['product_family'] = 'UNKNOWN'
+            metadata['product_models'] = ''
+            metadata['product_category'] = 'UNKNOWN'
+            metadata['is_generic'] = False
+        
+        # Add affected products if extracted
+        if affected_products:
+            metadata['affected_products'] = affected_products
+        
+        return {
+            'text': text,
+            'metadata': metadata
+        }
+    
     
     def _split_by_paragraphs(self, text: str) -> List[str]:
         """Split text by paragraphs (blank lines)"""
@@ -341,7 +477,8 @@ class SemanticChunker:
         source: str,
         doc_type: DocumentType,
         page_number: Optional[int] = None,  # NEW: Page number from PDF
-        product_metadata: Optional[Dict] = None  # NEW: Full product metadata
+        product_metadata: Optional[Dict] = None,  # NEW: Full product metadata
+        affected_products: Optional[str] = None  # NEW: Affected products for bulletins
     ) -> List[Dict]:
         """Chunk a paragraph into semantic pieces"""
         
@@ -361,7 +498,8 @@ class SemanticChunker:
                 doc_type=doc_type,
                 word_count=word_count,
                 page_number=page_number,  # Pass page number
-                product_metadata=product_metadata
+                product_metadata=product_metadata,
+                affected_products=affected_products
             )]
         
         # Split into sentences
@@ -386,7 +524,8 @@ class SemanticChunker:
                     doc_type=doc_type,
                     word_count=current_word_count,
                     page_number=page_number,  # Pass page number
-                    product_metadata=product_metadata
+                    product_metadata=product_metadata,
+                    affected_products=affected_products
                 ))
                 
                 # Start new chunk (with overlap)
@@ -407,7 +546,8 @@ class SemanticChunker:
                 doc_type=doc_type,
                 word_count=current_word_count,
                 page_number=page_number,  # Pass page number
-                product_metadata=product_metadata
+                product_metadata=product_metadata,
+                affected_products=affected_products
             ))
         
         return chunks
@@ -433,7 +573,8 @@ class SemanticChunker:
         doc_type: DocumentType,
         word_count: int,
         page_number: Optional[int] = None,  # NEW: Page number from PDF
-        product_metadata: Optional[Dict] = None  # NEW: Full product metadata
+        product_metadata: Optional[Dict] = None,  # NEW: Full product metadata
+        affected_products: Optional[str] = None  # NEW: Affected products from bulletin
     ) -> Dict:
         """Create a chunk with metadata"""
         
@@ -484,6 +625,10 @@ class SemanticChunker:
             chunk_metadata["product_models"] = ""
             chunk_metadata["product_category"] = "UNKNOWN"
             chunk_metadata["is_generic"] = True
+        
+        # Add affected products for bulletins
+        if affected_products:
+            chunk_metadata["affected_products"] = affected_products
         
         return {
             "text": text,

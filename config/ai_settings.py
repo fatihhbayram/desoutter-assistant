@@ -179,10 +179,12 @@ RAG_SIMILARITY_THRESHOLD = float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.30"))
 USE_HYBRID_SEARCH = os.getenv("USE_HYBRID_SEARCH", "true").lower() == "true"
 
 # Weight for semantic search in fusion (0.0-1.0)
-HYBRID_SEMANTIC_WEIGHT = float(os.getenv("HYBRID_SEMANTIC_WEIGHT", "0.7"))
+# Reduced from 0.7 to 0.6 to give more weight to exact keyword matches
+HYBRID_SEMANTIC_WEIGHT = float(os.getenv("HYBRID_SEMANTIC_WEIGHT", "0.6"))
 
 # Weight for BM25 keyword search in fusion (0.0-1.0)
-HYBRID_BM25_WEIGHT = float(os.getenv("HYBRID_BM25_WEIGHT", "0.3"))
+# Increased from 0.3 to 0.4 for better error code and technical term matching
+HYBRID_BM25_WEIGHT = float(os.getenv("HYBRID_BM25_WEIGHT", "0.4"))
 
 # RRF (Reciprocal Rank Fusion) constant - higher = more uniform weighting
 HYBRID_RRF_K = int(os.getenv("HYBRID_RRF_K", "60"))
@@ -192,6 +194,37 @@ ENABLE_QUERY_EXPANSION = os.getenv("ENABLE_QUERY_EXPANSION", "true").lower() == 
 
 # Maximum query expansions to generate
 MAX_QUERY_EXPANSIONS = int(os.getenv("MAX_QUERY_EXPANSIONS", "3"))
+
+
+def get_dynamic_weights(query: str) -> tuple:
+    """
+    Adjust search weights based on query characteristics.
+    
+    - Error codes → Higher BM25 (exact match important)
+    - Troubleshooting → Balanced with slight BM25 emphasis
+    - General questions → Higher Semantic (meaning important)
+    
+    Returns:
+        (bm25_weight, semantic_weight) tuple
+    """
+    import re
+    
+    query_upper = query.upper()
+    
+    # Error code present → BM25 dominant
+    if re.search(r'\b[EI]\d{2,4}\b', query_upper) or 'TRD-' in query_upper:
+        return (0.6, 0.4)
+    
+    # Troubleshooting keywords → Balanced with BM25 emphasis
+    troubleshooting_keywords = [
+        'error', 'issue', 'problem', 'fault', 'failure', 'not working',
+        'failed', 'broken', 'stuck', 'wont', "won't", 'unable'
+    ]
+    if any(kw in query.lower() for kw in troubleshooting_keywords):
+        return (0.45, 0.55)
+    
+    # Default → Semantic emphasis
+    return (HYBRID_BM25_WEIGHT, HYBRID_SEMANTIC_WEIGHT)
 
 # =============================================================================
 # METADATA-BASED FILTERING AND BOOSTING (Phase 4.1)
