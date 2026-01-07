@@ -14,6 +14,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.0] - 2026-01-07
+
+### Added
+- **Triple-Path Retrieval Strategy** - Enhanced document retrieval for connectivity queries
+  - Path A: Dedicated service bulletin retrieval
+  - Path B: General hybrid search (Semantic + BM25)
+  - Path C: Controller/unit documentation retrieval (CONNECT, CVI3 families)
+- **Dynamic Query Expander** (`src/llm/dynamic_query_expander.py`)
+  - Vector DB-based term expansion instead of hardcoded synonyms
+  - `HybridQueryExpander` with rule-based fallback
+- **Response Enhancer** (`src/llm/response_enhancer.py`)
+  - Safety net to ensure service bulletins are mentioned in responses
+  - Post-processing layer for bulletin awareness
+- **Connectivity-Aware Filtering** (`_filter_connectivity_relevance`)
+  - Detects WiFi/Connect/unit queries
+  - Excludes irrelevant docs (transducer, calibration, motor align)
+  - Negative keyword matching for false positive prevention
+
+### Changed
+- **SERVICE_BULLETIN_BOOST** increased from 1.5x to 2.5x
+- **Product Filter** - Includes controller families (CONNECT, CVI3, CVIC, CVIR, CVIL, AXON, ESP) for connectivity queries
+- **_filter_by_product_strict** - Exempts controller families from cross-product exclusion
+- **Troubleshooting Prompt** - Added 🔴 BULLETIN PRIORITY RULE with explicit bulletin handling instructions
+- **Context Formatting** - Bulletin-aware context with clear `🔴 SERVICE BULLETINS` markers
+
+### Fixed
+- Connect-W documentation not appearing for WiFi tool queries
+- Controller family docs (CVI3, CONNECT) being excluded by product filter
+- Generic docs with ambiguous keywords (e.g., "communication") false positive matches
+
+---
+
 ## [1.7.0] - 2026-01-06
 
 ### Added

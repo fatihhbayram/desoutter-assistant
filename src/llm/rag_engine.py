@@ -95,6 +95,7 @@ class RAGEngine:
         self.context_optimizer = ContextOptimizer(token_budget=8000)  # Phase 3.4
         self.performance_monitor = get_performance_monitor()  # Phase 5.1
         self.intent_detector = None  # Lazy initialized
+        self.dynamic_query_expander = None  # Phase 2.0v2 - Dynamic query expansion
         
         # Initialize hybrid search if enabled
         if USE_HYBRID_SEARCH:
@@ -115,6 +116,9 @@ class RAGEngine:
         
         # Initialize query processor (Phase 2.2)
         self._init_query_processor()
+        
+        # Initialize dynamic query expander (Phase 2.0v2)
+        self._init_dynamic_query_expander()
         
         logger.info("✅ RAG Engine initialized")
     
@@ -176,6 +180,300 @@ class RAGEngine:
             logger.warning(f"Failed to initialize query processor: {e}")
             self.query_processor = None
     
+    def _init_dynamic_query_expander(self):
+        """Initialize dynamic query expander (Phase 2.0v2)"""
+        try:
+            from src.llm.dynamic_query_expander import HybridQueryExpander
+            self.dynamic_query_expander = HybridQueryExpander(
+                chroma_client=self.vectordb,
+                embeddings_generator=self.embeddings
+            )
+            logger.info("✅ Dynamic query expander enabled (Phase 2.0v2)")
+        except Exception as e:
+            logger.warning(f"Failed to initialize dynamic query expander: {e}")
+            self.dynamic_query_expander = None
+    
+    def _retrieve_bulletins_separately(
+        self,
+        query: str,
+        product_filter: dict = None,
+        max_bulletins: int = 3
+    ) -> List[Dict]:
+        """
+        Retrieve bulletins separately to ensure they're not drowned out by manuals.
+        Part of dual-path retrieval strategy (Phase 1).
+        
+        Args:
+            query: User query or enhanced query
+            product_filter: Optional product family filter
+            max_bulletins: Maximum bulletins to retrieve
+            
+        Returns:
+            List of bulletin documents with metadata
+        """
+        try:
+            # Expand query specifically for bulletin matching
+            expanded_query = query
+            if self.dynamic_query_expander:
+                expanded_query = self.dynamic_query_expander.expand_for_bulletins(
+                    query=query,
+                    product_filter=product_filter
+                )
+                if expanded_query != query:
+                    logger.info(f"[BULLETIN] Expanded query: {expanded_query[:80]}...")
+            
+            # Build bulletin-only filter
+            bulletin_filter = {
+                "$or": [
+                    {"doc_type": {"$eq": "service_bulletin"}}
+                ]
+            }
+            
+            # Combine with product filter if provided
+            if product_filter:
+                combined_filter = {"$and": [bulletin_filter, product_filter]}
+            else:
+                combined_filter = bulletin_filter
+            
+            # Generate embedding for query
+            query_embedding = self.embeddings.generate_embedding(expanded_query)
+            
+            # Query ChromaDB for bulletins only
+            results = self.vectordb.query(
+                query_text=expanded_query,
+                query_embedding=query_embedding,
+                n_results=max_bulletins * 2,  # Get extra to account for filtering
+                where=combined_filter
+            )
+            
+            bulletin_docs = []
+            if results:
+                documents = results.get('documents', [[]])[0]
+                metadatas = results.get('metadatas', [[]])[0]
+                distances = results.get('distances', [[]])[0]
+                
+                seen_bulletins = set()  # Deduplicate by source
+                
+                for doc, meta, dist in zip(documents, metadatas, distances):
+                    source = meta.get('source', '').upper()
+                    
+                    # Skip if already seen this bulletin
+                    bulletin_id = source.split()[0] if source else ''
+                    if bulletin_id in seen_bulletins:
+                        continue
+                    seen_bulletins.add(bulletin_id)
+                    
+                    # Convert distance to similarity
+                    similarity = max(0, 1 - dist / 2)
+                    
+                    # Apply bulletin boost to score
+                    boosted_score = self._apply_metadata_boost(
+                        similarity, meta, query=query, content=doc
+                    )
+                    
+                    bulletin_docs.append({
+                        'text': doc,
+                        'metadata': meta,
+                        'similarity': similarity,
+                        'boosted_score': boosted_score,
+                        'is_bulletin': True
+                    })
+                    
+                    if len(bulletin_docs) >= max_bulletins:
+                        break
+            
+            if bulletin_docs:
+                logger.info(f"[BULLETIN] Retrieved {len(bulletin_docs)} dedicated bulletin(s)")
+            
+            return bulletin_docs
+            
+        except Exception as e:
+            logger.warning(f"[BULLETIN] Separate bulletin retrieval failed: {e}")
+            return []
+    
+    def _retrieve_controller_docs_separately(
+        self,
+        query: str,
+        max_controller_docs: int = 3
+    ) -> List[Dict]:
+        """
+        Retrieve controller/unit docs separately for connectivity queries.
+        Ensures CONNECT and CVI3 family docs appear even when tool-specific 
+        docs dominate search results.
+        
+        For WiFi tools like EABS, this retrieves:
+        - CONNECT-W/X setup documentation
+        - CVI3 with Access Point documentation
+        - eDock, RFID connection guides
+        
+        Args:
+            query: User query
+            max_controller_docs: Maximum controller docs to retrieve
+            
+        Returns:
+            List of controller documents with metadata
+        """
+        try:
+            # Build controller-only filter (CONNECT + CVI3)
+            controller_filter = {
+                "$or": [
+                    {"product_family": {"$eq": "CONNECT"}},
+                    {"product_family": {"$eq": "CVI3"}},
+                ]
+            }
+            
+            # Create connectivity-focused query
+            connectivity_query = f"WiFi connection setup {query} Connect-W Connect-X CVI3 access point"
+            
+            # Generate embedding
+            query_embedding = self.embeddings.generate_embedding(connectivity_query)
+            
+            # Query ChromaDB for controller docs only
+            results = self.vectordb.query(
+                query_text=connectivity_query,
+                query_embedding=query_embedding,
+                n_results=max_controller_docs * 2,
+                where=controller_filter
+            )
+            
+            controller_docs = []
+            if results:
+                documents = results.get('documents', [[]])[0]
+                metadatas = results.get('metadatas', [[]])[0]
+                distances = results.get('distances', [[]])[0]
+                
+                seen_sources = set()  # Deduplicate by source
+                
+                for doc, meta, dist in zip(documents, metadatas, distances):
+                    source = meta.get('source', '')
+                    
+                    # Skip if already seen
+                    if source in seen_sources:
+                        continue
+                    seen_sources.add(source)
+                    
+                    # Convert distance to similarity
+                    similarity = max(0, 1 - dist / 2)
+                    
+                    controller_docs.append({
+                        'text': doc,
+                        'metadata': meta,
+                        'similarity': similarity,
+                        'boosted_score': similarity * 1.2,  # Small boost for controller docs
+                        'is_controller_doc': True
+                    })
+                    
+                    if len(controller_docs) >= max_controller_docs:
+                        break
+            
+            if controller_docs:
+                logger.info(f"[CONTROLLER] Retrieved {len(controller_docs)} controller doc(s)")
+            
+            return controller_docs
+            
+        except Exception as e:
+            logger.warning(f"[CONTROLLER] Separate controller retrieval failed: {e}")
+            return []
+    
+    def _merge_with_bulletin_priority(
+        self,
+        bulletin_docs: List[Dict],
+        general_docs: List[Dict],
+        max_results: int
+    ) -> List[Dict]:
+        """
+        Merge bulletin and general retrieval results with bulletin priority.
+        
+        Rules:
+        1. Include ALL relevant bulletins first (up to 3)
+        2. Fill remaining slots with general docs
+        3. Deduplicate by source
+        
+        Args:
+            bulletin_docs: Separately retrieved bulletins
+            general_docs: General retrieval results
+            max_results: Maximum total results
+            
+        Returns:
+            Merged and prioritized document list
+        """
+        merged = []
+        seen_sources = set()
+        
+        # Add bulletins first (with score boost for priority)
+        for doc in bulletin_docs:
+            source = doc.get('metadata', {}).get('source', '')
+            if source not in seen_sources:
+                doc['is_bulletin_match'] = True
+                merged.append(doc)
+                seen_sources.add(source)
+                
+                if len(merged) >= 3:  # Max 3 dedicated bulletin slots
+                    break
+        
+        # Fill remaining slots with general results (excluding duplicates)
+        for doc in general_docs:
+            if len(merged) >= max_results:
+                break
+            
+            source = doc.get('metadata', {}).get('source', '')
+            if source not in seen_sources:
+                doc['is_bulletin_match'] = False
+                merged.append(doc)
+                seen_sources.add(source)
+        
+        # Sort by boosted score
+        merged.sort(key=lambda x: x.get('boosted_score', x.get('similarity', 0)), reverse=True)
+        
+        bulletin_count = sum(1 for d in merged if d.get('is_bulletin_match'))
+        logger.info(f"[MERGE] Result: {len(merged)} docs ({bulletin_count} bulletins prioritized)")
+        
+        return merged
+    
+    def _build_bulletin_aware_context(self, docs: List[Dict]) -> str:
+        """
+        Build context string with bulletins clearly marked.
+        Helps LLM identify and prioritize bulletin information.
+        
+        Args:
+            docs: List of documents (mixed bulletins and general)
+            
+        Returns:
+            Formatted context string with bulletin markers
+        """
+        # Separate bulletins from other docs
+        bulletins = []
+        others = []
+        
+        for doc in docs:
+            source = doc.get('metadata', {}).get('source', '').upper()
+            doc_type = doc.get('metadata', {}).get('doc_type', '')
+            
+            if source.startswith('ESDE') or doc_type == 'service_bulletin' or doc.get('is_bulletin_match'):
+                bulletins.append(doc)
+            else:
+                others.append(doc)
+        
+        context_parts = []
+        
+        # Bulletins first with clear markers
+        if bulletins:
+            context_parts.append("### 🔴 SERVICE BULLETINS (CHECK FIRST - KNOWN ISSUES):\n")
+            for doc in bulletins:
+                source = doc.get('metadata', {}).get('source', 'Unknown')
+                text = doc.get('text', '')
+                context_parts.append(f"**[{source}]**\n{text}\n")
+        
+        # General documentation
+        if others:
+            context_parts.append("\n### 📘 REFERENCE DOCUMENTATION:\n")
+            for doc in others:
+                source = doc.get('metadata', {}).get('source', 'Unknown')
+                text = doc.get('text', '')
+                context_parts.append(f"**[{source}]**\n{text}\n")
+        
+        return "\n".join(context_parts)
+
     def _detect_language(self, query: str) -> str:
         """
         Auto-detect query language (Turkish vs English).
@@ -254,6 +552,127 @@ class RAGEngine:
                     return "Query appears to be nonsense or test data"
         
         return None
+    
+    def _filter_connectivity_relevance(self, docs: List[Dict], query: str) -> List[Dict]:
+        """
+        Filter and EXCLUDE documents that don't match connectivity query intent.
+        For connectivity queries (WiFi, Connect-W, unit bağlantısı), remove docs
+        that don't contain any connectivity-related keywords.
+        
+        This prevents high-similarity but irrelevant docs like "Spring loaded shaft"
+        from appearing in WiFi connection results.
+        
+        Args:
+            docs: Retrieved documents
+            query: Original user query
+            
+        Returns:
+            Filtered documents list (irrelevant docs removed)
+        """
+        query_lower = query.lower()
+        
+        # Check if this is a connectivity query
+        connectivity_triggers = [
+            'connect', 'bağla', 'wifi', 'wi-fi', 'network', 'ağ', 
+            'pairing', 'eşleştir', 'unit', 'ünite', 'controller',
+            'access point', 'cvi', 'ethernet'
+        ]
+        
+        is_connectivity_query = any(kw in query_lower for kw in connectivity_triggers)
+        
+        if not is_connectivity_query:
+            return docs
+        
+        # Keywords that indicate connectivity-relevant content
+        connectivity_content_keywords = [
+            'wifi', 'wi-fi', 'wireless', 'wireless connection', 
+            'network setup', 'network configuration', 'ethernet connection',
+            'connect-w', 'connect-x', 'connect unit', 'connect module',
+            'access point', 'ap mode', 'ip address', 'mac address', 'ssid',
+            'wifi setup', 'wifi connection', 'wifi configuration',
+            'wireless network', 'network settings', 'bağlantı ayarları',
+            'odin-w2', 'firmware upgrade', 'usb connection', 'edock',
+            'communication settings', 'pairing mode', 'rfid'
+        ]
+        
+        # Source name keywords that indicate connectivity docs
+        connectivity_source_keywords = [
+            'connect', 'wifi', 'network', 'wireless',
+            'ethernet', 'odin', 'communication settings'
+        ]
+        
+        # NEGATIVE keywords - docs with these in source name are NOT about connectivity
+        # even if they contain some connectivity-related words
+        non_connectivity_source_keywords = [
+            'transducer', 'calibration', 'motor align', 'maintenance guide',
+            'vnc', 'remote control', 'torque test', 'angle test'
+        ]
+        
+        filtered_docs = []
+        excluded_count = 0
+        
+        for doc in docs:
+            content = doc.get('text', '').lower()
+            source = doc.get('metadata', {}).get('source', '').lower()
+            family = doc.get('metadata', {}).get('product_family', '')
+            is_generic = doc.get('metadata', {}).get('is_generic', False)
+            
+            # FIRST: Check for negative keywords in source name
+            # These docs are NOT about connectivity setup, exclude them
+            has_negative_keywords = any(
+                kw in source for kw in non_connectivity_source_keywords
+            )
+            if has_negative_keywords:
+                excluded_count += 1
+                logger.debug(f"[CONNECTIVITY_FILTER] Excluded (negative match): {source}")
+                continue
+            
+            # Check if doc has any connectivity keywords in content
+            has_content_keywords = any(
+                kw in content for kw in connectivity_content_keywords
+            )
+            
+            # Check if source name indicates connectivity
+            has_source_keywords = any(
+                kw in source for kw in connectivity_source_keywords
+            )
+            
+            # If doc is from controller families, check for connectivity content
+            # (prevents irrelevant CVI3 docs like "transducer test" from appearing)
+            if family in ['CONNECT', 'CVI3', 'CVIC', 'CVIR', 'CVIL', 'AXON', 'ESP']:
+                # CONNECT family docs are usually all connectivity-related, keep them
+                if family == 'CONNECT':
+                    filtered_docs.append(doc)
+                    continue
+                # For other controller families (CVI3 etc.), check for connectivity keywords
+                if has_content_keywords or has_source_keywords:
+                    filtered_docs.append(doc)
+                    continue
+                else:
+                    # CVI3 doc without connectivity keywords - exclude it
+                    excluded_count += 1
+                    logger.debug(f"[CONNECTIVITY_FILTER] Excluded controller doc: {source} (no connectivity keywords)")
+                    continue
+            
+            # If has connectivity keywords, keep
+            if has_content_keywords or has_source_keywords:
+                filtered_docs.append(doc)
+                continue
+            
+            # If generic/unknown and no connectivity keywords, EXCLUDE
+            if family in ['UNKNOWN', 'GENERAL'] or is_generic:
+                excluded_count += 1
+                logger.debug(f"[CONNECTIVITY_FILTER] Excluded: {source} (no connectivity keywords)")
+                continue
+            
+            # Keep docs from specific product families even without keywords
+            # (might be product-specific instructions)
+            filtered_docs.append(doc)
+        
+        if excluded_count > 0:
+            logger.info(f"[CONNECTIVITY_FILTER] Excluded {excluded_count} irrelevant docs for connectivity query")
+        
+        return filtered_docs
     
     def _filter_by_product_capabilities(self, docs: List[Dict], capabilities: Dict) -> List[Dict]:
         """
@@ -346,6 +765,10 @@ class RAGEngine:
             'EABS': 'EAB',                  # EABS -> EAB (Standalone)
         }
         
+        # Controller families should NEVER be excluded
+        # These contain tool-unit connection documentation
+        CONTROLLER_FAMILIES = {'CONNECT', 'CVI3', 'CVIC', 'CVIR', 'CVIL', 'AXON', 'ESP'}
+        
         # Get all matching families (target + aliases)
         matching_families = {target_family}
         if target_family in FAMILY_ALIASES:
@@ -368,15 +791,24 @@ class RAGEngine:
             detected_family = None
             
             # Method 1: Check metadata product_family
+            # IMPORTANT: Skip controller families - they should NEVER be excluded
+            # as they contain tool-unit connection documentation
             if doc_family and doc_family.upper() not in matching_families:
-                if doc_family.upper() in PRODUCT_FAMILIES:
+                doc_family_upper = doc_family.upper()
+                # Don't exclude if it's a controller family
+                if doc_family_upper in CONTROLLER_FAMILIES:
+                    pass  # Keep controller docs
+                elif doc_family_upper in PRODUCT_FAMILIES:
                     is_other_product = True
-                    detected_family = doc_family.upper()
+                    detected_family = doc_family_upper
             
             # Method 2: Check content for other product families
             if not is_other_product and target_family:
                 for family in PRODUCT_FAMILIES:
                     if family in matching_families:
+                        continue
+                    # IMPORTANT: Skip controller families - they should NEVER be excluded
+                    if family in CONTROLLER_FAMILIES:
                         continue
                     # Check if document is PRIMARILY about another product
                     # (appears in source name or 3+ times in content)
@@ -768,16 +1200,37 @@ class RAGEngine:
             logger.info("[FILTER] No product context detected - searching all documents")
             return None
         
+        # NEW: Check if query is about connectivity/controller/unit
+        # If so, include controller product families in filter
+        connectivity_keywords = [
+            'connect', 'bağla', 'bağlantı', 'connection', 'wifi', 'wi-fi',
+            'network', 'ağ', 'pairing', 'eşleştir', 'setup', 'kurulum',
+            'unit', 'ünite', 'controller', 'kontrol', 'cvi', 'cvic', 'cvir', 'cvil',
+            'access point', 'ap', 'ethernet', 'cable', 'kablo'
+        ]
+        
+        query_lower = query.lower()
+        is_connectivity_query = any(kw in query_lower for kw in connectivity_keywords)
+        
+        # Controller product families that contain tool-unit connection documentation
+        controller_families = ['CONNECT', 'CVI3', 'CVIC', 'CVIR', 'CVIL', 'AXON', 'ESP']
+        
         # Build ChromaDB where filter
         # Include: matching family + GENERAL (generic docs) + UNKNOWN (unclassified)
-        where_filter = {
-            "$or": [
-                {"product_family": {"$eq": detected_family}},
-                {"product_family": {"$eq": "GENERAL"}},
-                {"product_family": {"$eq": "UNKNOWN"}},
-                {"is_generic": {"$eq": True}}
-            ]
-        }
+        filter_conditions = [
+            {"product_family": {"$eq": detected_family}},
+            {"product_family": {"$eq": "GENERAL"}},
+            {"product_family": {"$eq": "UNKNOWN"}},
+            {"is_generic": {"$eq": True}}
+        ]
+        
+        # NEW: Add controller families for connectivity queries
+        if is_connectivity_query:
+            for ctrl_family in controller_families:
+                filter_conditions.append({"product_family": {"$eq": ctrl_family}})
+            logger.info(f"[FILTER] Connectivity query detected - including controller families: {controller_families}")
+        
+        where_filter = {"$or": filter_conditions}
         
         logger.info(f"[FILTER] Applying filter for family: {detected_family}")
         return where_filter
@@ -1317,13 +1770,52 @@ class RAGEngine:
         if capabilities.get('product_found'):
             logger.info(f"[CAPABILITIES] wireless={capabilities.get('wireless')}, battery={capabilities.get('battery_powered')}")
         
-        # Retrieve relevant context (always try RAG even if product not found)
+        # Build product filter for ChromaDB
+        product_filter = self._build_product_filter(enhanced_query, product_info)
+        
+        # =====================================================================
+        # DUAL-PATH RETRIEVAL (Phase 1 - Bulletin Priority)
+        # Path A: Retrieve bulletins separately to ensure they're not drowned out
+        # Path B: General retrieval for manual content
+        # =====================================================================
+        
+        # Path A: Dedicated bulletin retrieval
+        bulletin_docs = self._retrieve_bulletins_separately(
+            query=fault_description,  # Use original query for bulletins
+            product_filter=product_filter,
+            max_bulletins=3
+        )
+        
+        # Path B: General context retrieval
         context_result = self.retrieve_context(
             query=enhanced_query,
             part_number=actual_part_number
         )
+        general_docs = context_result["documents"]
         
-        retrieved_docs = context_result["documents"]
+        # Path C: Controller docs retrieval (for connectivity queries)
+        # Check if this is a connectivity query
+        connectivity_keywords = [
+            'connect', 'bağla', 'wifi', 'wi-fi', 'network', 'ağ', 
+            'pairing', 'eşleştir', 'unit', 'ünite', 'controller',
+            'access point', 'cvi', 'ethernet', 'edock', 'rfid'
+        ]
+        is_connectivity_query = any(kw in fault_description.lower() for kw in connectivity_keywords)
+        
+        controller_docs = []
+        if is_connectivity_query:
+            controller_docs = self._retrieve_controller_docs_separately(
+                query=fault_description,
+                max_controller_docs=3
+            )
+        
+        # Merge all results with priority: bulletins > controller > general
+        all_dedicated_docs = bulletin_docs + controller_docs
+        retrieved_docs = self._merge_with_bulletin_priority(
+            bulletin_docs=all_dedicated_docs,
+            general_docs=general_docs,
+            max_results=RAG_TOP_K * 2
+        )
         
         # =====================================================================
         # STRICT PRODUCT FILTERING (Priority 1 - Production Quality)
@@ -1338,6 +1830,14 @@ class RAGEngine:
         if capabilities.get('product_found'):
             retrieved_docs = self._filter_by_product_capabilities(retrieved_docs, capabilities)
         
+        # =====================================================================
+        # CONNECTIVITY QUERY RELEVANCE (Priority 3 - Demote Irrelevant Docs)
+        # For WiFi/Connect/Unit queries, demote docs without connectivity keywords
+        # =====================================================================
+        retrieved_docs = self._filter_connectivity_relevance(retrieved_docs, fault_description)
+        
+        # Re-sort by boosted score after connectivity demotion
+        retrieved_docs.sort(key=lambda x: x.get('boosted_score', x.get('similarity', 0)), reverse=True)
         # Apply learning: filter out excluded sources (for retry)
         all_excluded = set(excluded_sources or []) | set(learned_context.get("exclude_sources", []))
         if all_excluded:
