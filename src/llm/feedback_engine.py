@@ -187,7 +187,7 @@ class FeedbackLearningEngine:
             part_number=diagnosis["part_number"],
             fault_description=diagnosis["fault_description"],
             suggestion=diagnosis["suggestion"],
-            sources_used=[s.get("source", "") for s in diagnosis.get("sources", [])],
+            sources_used=diagnosis.get("sources", []),  # Sources are now List[str]
             feedback_type=feedback_type,
             negative_reason=negative_reason,
             user_comment=user_comment,

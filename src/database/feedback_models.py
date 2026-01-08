@@ -127,7 +127,7 @@ class DiagnosisHistory(BaseModel):
     # Response info
     suggestion: str
     confidence: str
-    sources: List[dict] = Field(default=[])
+    sources: List[str] = Field(default=[])  # List of source document names
     
     # User info
     username: str
@@ -144,6 +144,7 @@ class DiagnosisHistory(BaseModel):
     # Metadata
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     response_time_ms: Optional[int] = None
+    metadata: Optional[dict] = Field(default=None, description="Additional context like sufficiency, intent")
     
     def to_dict(self) -> dict:
         return self.model_dump(exclude_none=True)
