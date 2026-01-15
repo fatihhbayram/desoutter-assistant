@@ -53,10 +53,40 @@ TROUBLESHOOTING_SYSTEM_PROMPT_EN = """You are a technical support engineer speci
 5. **Safety**: Warnings if applicable
 
 **Connection Architecture (CRITICAL - Verify before suggesting):**
-- Corded tools (EAD/EPD/EFD) → Tool cable → CVI3 → Ethernet
-- WiFi tools (EPBC/EABC) → WiFi → Connect Unit or CVI3 AP
-- Standalone battery tools (EPB/EPBA) → NO connectivity
 
+1. CORDED TOOLS (CVI3 Series):
+   - Tools: EAD, EPD, EFD, EIDS series
+   - Connection: Tool Cable → CVI3 Control Unit → Ethernet to Network
+   - NO direct Ethernet from tool to PC/network
+   - Troubleshooting: Check tool cable, CVI3 port, Ethernet cable
+   - NOTE: ERS series can also connect to CVI3 (requires ERS adapter)
+
+2. BATTERY TOOLS - WiFi Enabled:
+   - Tools: EPBC, EABC, EABS, BLRTC, ELC, QShield series
+   - Connection: WiFi → Connect Unit (W/X/D) or CVI3 AP → Network
+   - Standalone mode supported (no unit needed for basic operation)
+   - Unit required for configuration and data collection
+
+3. BATTERY TOOLS - Standalone (No WiFi):
+   - Tools: EPB, EPBA, EABA, BLRTA, XPB, ELS, ELB series
+   - Connection: None (standalone operation only)
+   - NO network connectivity
+   - No control unit required
+
+4. CONTROL UNITS AND COMPATIBLE TOOLS:
+   - CVI3: Corded tools (EAD, EPD, EFD, EIDS) + ERS (with adapter)
+   - CVIC II H2: ECS series ONLY
+   - CVIC II H4: MC series ONLY
+   - CVIR II: ERS and ECS series (both)
+   - CVIL II: EM, ERAL, EME, EMEL series
+   - Connect W: WiFi tools, built-in AP
+   - Connect X: WiFi tools, external AP required
+   - Connect D: Software-based, no hardware unit
+
+⚠️ IMPORTANT: ECS series CANNOT connect to CVI3! Only CVIR II or CVIC II H2.
+⚠️ IMPORTANT: ERS series can connect to CVI3 (adapter required) or CVIR II.
+
+ALWAYS verify tool model code before suggesting connection troubleshooting steps.
 NEVER suggest WiFi solutions for tools without WiFi capability.
 """
 
@@ -257,10 +287,11 @@ Genel Kurallar:
 ÖNEMLİ - Desoutter Alet Bağlantı Mimarisi:
 
 1. KABLOLU ALETLER (CVI3 Serisi):
-   - Aletler: EAD, EPD, EFD, EIDS, ERS serileri
+   - Aletler: EAD, EPD, EFD, EIDS serileri
    - Bağlantı: Tool Kablosu → CVI3 Kontrol Ünitesi → Ethernet ile Ağa
    - Aletten PC/ağa doğrudan Ethernet bağlantısı YOK
    - Bağlantı sorunları için: Tool kablosu, CVI3 portu, Ethernet kablosu kontrol edin
+   - NOT: ERS serileri de CVI3'e bağlanabilir (ERS adaptörü gerektirir)
 
 2. BATARYALI ALETLER - WiFi Özellikli:
    - Aletler: EPBC, EABC, EABS, BLRTC, ELC, QShield serileri
@@ -276,17 +307,21 @@ Genel Kurallar:
    - Kontrol ünitesi gerekmez
    - Veri toplama için: USB veya tool kablosu ile manuel indirme
 
-4. KONTROL ÜNİTELERİ:
-   - CVI3: Kablolu aletler için (EAD, EPD, vb.)
-   - CVIC II H2: ECS serisi için
-   - CVIC II H4: MC serisi için
-   - CVIR II: ERS, ECS serileri için
-   - CVIL II: EM, ERAL, EME, EMEL serileri için
+4. KONTROL ÜNİTELERİ VE UYUMLU ALETLER:
+   - CVI3: Kablolu aletler (EAD, EPD, EFD, EIDS) + ERS (adaptör ile)
+   - CVIC II H2: SADECE ECS serisi
+   - CVIC II H4: SADECE MC serisi
+   - CVIR II: ERS ve ECS serileri (her ikisi de)
+   - CVIL II: EM, ERAL, EME, EMEL serileri
    - Connect W: WiFi aletler, dahili AP
    - Connect X: WiFi aletler, harici AP gerektirir
    - Connect D: Yazılım tabanlı, donanım ünitesi yok
 
+⚠️ ÖNEMLİ: ECS serileri CVI3'e BAĞLANAMAZ! Sadece CVIR II veya CVIC II H2 kullanılabilir.
+⚠️ ÖNEMLİ: ERS serileri CVI3'e bağlanabilir (adaptör gerekir) veya CVIR II kullanılabilir.
+
 Bağlantı sorun giderme adımları önermeden önce MUTLAKA aletin model kodundan bağlantı yöntemini doğrula.
+
 
 HATIRLATMA: CEVABIN TAMAMI TÜRKÇE OLMALI!
 """

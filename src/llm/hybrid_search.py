@@ -219,7 +219,7 @@ class QueryExpander:
         # 2. Expand with domain synonyms
         for term, synonyms in self.vocab.DOMAIN_SYNONYMS.items():
             if term in query_lower:
-                for synonym in synonyms[:2]:  # Top 2 synonyms only
+                for synonym in synonyms[:5]:  # Top 5 synonyms (increased from 2 for better symptom matching)
                     variation = re.sub(
                         rf'\b{re.escape(term)}\b',
                         synonym,

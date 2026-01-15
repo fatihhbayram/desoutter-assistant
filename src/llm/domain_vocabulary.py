@@ -89,6 +89,63 @@ class DomainVocabulary:
         # Components
         "transducer": ["transducer", "torque transducer", "strain gauge", "torque sensor"],
         "encoder": ["encoder", "resolver", "angle encoder", "rotation sensor"],
+        
+        # =========================================================================
+        # SYMPTOM SYNONYMS - Screen/Display/Controller Issues
+        # =========================================================================
+        # These help match user queries like "screen freeze" with bulletins about
+        # "infinite rebooting" or "not responding" - they're often related symptoms
+        # IMPORTANT: First 5 synonyms are most critical (used in query expansion)
+        
+        # Screen freeze symptoms (English) - reboot/restart FIRST for cross-symptom matching
+        "freeze": ["reboot", "rebooting", "restart", "restarting", "freeze", 
+                   "frozen", "freezing", "hang", "hung", "hanging", "stuck", 
+                   "not responding", "unresponsive", "locked up", "locked", "crash", "crashed"],
+        "freezing": ["reboot", "rebooting", "restart", "freeze", "freezing", 
+                     "frozen", "hang", "stuck", "unresponsive"],
+        "frozen": ["reboot", "rebooting", "restart", "freeze", "frozen", 
+                   "freezing", "hang", "stuck", "locked", "not responding"],
+        
+        # Hang/stuck symptoms
+        "hang": ["reboot", "rebooting", "hang", "hung", "hanging", 
+                 "freeze", "frozen", "stuck", "locked", "not responding", "unresponsive"],
+        "stuck": ["reboot", "rebooting", "stuck", "freeze", "frozen", 
+                  "hang", "locked", "jammed", "not responding"],
+        
+        # Unresponsive symptoms
+        "unresponsive": ["reboot", "rebooting", "unresponsive", "not responding", "no response", 
+                         "freeze", "frozen", "hang", "stuck", "dead"],
+        "not responding": ["reboot", "rebooting", "not responding", "unresponsive", "no response", 
+                           "freeze", "frozen", "hang", "stuck"],
+        
+        # Reboot/restart symptoms (often related to freeze)
+        "reboot": ["reboot", "rebooting", "restart", "restarting", "reset", 
+                   "freeze", "frozen", "hang", "crash", "boot loop", "infinite reboot", "resetting"],
+        "rebooting": ["rebooting", "reboot", "restart", "restarting", "boot loop", 
+                      "infinite reboot", "freeze", "crash"],
+        "restart": ["restart", "restarting", "reboot", "rebooting", "reset", 
+                    "freeze", "crash"],
+        
+        # Screen/display specific
+        "screen": ["screen", "display", "monitor", "LCD", "interface", "UI", "panel"],
+        "display": ["display", "screen", "monitor", "LCD", "interface", "panel"],
+        
+        # Turkish equivalents - Ekran donma/yanıt vermeme - reboot/restart FIRST
+        "donuyor": ["reboot", "restart", "yeniden başlatma", "donuyor", "dondu", 
+                    "donma", "yanıt vermiyor", "yanıtsız", "takıldı", "çöktü"],
+        "donma": ["reboot", "restart", "yeniden başlatma", "donma", "donuyor", 
+                  "dondu", "yanıt vermiyor", "takılma", "kilitleme"],
+        "dondu": ["reboot", "restart", "yeniden başlatma", "dondu", "donma", 
+                  "donuyor", "yanıt vermiyor", "takıldı", "kilitlendi"],
+        "yanıt vermiyor": ["reboot", "restart", "yeniden başlatma", "yanıt vermiyor", "yanıtsız", 
+                           "cevap vermiyor", "dondu", "donma", "takıldı"],
+        "takıldı": ["reboot", "restart", "takıldı", "takılma", "dondu", 
+                    "donma", "yanıt vermiyor", "kilitlendi"],
+        "yeniden başlatma": ["yeniden başlatma", "restart", "reboot", "donma", "dondu", "çöküş"],
+        
+        # Ekran/görüntü (Turkish screen/display)
+        "ekran": ["ekran", "görüntü", "display", "screen", "panel", "arayüz"],
+        "görüntü": ["görüntü", "ekran", "display", "screen"],
     }
     
     # -------------------------------------------------------------------------

@@ -87,8 +87,8 @@ class IntelligentProductExtractor:
         (r'\b(ESP\d*[-\w]*)\b', 'CONTROLLER'),
         (r'\b(AXON\d*[-\w]*)\b', 'CONTROLLER'),
         
-        # Ecosystem: Connect-W, Connect-X, Smart Hub
-        (r'\b(CONNECT[-]?[WX]\w*)\b', 'ECOSYSTEM'),
+        # Ecosystem: Connect, Connect-W, Connect-X, Connect-D, Smart Hub
+        (r'\b(CONNECT[-]?[WDXC]?\w*)\b', 'ECOSYSTEM'),  # Matches CONNECT, CONNECT-W, CONNECT-X, CONNECT-D
         (r'\b(C[-]?[WX]\d*)\b', 'ECOSYSTEM'),
         (r'\b(SMART\s*HUB\w*)\b', 'ECOSYSTEM'),
         

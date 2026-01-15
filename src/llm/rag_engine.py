@@ -335,21 +335,32 @@ class RAGEngine:
         # Known product family prefixes that are mutually exclusive
         PRODUCT_FAMILIES = {
             'EAD', 'EPD', 'EFD', 'ERS', 'ECS', 'EPB', 'EPBC', 'EABC', 'EABS',
-            'CVI', 'CVIL', 'CVIR', 'CVIC', 'DVT', 'QST', 'PF', 'CONNECT',
+            'CVI', 'CVIL', 'CVIR', 'CVIC', 'DVT', 'QST', 'PF', 
+            'CONNECT', 'CONNECT-W', 'CONNECT-X', 'CONNECT-D',  # CONNECT family variants
             'ELC', 'ELS', 'ELB', 'BLRT', 'XPB', 'EM', 'ERAL', 'EME', 'EMEL'
         }
         
         # WiFi variants map to their base family (C suffix = WiFi)
+        # CONNECT variants are all interchangeable (W/X/D are deployment types, not different products)
+        # Using list format for consistency and multi-directional mapping
         FAMILY_ALIASES = {
-            'EPBC': 'EPB', 'EPB': 'EPBC',  # EPB <-> EPBC (WiFi)
-            'EABC': 'EAB', 'EAB': 'EABC',  # EAB <-> EABC (WiFi)
-            'EABS': 'EAB',                  # EABS -> EAB (Standalone)
+            'EPBC': ['EPB'], 'EPB': ['EPBC'],  # EPB <-> EPBC (WiFi)
+            'EABC': ['EAB'], 'EAB': ['EABC'],  # EAB <-> EABC (WiFi)
+            'EABS': ['EAB', 'EABC'],            # EABS -> EAB family
+            # CONNECT family - all variants share same bulletins
+            'CONNECT-W': ['CONNECT', 'CONNECT-X', 'CONNECT-D'],
+            'CONNECT-X': ['CONNECT', 'CONNECT-W', 'CONNECT-D'],
+            'CONNECT-D': ['CONNECT', 'CONNECT-W', 'CONNECT-X'],
+            'CONNECT': ['CONNECT-W', 'CONNECT-X', 'CONNECT-D'],
         }
+        
         
         # Get all matching families (target + aliases)
         matching_families = {target_family}
         if target_family in FAMILY_ALIASES:
-            matching_families.add(FAMILY_ALIASES[target_family])
+            matching_families.update(FAMILY_ALIASES[target_family])
+        
+        
         
         filtered = []
         excluded_count = 0
@@ -779,6 +790,7 @@ class RAGEngine:
         # Include: matching family + aliases + GENERAL (generic docs) + UNKNOWN (unclassified)
         
         # Family aliases for cross-product retrieval
+        # CONNECT variants are all interchangeable (W/X/D are deployment types, not different products)
         FAMILY_ALIASES = {
             'EPBC': ['EPB'], 'EPB': ['EPBC'],  # EPB/EPBC are interchangeable
             'EABC': ['EAB'], 'EAB': ['EABC'],  # EAB/EABC are interchangeable
@@ -786,6 +798,11 @@ class RAGEngine:
             'ERS': ['ERSA', 'ERSF'],            # ERS variants
             'ERSA': ['ERS', 'ERSF'],
             'ERSF': ['ERS', 'ERSA'],
+            # CONNECT family - all variants share same bulletins
+            'CONNECT-W': ['CONNECT', 'CONNECT-X', 'CONNECT-D'],
+            'CONNECT-X': ['CONNECT', 'CONNECT-W', 'CONNECT-D'],
+            'CONNECT-D': ['CONNECT', 'CONNECT-W', 'CONNECT-X'],
+            'CONNECT': ['CONNECT-W', 'CONNECT-X', 'CONNECT-D'],
         }
         
         # Start with detected family
