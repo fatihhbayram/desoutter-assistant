@@ -6,6 +6,7 @@
       dockerfile: Dockerfile
     container_name: desoutter-api
     restart: unless-stopped
+    runtime: nvidia
     ports:
       - "0.0.0.0:8000:8000"
     volumes:
@@ -30,6 +31,9 @@
       - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
       - EMBEDDING_DEVICE=cuda
       - EMBEDDING_BATCH_SIZE=64
+      
+      # GPU Configuration
+      - NVIDIA_VISIBLE_DEVICES=all
       
       # RAG
       - RAG_TOP_K=5
@@ -59,6 +63,13 @@
       timeout: 10s
       retries: 3
       start_period: 60s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
 # Add volume
 volumes:
