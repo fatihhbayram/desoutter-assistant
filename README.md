@@ -17,7 +17,7 @@ An intelligent **Retrieval-Augmented Generation (RAG)** system that provides con
 
 When a technician encounters an issue with a Desoutter tool:
 
-1. **Asks a question**: "My EPB 400-110 shows error code E06"
+1. **Asks a question**: "My EPBC8-1800-4Q shows error code E018"
 2. **System searches**: Finds relevant information from 28,000+ document chunks
 3. **Generates response**: AI-powered solution with cited sources
 4. **Learns**: Continuously improves from user feedback
@@ -25,7 +25,7 @@ When a technician encounters an issue with a Desoutter tool:
 ```
 ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
 │    Technician    │────▶│  Desoutter AI    │────▶│ Solution + Sources│
-│   "E06 error"    │     │  (14-stage RAG)  │     │  Confidence: 89%  │
+│   "E018 error"   │     │  (14-stage RAG)  │     │  Confidence: 89%  │
 └──────────────────┘     └──────────────────┘     └──────────────────┘
 ```
 
@@ -326,8 +326,8 @@ curl -X POST http://localhost:8000/diagnose \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
-    "part_number": "6151659770",
-    "fault_description": "motor not starting, error code E06",
+    "part_number": "6151659000",
+    "fault_description": "motor not starting, error code E018",
     "language": "en"
   }'
 ```
@@ -336,13 +336,13 @@ curl -X POST http://localhost:8000/diagnose \
 
 ```json
 {
-  "suggestion": "Error code E06 indicates motor overload protection triggered. Check the following:\n1. Verify motor current is below 12A threshold\n2. Inspect cooling vents for blockage\n3. Allow 5-minute cool-down before restart...",
+  "suggestion": "Error code E018 indicates motor overload protection triggered. Check the following:\n1. Verify motor current is below 12A threshold\n2. Inspect cooling vents for blockage\n3. Allow 5-minute cool-down before restart...",
   "confidence": 0.89,
   "sources": [
     {
       "document": "ESDE23029_Motor_Overload.pdf",
       "page": 3,
-      "snippet": "E06 error occurs when motor current exceeds 12A..."
+      "snippet": "E018 error occurs when motor current exceeds 12A..."
     }
   ],
   "intent": "troubleshooting"
