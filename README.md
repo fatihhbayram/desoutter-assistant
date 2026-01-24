@@ -598,6 +598,7 @@ python scripts/test_product_filtering.py
 - [ ] Controller Units Scraping
 
 ### Planned (Q2 2026)
+- [ ] Field Installation Support (extend beyond repair to on-site tool setup and commissioning)
 - [ ] Qdrant Migration (10x scalability, 100M+ vectors)
 - [ ] Prompt Caching (40% latency reduction)
 - [ ] Async Ingestion Queue (Celery + Redis)
