@@ -40,6 +40,7 @@ When a technician encounters an issue with a Desoutter tool:
 - [API Reference](#api-reference)
 - [Usage Examples](#usage-examples)
 - [Performance Metrics](#performance-metrics)
+- [Feedback System](#feedback-system)
 - [Self-Learning System](#self-learning-system)
 - [Local Development](#local-development)
 - [Docker Services](#docker-services)
@@ -377,6 +378,79 @@ curl -X POST http://localhost:8000/diagnose \
 
 ---
 
+## Feedback System
+
+The feedback system is the foundation of continuous learning. Every user interaction helps improve future responses.
+
+### Feedback Interface
+
+After each AI response, users can submit feedback:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  AI Response: "Error E018 indicates transducer fault..."    │
+├─────────────────────────────────────────────────────────────┤
+│  Was this helpful?                                          │
+│                                                             │
+│  [ 👍 Helpful ]    [ 👎 Not Helpful ]                       │
+│                                                             │
+│  Reason (optional):                                         │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ ○ Solved my problem                                  │   │
+│  │ ○ Partially helpful                                  │   │
+│  │ ○ Information was incorrect                          │   │
+│  │ ○ Missing important details                          │   │
+│  │ ○ Wrong product/context                              │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  Additional comments:                                       │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ [Free text input...]                                 │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  [ Submit Feedback ]                                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Feedback API
+
+```bash
+# Submit feedback
+curl -X POST http://localhost:8000/diagnose/feedback \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "diagnosis_id": "diag_abc123",
+    "rating": "helpful",
+    "reason": "solved_problem",
+    "comment": "The cable connector was indeed the issue",
+    "part_number": "6151659000"
+  }'
+```
+
+### Feedback Types
+
+| Rating | Description | System Action |
+|--------|-------------|---------------|
+| `helpful` | Response solved the problem | Boost source relevance, strengthen pattern |
+| `partially_helpful` | Some useful information | Minor boost, flag for review |
+| `not_helpful` | Response didn't help | Record negative signal, analyze gaps |
+| `incorrect` | Information was wrong | Flag sources, prevent future use |
+
+### Feedback Reasons
+
+| Reason Code | Description |
+|-------------|-------------|
+| `solved_problem` | Completely resolved the issue |
+| `partially_helpful` | Some parts were useful |
+| `incorrect_info` | Contains factual errors |
+| `missing_details` | Needs more specific information |
+| `wrong_product` | Information for different product |
+| `outdated_info` | Information no longer applicable |
+| `too_generic` | Not specific enough for the problem |
+
+---
+
 ## Self-Learning System
 
 The system continuously learns from user feedback to improve response quality:
@@ -385,8 +459,8 @@ The system continuously learns from user feedback to improve response quality:
 User Query ──▶ RAG Retrieval ──▶ LLM Response ──▶ User Feedback
                                                         │
                                          ┌──────────────┴──────────────┐
-                                         │ Positive: Reinforce pattern │
-                                         │ Negative: Record to avoid   │
+                                         │ 👍 Positive: Reinforce      │
+                                         │ 👎 Negative: Record & avoid │
                                          └──────────────┬──────────────┘
                                                         │
                                                Wilson Score Ranking
@@ -398,18 +472,44 @@ User Query ──▶ RAG Retrieval ──▶ LLM Response ──▶ User Feedbac
 
 | Component | Purpose |
 |-----------|---------|
-| `DiagnosisFeedback` | Records all user feedback with context |
-| `LearnedMapping` | Stores successful fault-solution patterns |
-| `SourceRankingLearner` | Wilson score-based source prioritization |
+| `DiagnosisFeedback` | Records all user feedback with full context |
+| `LearnedMapping` | Stores successful fault→solution patterns |
+| `SourceRankingLearner` | Wilson score-based document prioritization |
 | `ContrastiveLearningManager` | Collects data for embedding fine-tuning |
 
-### How It Works
+### Wilson Score Ranking
 
-1. User submits feedback on a response
-2. System calculates Wilson score confidence interval
-3. Positive feedback strengthens source-query mappings
-4. Negative feedback is recorded to avoid similar patterns
-5. Future queries benefit from learned patterns with boosted relevance scores
+The system uses Wilson score confidence interval to rank sources reliably:
+
+```
+Wilson Score = (p + z²/2n - z√(p(1-p)/n + z²/4n²)) / (1 + z²/n)
+
+Where:
+- p = positive feedback ratio
+- n = total feedback count
+- z = 1.96 (95% confidence)
+```
+
+This prevents sources with few ratings from outranking well-tested sources.
+
+### How Self-Learning Works
+
+1. **Feedback Collection** - User submits 👍/👎 with optional reason and comment
+2. **Signal Processing** - System extracts query patterns, source IDs, and context
+3. **Score Update** - Wilson score recalculated for affected sources
+4. **Pattern Storage** - Successful fault→solution mappings saved to `learned_mappings`
+5. **Future Boost** - Matching patterns get relevance boost (up to 1.5x) in retrieval
+6. **Negative Avoidance** - Low-scoring sources deprioritized in results
+
+### Learning Metrics (Admin Dashboard)
+
+| Metric | Description |
+|--------|-------------|
+| Total Feedback | All-time feedback submissions |
+| Positive Rate | Percentage of helpful ratings |
+| Learning Events | Patterns learned this week |
+| Top Sources | Highest-rated documents |
+| Problem Areas | Topics needing improvement |
 
 ---
 
