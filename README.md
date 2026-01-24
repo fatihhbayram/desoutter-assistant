@@ -336,13 +336,13 @@ curl -X POST http://localhost:8000/diagnose \
 
 ```json
 {
-  "suggestion": "Error code E018 indicates motor overload protection triggered. Check the following:\n1. Verify motor current is below 12A threshold\n2. Inspect cooling vents for blockage\n3. Allow 5-minute cool-down before restart...",
+  "suggestion": "Error Code E018: Torque Out of Range!\n\nCause: The error code E018 indicates a transducer fault due to an incorrect cable assembly with the wrong connector.\n\nSolution:\n1. Check the cable assembly and connector compatibility\n2. Verify transducer connection is secure\n3. Replace cable if connector type is incorrect...",
   "confidence": 0.89,
   "sources": [
     {
-      "document": "ESDE23029_Motor_Overload.pdf",
+      "document": "CVI3_Error_Codes.pdf",
       "page": 3,
-      "snippet": "E018 error occurs when motor current exceeds 12A..."
+      "snippet": "E018 indicates transducer fault - check cable assembly connector type..."
     }
   ],
   "intent": "troubleshooting"
