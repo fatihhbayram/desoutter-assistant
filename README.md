@@ -340,7 +340,7 @@ curl -X POST http://localhost:8000/diagnose \
   "confidence": 0.89,
   "sources": [
     {
-      "document": "CVI3_Error_Codes.pdf",
+      "document": "ESDE25004_ERS_range_EPB8_Transducer_Issue.pdf",
       "page": 3,
       "snippet": "E018 indicates transducer fault - check cable assembly connector type..."
     }
