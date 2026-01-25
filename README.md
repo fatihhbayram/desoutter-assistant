@@ -7,9 +7,9 @@
 [![React](https://img.shields.io/badge/React-18.2+-61DAFB?logo=react&logoColor=white)](https://reactjs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-96%25%20Passing-success)](test_results/)
+[![Tests](https://img.shields.io/badge/Tests-88%25%20Passing-success)](test_results/)
 
-An intelligent **Retrieval-Augmented Generation (RAG)** system that provides context-aware repair and troubleshooting assistance for Desoutter industrial tools. Features a self-learning feedback loop, 14-stage quality pipeline, and production-grade architecture achieving **96% test pass rate**.
+An intelligent **Retrieval-Augmented Generation (RAG)** system that provides context-aware repair and troubleshooting assistance for Desoutter industrial tools. Features a self-learning feedback loop, 14-stage quality pipeline, and production-grade architecture achieving **88% test pass rate**.
 
 ---
 
@@ -365,7 +365,7 @@ curl -X POST http://localhost:8000/diagnose \
 
 | Metric | Value |
 |--------|-------|
-| **Test Pass Rate** | 96% (24/25 scenarios) |
+| **Test Pass Rate** | 88% (22/25 scenarios) |
 | **Total Products** | 451 (71 wireless, 380 cable) |
 | **ChromaDB Chunks** | 28,414 semantic chunks |
 | **Indexed Documents** | 541 (121 PDF + 420 Word) |
@@ -685,7 +685,7 @@ python scripts/test_product_filtering.py
 ## Roadmap
 
 ### Completed (January 2026)
-- [x] 14-stage RAG Pipeline with 96% test pass rate
+- [x] 14-stage RAG Pipeline with 88% test pass rate
 - [x] Hybrid Search (BM25 + Semantic + RRF)
 - [x] Self-Learning Feedback Loop
 - [x] Multi-turn Conversation
