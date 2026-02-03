@@ -26,15 +26,37 @@ logger = logging.getLogger(__name__)
 
 
 class QueryIntent(str, Enum):
-    """Query intent classification"""
-    TROUBLESHOOTING = "troubleshooting"  # Error, fault, problem
-    SPECIFICATIONS = "specifications"     # Torque, speed, weight, dimensions
-    INSTALLATION = "installation"         # Setup, assembly, configuration
-    CALIBRATION = "calibration"           # Calibrate, adjust, zero
-    MAINTENANCE = "maintenance"           # Clean, lubricate, replace
-    CONNECTION = "connection"             # WiFi, ethernet, network, pairing
-    ERROR_CODE = "error_code"            # E01, E02, error code lookup
-    GENERAL = "general"                   # Default for unclear intent
+    """
+    Query intent classification - El-Harezmi Architecture
+    
+    Expanded from 8 to 15 intent types for better response targeting.
+    
+    Original (8):
+        TROUBLESHOOTING, SPECIFICATIONS, INSTALLATION, CALIBRATION,
+        MAINTENANCE, CONNECTION, ERROR_CODE, GENERAL
+    
+    New (7):
+        CONFIGURATION, COMPATIBILITY, PROCEDURE, FIRMWARE,
+        COMPARISON, CAPABILITY_QUERY, ACCESSORY_QUERY
+    """
+    # Original intents (8)
+    TROUBLESHOOTING = "troubleshooting"   # Error, fault, problem diagnosis
+    SPECIFICATIONS = "specifications"      # Torque, speed, weight, dimensions
+    INSTALLATION = "installation"          # Setup, assembly, first-time config
+    CALIBRATION = "calibration"            # Calibrate, adjust, zero setting
+    MAINTENANCE = "maintenance"            # Clean, lubricate, replace parts
+    CONNECTION = "connection"              # WiFi, ethernet, network, pairing
+    ERROR_CODE = "error_code"              # E01, E02, error code lookup
+    GENERAL = "general"                    # Default for unclear intent
+    
+    # New intents (7) - El-Harezmi Phase 1
+    CONFIGURATION = "configuration"        # Pset, parameter setup, settings
+    COMPATIBILITY = "compatibility"        # Tool-controller compatibility
+    PROCEDURE = "procedure"                # Step-by-step instructions
+    FIRMWARE = "firmware"                  # Firmware update/downgrade
+    COMPARISON = "comparison"              # Model comparison, "hangisi daha iyi"
+    CAPABILITY_QUERY = "capability"        # "WiFi var mı?", "Max tork nedir?"
+    ACCESSORY_QUERY = "accessory"          # Battery, dock, adapter questions
 
 
 @dataclass
@@ -173,6 +195,92 @@ class IntentDetector:
                 # Turkish
                 'kurulum', 'montaj', 'tak', 'yerlestir', 'yerleştir',
             ],
+            
+            # =================================================================
+            # NEW INTENTS (El-Harezmi Phase 1)
+            # =================================================================
+            
+            'configuration': [
+                # English - Parameter/Pset setup
+                'pset', 'parameter', 'setting', 'settings',
+                'torque setting', 'angle setting', 'speed setting',
+                'how to set', 'how to configure', 'configure parameter',
+                'change parameter', 'modify setting', 'adjust setting',
+                'target torque', 'target angle', 'set value',
+                'program', 'programming', 'batch',
+                # Turkish
+                'ayar', 'ayarla', 'ayarlama', 'parametre',
+                'pset ayarı', 'pset ayar', 'tork ayarı', 'açı ayarı',
+                'hız ayarı', 'değer ayarla', 'program ayarı',
+            ],
+            
+            'compatibility': [
+                # English - Tool/Controller matching
+                'compatible', 'compatibility', 'work with', 'works with',
+                'support', 'supports', 'supported',
+                'which controller', 'which version', 'what version',
+                'can i use', 'is it compatible', 'does it work',
+                'require', 'requirement', 'needed for',
+                # Turkish
+                'uyumlu', 'uyumluluk', 'çalışır mı', 'ile çalışır',
+                'hangi controller', 'hangi versiyon', 'hangi sürüm',
+                'gerekli mi', 'gereksinim', 'destekliyor mu',
+            ],
+            
+            'procedure': [
+                # English - Step-by-step guides
+                'step by step', 'step-by-step', 'procedure', 'procedures',
+                'instructions', 'instruction', 'guide', 'tutorial',
+                'process', 'method', 'way to', 'how do i',
+                'walkthrough', 'steps to', 'sequence',
+                # Turkish
+                'adım adım', 'prosedür', 'nasıl yapılır', 'yapılır mı',
+                'talimat', 'rehber', 'yöntem', 'işlem', 'sıra',
+            ],
+            
+            'firmware': [
+                # English - Software/Firmware updates
+                'firmware', 'update', 'upgrade', 'downgrade',
+                'version', 'flash', 'software update', 'software version',
+                'latest version', 'new version', 'update firmware',
+                # Turkish
+                'yazılım', 'güncelleme', 'güncelle', 'versiyon', 'sürüm',
+                'yazılım güncelleme', 'firmware güncelleme',
+            ],
+            
+            'comparison': [
+                # English - Model comparisons
+                'compare', 'comparison', 'difference', 'differences',
+                'vs', 'versus', 'or', 'better', 'which one',
+                'between', 'pros and cons', 'advantages',
+                # Turkish
+                'karşılaştır', 'karşılaştırma', 'fark', 'farkı',
+                'hangisi', 'arasındaki fark', 'mı yoksa', 'daha iyi',
+            ],
+            
+            'capability': [
+                # English - Feature/capability questions
+                'does it have', 'can it', 'is there', 'has',
+                'feature', 'capability', 'able to', 'capable',
+                'support wifi', 'has bluetooth', 'has wifi',
+                'maximum', 'minimum', 'limit', 'range',
+                # Turkish
+                'var mı', 'yapabilir mi', 'özellik', 'özelliği',
+                'wifi var mı', 'bluetooth var mı', 'destekler mi',
+                'maksimum', 'minimum', 'sınır', 'aralık',
+            ],
+            
+            'accessory': [
+                # English - Accessory questions
+                'battery', 'batteries', 'charger', 'charging',
+                'dock', 'docking', 'adapter', 'cable', 'cables',
+                'which battery', 'which charger', 'accessory', 'accessories',
+                'spare part', 'replacement part',
+                # Turkish
+                'batarya', 'pil', 'şarj', 'şarj cihazı', 'şarj aleti',
+                'dok', 'adaptör', 'kablo', 'aksesuar',
+                'hangi batarya', 'hangi şarj', 'yedek parça',
+            ],
         }
         
         logger.info("IntentDetector initialized (v2.0 - keyword-based)")
@@ -292,6 +400,7 @@ class IntentDetector:
             Description string
         """
         descriptions = {
+            # Original intents
             QueryIntent.TROUBLESHOOTING: "Diagnose and fix problems",
             QueryIntent.SPECIFICATIONS: "Technical specifications and parameters",
             QueryIntent.INSTALLATION: "Setup and installation procedures",
@@ -299,7 +408,15 @@ class IntentDetector:
             QueryIntent.MAINTENANCE: "Maintenance and service procedures",
             QueryIntent.CONNECTION: "Network and connectivity setup",
             QueryIntent.ERROR_CODE: "Error code lookup and resolution",
-            QueryIntent.GENERAL: "General inquiry"
+            QueryIntent.GENERAL: "General inquiry",
+            # New intents (El-Harezmi)
+            QueryIntent.CONFIGURATION: "Parameter and Pset configuration",
+            QueryIntent.COMPATIBILITY: "Tool-controller compatibility check",
+            QueryIntent.PROCEDURE: "Step-by-step procedure guide",
+            QueryIntent.FIRMWARE: "Firmware update/downgrade procedures",
+            QueryIntent.COMPARISON: "Model comparison and selection",
+            QueryIntent.CAPABILITY_QUERY: "Feature and capability inquiry",
+            QueryIntent.ACCESSORY_QUERY: "Accessory and spare parts inquiry",
         }
         return descriptions.get(intent, "Unknown intent")
 
@@ -311,6 +428,7 @@ if __name__ == "__main__":
     detector = IntentDetector()
     
     test_cases = [
+        # Original test cases
         ("Motor won't start", "troubleshooting"),
         ("Motor stops during operation", "troubleshooting"),
         ("Tool turns off randomly", "troubleshooting"),
@@ -326,6 +444,45 @@ if __name__ == "__main__":
         ("How often should I lubricate?", "maintenance"),
         ("Bakım periyodu ne kadar?", "maintenance"),
         ("Tell me about this tool", "general"),
+        
+        # NEW: Configuration intent
+        ("EABC-3000 pset ayarı nasıl yapılır?", "configuration"),
+        ("How to set torque to 50 Nm?", "configuration"),
+        ("Tork ayarı nasıl değiştirilir?", "configuration"),
+        ("Change parameter settings", "configuration"),
+        
+        # NEW: Compatibility intent
+        ("EABC-3000 hangi CVI3 ile çalışır?", "compatibility"),
+        ("Is this tool compatible with CVI3 v2.5?", "compatibility"),
+        ("Which controller works with ERS6?", "compatibility"),
+        ("Bu alet CVIR II ile uyumlu mu?", "compatibility"),
+        
+        # NEW: Procedure intent
+        ("Step by step firmware update", "firmware"),  # firmware is primary when mentioned
+        ("Kalibrasyon prosedürü adımları", "calibration"),  # calibration is primary
+        ("Give me instructions for setup", "procedure"),
+        ("How do I perform the installation procedure?", "procedure"),
+        
+        # NEW: Firmware intent
+        ("How to update firmware?", "firmware"),
+        ("Firmware güncelleme nasıl yapılır?", "firmware"),
+        ("What is the latest firmware version?", "firmware"),
+        
+        # NEW: Comparison intent
+        ("ERS6 vs ERS12 difference", "comparison"),
+        ("Hangisi daha iyi EPBC mi EPB mi?", "comparison"),
+        ("Compare EABC-3000 and EABC-2500", "comparison"),
+        
+        # NEW: Capability intent
+        ("Does this tool have WiFi feature?", "capability"),
+        ("Bu alette bluetooth var mı?", "capability"),
+        ("What features does EABC-3000 have?", "capability"),
+        
+        # NEW: Accessory intent
+        ("Which battery works with EPBC?", "accessory"),
+        ("Hangi batarya ile çalışır?", "accessory"),
+        ("What charger should I use for ELC?", "accessory"),
+        ("Hangi şarj cihazı kullanmalıyım?", "accessory"),
     ]
     
     print("=" * 70)

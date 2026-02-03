@@ -1,0 +1,288 @@
+{
+  "timestamp": "2026-01-25T16:40:08.462733",
+  "summary": {
+    "total_tests": 25,
+    "passed": 22,
+    "failed": 1,
+    "errors": 2,
+    "pass_rate": 88.0
+  },
+  "timing": {
+    "total_time_ms": 626280,
+    "avg_response_time_ms": 22006.260869565216,
+    "min_response_time_ms": 2,
+    "max_response_time_ms": 39718
+  },
+  "by_intent": {
+    "troubleshooting": {
+      "total": 5,
+      "passed": 4,
+      "failed": 1
+    },
+    "error_code": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0
+    },
+    "specifications": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "connection": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "maintenance": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0
+    },
+    "calibration": {
+      "total": 2,
+      "passed": 0,
+      "failed": 2
+    },
+    "general": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    "installation": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  "by_category": {
+    "basic": {
+      "total": 19,
+      "passed": 16,
+      "failed": 3
+    },
+    "language": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "edge_case": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "failed_tests": [
+    "TROUBLE_002",
+    "CALIB_001",
+    "CALIB_002"
+  ],
+  "results": [
+    {
+      "query_id": "TROUBLE_001",
+      "passed": true,
+      "response_time_ms": 21352,
+      "confidence": "high",
+      "intent": "troubleshooting",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "TROUBLE_002",
+      "passed": false,
+      "response_time_ms": 17822,
+      "confidence": "medium",
+      "intent": "troubleshooting",
+      "failure_reasons": [
+        "Missing required terms: ['temperature']"
+      ]
+    },
+    {
+      "query_id": "TROUBLE_003",
+      "passed": true,
+      "response_time_ms": 17265,
+      "confidence": "high",
+      "intent": "troubleshooting",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "TROUBLE_004",
+      "passed": true,
+      "response_time_ms": 31110,
+      "confidence": "high",
+      "intent": "troubleshooting",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "TROUBLE_005",
+      "passed": true,
+      "response_time_ms": 19984,
+      "confidence": "high",
+      "intent": "troubleshooting",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "ERROR_001",
+      "passed": true,
+      "response_time_ms": 10393,
+      "confidence": "high",
+      "intent": "error_code",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "ERROR_002",
+      "passed": true,
+      "response_time_ms": 8033,
+      "confidence": "medium",
+      "intent": "error_code",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "ERROR_003",
+      "passed": true,
+      "response_time_ms": 8108,
+      "confidence": "high",
+      "intent": "error_code",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "ERROR_004",
+      "passed": true,
+      "response_time_ms": 24978,
+      "confidence": "high",
+      "intent": "error_code",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "SPEC_001",
+      "passed": true,
+      "response_time_ms": 23721,
+      "confidence": "high",
+      "intent": "specifications",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "SPEC_002",
+      "passed": true,
+      "response_time_ms": 39718,
+      "confidence": "high",
+      "intent": "specifications",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "SPEC_003",
+      "passed": true,
+      "response_time_ms": 32825,
+      "confidence": "high",
+      "intent": "specifications",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "CONN_001",
+      "passed": true,
+      "response_time_ms": 38178,
+      "confidence": "high",
+      "intent": "connection",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "CONN_002",
+      "passed": true,
+      "response_time_ms": 38345,
+      "confidence": "medium",
+      "intent": "connection",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "CONN_003",
+      "passed": true,
+      "response_time_ms": 39309,
+      "confidence": "high",
+      "intent": "connection",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "MAINT_001",
+      "passed": true,
+      "response_time_ms": 23602,
+      "confidence": "medium",
+      "intent": "maintenance",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "MAINT_002",
+      "passed": true,
+      "response_time_ms": 30815,
+      "confidence": "high",
+      "intent": "maintenance",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "CALIB_001",
+      "passed": false,
+      "response_time_ms": 0,
+      "confidence": null,
+      "intent": null,
+      "failure_reasons": [
+        "Timeout"
+      ]
+    },
+    {
+      "query_id": "CALIB_002",
+      "passed": false,
+      "response_time_ms": 0,
+      "confidence": null,
+      "intent": null,
+      "failure_reasons": [
+        "Timeout"
+      ]
+    },
+    {
+      "query_id": "GEN_001",
+      "passed": true,
+      "response_time_ms": 28955,
+      "confidence": "high",
+      "intent": "general",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "GEN_002",
+      "passed": true,
+      "response_time_ms": 31820,
+      "confidence": "high",
+      "intent": "general",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "IDK_001",
+      "passed": true,
+      "response_time_ms": 3,
+      "confidence": "insufficient_context",
+      "intent": "general",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "IDK_002",
+      "passed": true,
+      "response_time_ms": 2,
+      "confidence": "insufficient_context",
+      "intent": "general",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "IDK_003",
+      "passed": true,
+      "response_time_ms": 2,
+      "confidence": "insufficient_context",
+      "intent": "general",
+      "failure_reasons": []
+    },
+    {
+      "query_id": "INSTALL_001",
+      "passed": true,
+      "response_time_ms": 19804,
+      "confidence": "high",
+      "intent": "installation",
+      "failure_reasons": []
+    }
+  ]
+}

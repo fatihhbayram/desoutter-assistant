@@ -27,3 +27,4 @@ PyPDF2==3.0.1
 # Testing (optional)
 pytest==7.4.3
 pytest-asyncio==0.21.1
+qdrant-client>=1.7.0
