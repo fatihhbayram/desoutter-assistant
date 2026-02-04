@@ -40,7 +40,8 @@ try:
         PayloadSchemaType, TextIndexParams, TokenizerType,
         OptimizersConfigDiff, HnswConfigDiff,
         SearchParams, QuantizationSearchParams,
-        ScoredPoint, UpdateStatus
+        ScoredPoint, UpdateStatus,
+        ScalarQuantization, ScalarQuantizationConfig, ScalarType
     )
     QDRANT_AVAILABLE = True
 except ImportError:
@@ -138,7 +139,15 @@ class QdrantDBClient:
                 vectors_config={
                     "dense": VectorParams(
                         size=VECTOR_SIZE,
-                        distance=Distance.COSINE
+                        distance=Distance.COSINE,
+                        # Scalar quantization for memory efficiency
+                        quantization_config=ScalarQuantization(
+                            scalar=ScalarQuantizationConfig(
+                                type=ScalarType.INT8,
+                                quantile=0.99,
+                                always_ram=True
+                            )
+                        )
                     )
                 },
                 # Sparse vectors for BM25 (optional, can be added later)
@@ -389,12 +398,17 @@ class QdrantDBClient:
         """Get collection statistics"""
         try:
             info = self.client.get_collection(self.collection_name)
+            # Handle different Qdrant client versions
+            vectors_count = getattr(info, 'vectors_count', None)
+            if vectors_count is None:
+                vectors_count = getattr(info, 'points_count', 0)
+            
             return {
                 "name": self.collection_name,
-                "vectors_count": info.vectors_count,
-                "points_count": info.points_count,
-                "status": info.status.name,
-                "optimizer_status": info.optimizer_status.name if info.optimizer_status else None
+                "vectors_count": vectors_count,
+                "points_count": getattr(info, 'points_count', 0),
+                "status": info.status.name if hasattr(info.status, 'name') else str(info.status),
+                "optimizer_status": info.optimizer_status.name if info.optimizer_status and hasattr(info.optimizer_status, 'name') else None
             }
         except Exception as e:
             logger.error(f"Failed to get collection info: {e}")
