@@ -54,6 +54,9 @@ from src.documents.document_processor import DocumentProcessor, SUPPORTED_EXTENS
 from src.documents.embeddings import EmbeddingsGenerator  # Embedding generation
 from src.vectordb import ChromaDBClient  # Vector database client
 
+# El-Harezmi v2 router
+from src.api.el_harezmi_router import router as el_harezmi_router
+
 # Initialize logger for this module
 logger = setup_logger(__name__)
 
@@ -63,8 +66,11 @@ logger = setup_logger(__name__)
 app = FastAPI(
     title="Desoutter Repair Assistant API",
     description="AI-powered repair suggestions for Desoutter industrial tools",
-    version="1.0.0"
+    version="2.0.0"  # Updated for El-Harezmi integration
 )
+
+# Include El-Harezmi v2 router
+app.include_router(el_harezmi_router)
 
 # -----------------------------------------------------------------------------
 # CORS MIDDLEWARE CONFIGURATION
