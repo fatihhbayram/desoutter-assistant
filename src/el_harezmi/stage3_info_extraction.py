@@ -462,6 +462,11 @@ Return ONLY valid JSON, no explanations.
         # Execute LLM extraction
         raw_extraction = await self._execute_extraction(prompt)
         
+        # Check if extraction is empty or failed
+        if self._is_empty_extraction(raw_extraction):
+            logger.warning("LLM extraction returned empty - using pattern-based fallback")
+            return self.extract_without_llm(intent_result, retrieval_result)
+        
         # Parse and validate extraction
         result = self._parse_extraction(
             raw_extraction=raw_extraction,
@@ -471,6 +476,28 @@ Return ONLY valid JSON, no explanations.
         )
         
         return result
+    
+    def _is_empty_extraction(self, extraction: Dict[str, Any]) -> bool:
+        """
+        Check if extraction result is empty or contains only null/empty values.
+        
+        Returns True if extraction should be considered failed.
+        """
+        if not extraction:
+            return True
+        
+        # Check if all values are None, empty strings, or empty lists
+        for key, value in extraction.items():
+            if value is None:
+                continue
+            if isinstance(value, str) and value.strip():
+                return False
+            if isinstance(value, (list, dict)) and len(value) > 0:
+                return False
+            if isinstance(value, (int, float)) and value != 0:
+                return False
+        
+        return True
     
     def _prepare_chunks(self, chunks: List[RetrievedChunk]) -> str:
         """Prepare chunk content for LLM prompt"""
@@ -710,7 +737,12 @@ Return ONLY valid JSON, no explanations.
         """
         Fallback extraction without LLM using pattern matching.
         
-        Used when LLM is unavailable or for simple queries.
+        Used when:
+        - LLM is unavailable
+        - LLM extraction returns empty/null values
+        - Simple queries that don't require LLM
+        
+        Implements intent-specific pattern extraction for each intent type.
         """
         result = ExtractionResult(
             intent=intent_result.primary_intent,
@@ -719,25 +751,355 @@ Return ONLY valid JSON, no explanations.
             confidence=0.6
         )
         
-        # Simple pattern-based extraction
+        # Combine all chunk content for pattern matching
         all_content = " ".join([c.content for c in retrieval_result.chunks])
         
-        # Extract warnings
-        warning_patterns = [
-            r"(?:WARNING|CAUTION|UYARI|DİKKAT)[:\s]+([^.]+\.)",
-            r"⚠️\s*([^.]+\.)",
-        ]
-        for pattern in warning_patterns:
-            matches = re.findall(pattern, all_content, re.IGNORECASE)
-            result.warnings.extend(matches)
+        # Extract common fields (warnings)
+        result.warnings = self._extract_warnings(all_content)
         
-        # Extract numbered steps
-        step_pattern = r"(\d+)\.\s+([^.]+\.)"
-        steps = re.findall(step_pattern, all_content)
-        for num, action in steps[:10]:  # Limit to 10 steps
-            result.procedure.append(ProcedureStep(
-                step_number=int(num),
-                action=action.strip()
-            ))
+        # Intent-specific extraction
+        intent = intent_result.primary_intent
+        
+        if intent == IntentType.CONFIGURATION:
+            self._extract_configuration_patterns(result, all_content, retrieval_result)
+        elif intent == IntentType.COMPATIBILITY:
+            self._extract_compatibility_patterns(result, all_content, retrieval_result)
+        elif intent in [IntentType.TROUBLESHOOT, IntentType.ERROR_CODE]:
+            self._extract_troubleshoot_patterns(result, all_content, intent_result)
+        elif intent == IntentType.SPECIFICATION:
+            self._extract_specification_patterns(result, all_content, retrieval_result)
+        elif intent in [IntentType.PROCEDURE, IntentType.HOW_TO, IntentType.INSTALLATION,
+                        IntentType.FIRMWARE, IntentType.CALIBRATION]:
+            self._extract_procedure_patterns(result, all_content)
+        elif intent == IntentType.CAPABILITY_QUERY:
+            self._extract_capability_patterns(result, all_content)
+        elif intent == IntentType.ACCESSORY_QUERY:
+            self._extract_accessory_patterns(result, all_content)
+        
+        # Set confidence based on extraction quality
+        result.confidence = self._calculate_extraction_confidence(result)
         
         return result
+    
+    def _extract_warnings(self, content: str) -> List[str]:
+        """Extract warning/caution statements from content"""
+        warnings = []
+        warning_patterns = [
+            r"(?:WARNING|CAUTION|UYARI|DİKKAT)[:\s]+([^.!]+[.!])",
+            r"⚠️\s*([^.!]+[.!])",
+            r"(?:IMPORTANT|ÖNEMLİ)[:\s]+([^.!]+[.!])",
+        ]
+        for pattern in warning_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            warnings.extend([m.strip() for m in matches if len(m.strip()) > 10])
+        return warnings[:5]  # Limit to 5 warnings
+    
+    def _extract_configuration_patterns(
+        self,
+        result: ExtractionResult,
+        content: str,
+        retrieval_result: RetrievalResult
+    ) -> None:
+        """Extract configuration-related patterns"""
+        # Extract parameter ranges from tables or text
+        # Pattern: "Torque: 5-85 Nm" or "Max Torque: 85 Nm"
+        param_patterns = [
+            r"(Torque|Tork)[:\s]*([\d.]+)\s*[-–]\s*([\d.]+)\s*(Nm|N\.m)",
+            r"(Angle|Açı)[:\s]*([\d.]+)\s*[-–]\s*([\d.]+)\s*(°|deg|derece)",
+            r"(Speed|Hız)[:\s]*([\d.]+)\s*[-–]\s*([\d.]+)\s*(RPM|rpm)",
+            r"Max\.?\s*(Torque|Tork)[:\s]*([\d.]+)\s*(Nm|N\.m)",
+        ]
+        
+        for pattern in param_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            for match in matches:
+                if len(match) >= 4:  # Range pattern
+                    result.parameter_ranges.append(ParameterRange(
+                        parameter=match[0],
+                        min_value=float(match[1]),
+                        max_value=float(match[2]),
+                        unit=match[3]
+                    ))
+                elif len(match) >= 3:  # Max only pattern
+                    result.parameter_ranges.append(ParameterRange(
+                        parameter=match[0],
+                        max_value=float(match[1]),
+                        unit=match[2]
+                    ))
+        
+        # Extract controller requirements
+        controller_patterns = [
+            r"(CVI3|CVIR|CVIC-II|CONNECT)\s*v?([\d.]+)\+?",
+            r"Controller[:\s]*(CVI3|CVIR|CVIC-II|CONNECT)",
+        ]
+        for pattern in controller_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            if matches:
+                result.prerequisites = Prerequisites(
+                    controller={"model": matches[0][0].upper() if isinstance(matches[0], tuple) else matches[0]}
+                )
+                break
+        
+        # Extract procedure steps
+        self._extract_numbered_steps(result, content)
+    
+    def _extract_compatibility_patterns(
+        self,
+        result: ExtractionResult,
+        content: str,
+        retrieval_result: RetrievalResult
+    ) -> None:
+        """Extract compatibility information from content"""
+        compatible_controllers = []
+        
+        # Pattern: "Compatible with CVI3 v2.5+"
+        compat_patterns = [
+            r"(?:Compatible|Uyumlu)[^.]*?(CVI3|CVIR|CVIC-II|CONNECT)\s*v?([\d.]+)?",
+            r"(CVI3|CVIR|CVIC-II|CONNECT)\s*v?([\d.]+)?\s*(?:or later|veya üstü|\+)",
+            r"Requires?\s*(CVI3|CVIR|CVIC-II|CONNECT)\s*v?([\d.]+)?",
+        ]
+        
+        for pattern in compat_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            for match in matches:
+                controller = match[0].upper() if match[0] else None
+                version = match[1] if len(match) > 1 else None
+                if controller:
+                    compatible_controllers.append({
+                        "model": controller,
+                        "min_version": version,
+                        "recommended": True
+                    })
+        
+        # Extract firmware requirements
+        firmware_req = {}
+        fw_patterns = [
+            r"Firmware[:\s]*v?([\d.]+)\+?",
+            r"Min\.?\s*firmware[:\s]*v?([\d.]+)",
+        ]
+        for pattern in fw_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                firmware_req["min_version"] = match.group(1)
+                break
+        
+        # Extract compatible accessories
+        accessories = {"docks": [], "batteries": [], "cables": []}
+        accessory_patterns = [
+            (r"(?:Dock|Dok)[:\s]*([A-Z0-9-]+)", "docks"),
+            (r"(?:Battery|Batarya)[:\s]*([A-Z0-9-]+)", "batteries"),
+            (r"(?:Cable|Kablo)[:\s]*(USB-C|USB|WiFi|Ethernet)", "cables"),
+        ]
+        for pattern, category in accessory_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            accessories[category].extend(matches)
+        
+        result.compatibility = CompatibilityInfo(
+            compatible_controllers=compatible_controllers,
+            firmware_requirements=firmware_req if firmware_req else None,
+            compatible_accessories=accessories
+        )
+    
+    def _extract_troubleshoot_patterns(
+        self,
+        result: ExtractionResult,
+        content: str,
+        intent_result: IntentResult
+    ) -> None:
+        """Extract troubleshooting information"""
+        # Extract ESDE reference
+        esde_pattern = r"(ESDE-\d{4,5})"
+        esde_match = re.search(esde_pattern, content)
+        esde_ref = esde_match.group(1) if esde_match else None
+        
+        # Extract error code if present in query
+        error_code = intent_result.entities.error_code
+        
+        # Extract possible causes
+        causes = []
+        cause_patterns = [
+            r"(?:Cause|Sebep|Neden)[:\s]*([^.!]+[.!])",
+            r"(?:caused by|nedeniyle)[:\s]*([^.!]+[.!])",
+        ]
+        for pattern in cause_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            causes.extend([m.strip() for m in matches])
+        
+        # Extract solutions
+        solutions = []
+        solution_patterns = [
+            r"(?:Solution|Çözüm)[:\s]*([^.!]+[.!])",
+            r"(?:Fix|Düzeltme)[:\s]*([^.!]+[.!])",
+        ]
+        for pattern in solution_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            for i, sol in enumerate(matches[:5]):
+                solutions.append(ProcedureStep(
+                    step_number=i + 1,
+                    action=sol.strip()
+                ))
+        
+        # If no explicit solutions, extract numbered steps
+        if not solutions:
+            self._extract_numbered_steps(result, content)
+            solutions = result.procedure
+        
+        result.troubleshoot = TroubleshootInfo(
+            problem_description=intent_result.raw_query,
+            possible_causes=causes[:5],
+            solutions=solutions,
+            esde_reference=esde_ref,
+            affected_models=[intent_result.entities.product_model] if intent_result.entities.product_model else []
+        )
+    
+    def _extract_specification_patterns(
+        self,
+        result: ExtractionResult,
+        content: str,
+        retrieval_result: RetrievalResult
+    ) -> None:
+        """Extract technical specifications from content (tables, lists)"""
+        specs = {}
+        
+        # Common specification patterns
+        spec_patterns = [
+            (r"(?:Max\.?\s*)?Torque[:\s]*([\d.]+)\s*(Nm|N\.m)", "max_torque"),
+            (r"(?:Max\.?\s*)?Speed[:\s]*([\d.]+)\s*(RPM|rpm)", "max_speed"),
+            (r"Weight[:\s]*([\d.]+)\s*(kg|g)", "weight"),
+            (r"Length[:\s]*([\d.]+)\s*(mm|cm)", "length"),
+            (r"Voltage[:\s]*([\d.]+)\s*(V|volt)", "voltage"),
+            (r"Battery[:\s]*([\d.]+)\s*(Ah|mAh)", "battery_capacity"),
+        ]
+        
+        for pattern, spec_name in spec_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                specs[spec_name] = f"{match.group(1)} {match.group(2)}"
+        
+        # Extract table data if present in chunks
+        for chunk in retrieval_result.chunks:
+            if chunk.chunk_type == "table_row" and chunk.metadata:
+                # Table rows often have key-value pairs in metadata
+                for key, value in chunk.metadata.items():
+                    if key not in ["source", "chunk_id", "score"]:
+                        specs[key] = value
+        
+        result.specifications = specs
+    
+    def _extract_procedure_patterns(self, result: ExtractionResult, content: str) -> None:
+        """Extract procedure steps from content"""
+        self._extract_numbered_steps(result, content)
+        
+        # Extract prerequisites/tools needed
+        tool_patterns = [
+            r"(?:Required|Gerekli)[:\s]*([^.]+\.)",
+            r"(?:Tools|Aletler)[:\s]*([^.]+\.)",
+            r"(?:Prerequisites|Ön koşullar)[:\s]*([^.]+\.)",
+        ]
+        accessories = []
+        for pattern in tool_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            accessories.extend([m.strip() for m in matches])
+        
+        if accessories:
+            result.prerequisites = Prerequisites(accessories=accessories)
+    
+    def _extract_capability_patterns(self, result: ExtractionResult, content: str) -> None:
+        """Extract capability information (WiFi, Bluetooth, etc.)"""
+        capabilities = {}
+        
+        # Check for common capabilities
+        cap_patterns = [
+            (r"WiFi[:\s]*(Yes|No|Evet|Hayır|✓|✗|supported|destekleniyor)", "wifi"),
+            (r"Bluetooth[:\s]*(Yes|No|Evet|Hayır|✓|✗|supported|destekleniyor)", "bluetooth"),
+            (r"Display[:\s]*(LCD|LED|OLED|Yes|No)", "display"),
+            (r"Data\s*Log(?:ging)?[:\s]*(Yes|No|Evet|Hayır|✓|✗)", "data_logging"),
+        ]
+        
+        for pattern, cap_name in cap_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                value = match.group(1)
+                # Normalize boolean values
+                if value.lower() in ["yes", "evet", "✓", "supported", "destekleniyor"]:
+                    capabilities[cap_name] = True
+                elif value.lower() in ["no", "hayır", "✗"]:
+                    capabilities[cap_name] = False
+                else:
+                    capabilities[cap_name] = value
+        
+        result.specifications = capabilities
+    
+    def _extract_accessory_patterns(self, result: ExtractionResult, content: str) -> None:
+        """Extract accessory information"""
+        accessories = {"docks": [], "batteries": [], "cables": [], "adapters": []}
+        
+        # Extract accessory names/models
+        accessory_patterns = [
+            (r"(?:Dock|Dok)[:\s]*([A-Z0-9][A-Z0-9-]+)", "docks"),
+            (r"(?:Battery|Batarya|BAT)[:\s-]*([A-Z0-9][A-Z0-9-]+)", "batteries"),
+            (r"(?:Adapter|Adaptör)[:\s]*([A-Z0-9][A-Z0-9-]+)", "adapters"),
+            (r"(USB-C|USB-A|Ethernet|WiFi)\s*(?:cable|kablo)?", "cables"),
+        ]
+        
+        for pattern, category in accessory_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            accessories[category].extend([m.upper() for m in matches if m])
+        
+        result.compatibility = CompatibilityInfo(
+            compatible_accessories=accessories
+        )
+    
+    def _extract_numbered_steps(self, result: ExtractionResult, content: str) -> None:
+        """Extract numbered procedure steps"""
+        # Multiple step patterns for different formats
+        step_patterns = [
+            r"(\d+)[\.\)\-]\s+([^.!\n]+[.!])",  # "1. Step text."
+            r"Step\s*(\d+)[:\s]+([^.!\n]+[.!])",  # "Step 1: Step text."
+            r"Adım\s*(\d+)[:\s]+([^.!\n]+[.!])",  # "Adım 1: Step text." (Turkish)
+        ]
+        
+        all_steps = []
+        for pattern in step_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            all_steps.extend(matches)
+        
+        # Deduplicate and sort by step number
+        seen_numbers = set()
+        for num, action in all_steps:
+            step_num = int(num)
+            if step_num not in seen_numbers and step_num <= 20:  # Limit to 20 steps
+                seen_numbers.add(step_num)
+                result.procedure.append(ProcedureStep(
+                    step_number=step_num,
+                    action=action.strip()
+                ))
+        
+        # Sort by step number
+        result.procedure.sort(key=lambda x: x.step_number)
+    
+    def _calculate_extraction_confidence(self, result: ExtractionResult) -> float:
+        """
+        Calculate confidence score based on extraction quality.
+        
+        Higher confidence if more fields are populated.
+        """
+        score = 0.3  # Base score for fallback extraction
+        
+        # Add points for populated fields
+        if result.procedure:
+            score += 0.15
+        if result.parameter_ranges:
+            score += 0.1
+        if result.prerequisites:
+            score += 0.1
+        if result.compatibility and result.compatibility.compatible_controllers:
+            score += 0.15
+        if result.troubleshoot and result.troubleshoot.possible_causes:
+            score += 0.1
+        if result.specifications:
+            score += 0.1
+        if result.warnings:
+            score += 0.05
+        
+        return min(score, 0.85)  # Cap at 0.85 for fallback (LLM can reach 0.95)
