@@ -26,7 +26,7 @@ class FeatureFlags:
     # 0.0 = all traffic to legacy
     # 0.5 = 50% to each
     # 1.0 = all traffic to El-Harezmi
-    el_harezmi_rollout: float = 0.0
+    el_harezmi_rollout: float = 1.0  # FULL ROLLOUT - El-Harezmi is now default
     
     # Force specific pipeline (for testing)
     # Set to "legacy" or "el_harezmi" to override rollout
@@ -109,7 +109,7 @@ def get_feature_flags() -> FeatureFlags:
     if _feature_flags is None:
         _feature_flags = FeatureFlags(
             # Load from environment
-            el_harezmi_rollout=float(os.environ.get("EL_HAREZMI_ROLLOUT", "0.0")),
+            el_harezmi_rollout=float(os.environ.get("EL_HAREZMI_ROLLOUT", "1.0")),  # Default: El-Harezmi enabled
             force_pipeline=os.environ.get("FORCE_PIPELINE"),
             enable_kg_validation=os.environ.get("ENABLE_KG_VALIDATION", "true").lower() == "true",
             enable_llm_extraction=os.environ.get("ENABLE_LLM_EXTRACTION", "true").lower() == "true",

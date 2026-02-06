@@ -544,7 +544,10 @@ class ResponseFormatter:
                 if fw.get("controller_min"):
                     prereq_parts.append(f"- Controller Firmware: v{fw['controller_min']}+")
             if extraction.prerequisites.accessories:
-                prereq_parts.append(f"- Aksesuarlar: {', '.join(extraction.prerequisites.accessories)}")
+                # Filter out None values
+                accessories = [a for a in extraction.prerequisites.accessories if a]
+                if accessories:
+                    prereq_parts.append(f"- Aksesuarlar: {', '.join(accessories)}")
             prereq_section = "\n".join(prereq_parts)
         
         # Procedure section
@@ -624,26 +627,36 @@ class ResponseFormatter:
             acc = extraction.compatibility.compatible_accessories
             acc_parts = []
             if acc.get("docks"):
-                acc_parts.append(f"- **Doklar:** {', '.join(acc['docks'])}")
+                docks = [d for d in acc['docks'] if d]
+                if docks:
+                    acc_parts.append(f"- **Doklar:** {', '.join(docks)}")
             if acc.get("batteries"):
-                acc_parts.append(f"- **Bataryalar:** {', '.join(acc['batteries'])}")
+                batteries = [b for b in acc['batteries'] if b]
+                if batteries:
+                    acc_parts.append(f"- **Bataryalar:** {', '.join(batteries)}")
             if acc.get("cables"):
-                acc_parts.append(f"- **Kablolar:** {', '.join(acc['cables'])}")
+                cables = [c for c in acc['cables'] if c]
+                if cables:
+                    acc_parts.append(f"- **Kablolar:** {', '.join(cables)}")
             accessories_section = "\n".join(acc_parts)
         
         # Incompatible section
         incompatible_section = ""
         if extraction.compatibility and extraction.compatibility.incompatible_items:
-            incompatible_section = "❌ **Uyumsuz:**\n" + "\n".join(
-                f"- {item}" for item in extraction.compatibility.incompatible_items
-            )
+            items = [item for item in extraction.compatibility.incompatible_items if item]
+            if items:
+                incompatible_section = "❌ **Uyumsuz:**\n" + "\n".join(
+                    f"- {item}" for item in items
+                )
         
         # Recommendations
         recommendations_section = ""
         if extraction.compatibility and extraction.compatibility.recommendations:
-            recommendations_section = "📌 **Öneriler:**\n" + "\n".join(
-                f"- {rec}" for rec in extraction.compatibility.recommendations
-            )
+            recs = [rec for rec in extraction.compatibility.recommendations if rec]
+            if recs:
+                recommendations_section = "📌 **Öneriler:**\n" + "\n".join(
+                    f"- {rec}" for rec in recs
+                )
         
         # Add validation-based recommendations
         for issue in validation.issues:

@@ -181,11 +181,13 @@ async def chat(
             pass
     
     # Determine pipeline version
+    logger.info(f"[DEBUG] Request force_pipeline: {request.force_pipeline}")
+    
     pipeline_version = get_pipeline_version(user_id, request.force_pipeline)
     
+    logger.info(f"[DEBUG] Pipeline selection: {pipeline_version.value} for user {user_id}, force={request.force_pipeline}")
+    
     flags = get_feature_flags()
-    if flags.log_pipeline_selection:
-        logger.info(f"Pipeline selection: {pipeline_version.value} for user {user_id}")
     
     # Use El-Harezmi pipeline
     if pipeline_version == PipelineVersion.EL_HAREZMI:
@@ -243,7 +245,7 @@ async def _process_with_el_harezmi(
     warnings = []
     if result.validation_result and result.validation_result.issues:
         for issue in result.validation_result.issues:
-            warnings.append(f"{issue.severity}: {issue.message}")
+            warnings.append(f"{issue.status.value}: {issue.message}")
     
     return ChatResponse(
         response=result.response.content,
@@ -294,10 +296,18 @@ async def _process_with_legacy(
                 product_family=None
             ))
     
+    # Convert confidence to float (legacy returns "high", "low", etc.)
+    raw_confidence = result.get("confidence", 0.5)
+    if isinstance(raw_confidence, str):
+        confidence_map = {"high": 0.9, "medium": 0.7, "low": 0.4}
+        confidence = confidence_map.get(raw_confidence.lower(), 0.5)
+    else:
+        confidence = float(raw_confidence) if raw_confidence is not None else 0.5
+    
     return ChatResponse(
         response=result.get("suggestion", ""),
         intent="general",  # Legacy doesn't have intent
-        confidence=result.get("confidence", 0.5),
+        confidence=confidence,
         product_model=request.product_model,
         sources=sources,
         pipeline_version="legacy",
