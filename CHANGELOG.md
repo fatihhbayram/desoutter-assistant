@@ -10,7 +10,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### In Progress
+- Knowledge Graph validation with hard-coded compatibility matrix
+- Legacy ChromaDB code cleanup
 - Controller units scraping (10 units)
+
+---
+
+## [2.0.0] - 2026-02-18
+
+### 🚀 Major Release: El-Harezmi Pipeline + Qdrant Migration
+
+A complete architectural overhaul introducing the 5-stage El-Harezmi intelligent pipeline,
+migrating from ChromaDB to Qdrant vector database, and expanding intent classification
+from 8 to 15 types.
+
+### Added
+- **El-Harezmi 5-Stage Pipeline** (`src/el_harezmi/`)
+  - Stage 1: Multi-label Intent Classification with entity extraction
+  - Stage 2: Intent-Aware Retrieval Strategy with dynamic boost factors
+  - Stage 3: Structured Information Extraction (LLM-based)
+  - Stage 4: Knowledge Graph Validation (compatibility matrix)
+  - Stage 5: Structured Response Generation (intent-specific templates)
+  - El-Harezmi API router (`src/api/el_harezmi_router.py`)
+  - Configurable rollout via `EL_HAREZMI_ROLLOUT` environment variable
+- **Qdrant Vector Database** (`src/vectordb/qdrant_client.py`)
+  - Replaced ChromaDB as primary vector store
+  - `desoutter_docs_v2` collection with dense + sparse vectors
+  - Advanced payload filtering (product_family, intent_relevance, chunk_type)
+  - Hybrid search with BM25 sparse vectors + semantic dense vectors
+  - Quantization support (int8) for reduced memory footprint
+  - Docker Compose integration with health checks
+- **Adaptive Chunking System** (`src/documents/`)
+  - Document type detection (8 types: TECHNICAL_MANUAL, SERVICE_BULLETIN, CONFIGURATION_GUIDE, COMPATIBILITY_MATRIX, SPEC_SHEET, ERROR_CODE_LIST, PROCEDURE_GUIDE, FRESHDESK_TICKET)
+  - 6 chunking strategies:
+    - `SemanticChunker` — configuration guides
+    - `TableAwareChunker` — compatibility matrices
+    - `EntityChunker` — error code lists
+    - `ProblemSolutionChunker` — ESDE service bulletins
+    - `StepPreservingChunker` — procedure guides
+    - `HybridChunker` — fallback
+  - `ChunkerFactory` for automatic strategy selection
+  - `DocumentClassifier` with regex-based type detection
+- **15 Intent Types** (expanded from 8) (`src/el_harezmi/stage1_intent_classifier.py`)
+  - New: CONFIGURATION, COMPATIBILITY, SPECIFICATION, PROCEDURE, CALIBRATION, FIRMWARE, COMPARISON, CAPABILITY_QUERY, ACCESSORY_QUERY
+  - Multi-label classification (1 primary + 0-2 secondary intents)
+  - Entity extraction: product_model, controller_type, error_code, firmware_version, parameter_type, target_value, accessory_type
+  - Turkish + English pattern matching
+- **Metadata Enrichment** (`scripts/enrich_qdrant_metadata.py`)
+  - In-place enrichment of 26,513 Qdrant points (no re-embedding)
+  - Extracted: document_type, chunk_type, product_model, product_family, error_code, esde_code, intent_relevance, boolean feature flags
+  - All 8 metadata index fields populated from 0
+- **Expanded Test Suite** (`tests/fixtures/standard_queries.py`)
+  - 25 → 40 test cases (+15 new)
+  - New test categories: CONFIG (3), COMPAT (3), PROC (3), CAP (3), ACC (3)
+  - Turkish query coverage: 3 → 13 tests (10% → 32.5%)
+  - `el_harezmi` test category for new intent validation
+- **Adaptive Re-ingestion** (`scripts/reingest_adaptive.py`)
+  - Document type-aware ingestion pipeline
+  - Metadata extraction during chunking
+  - Qdrant batch upload with rich payloads
+
+### Changed
+- **API version**: 1.8.0 → 2.0.0
+- **Vector DB**: ChromaDB → Qdrant (running in Docker)
+- **Intent system**: Rule-based 8-type → Pattern-matched 15-type multi-label
+- **Docker Compose** (`ai-stack.yml`): Added Qdrant service, El-Harezmi env vars
+- **ExpectedIntent enum**: Added 8 new intent values for test validation
+- **Retrieval pipeline**: Intent-aware boost factors per document/chunk type
+
+### Infrastructure
+- Qdrant Docker service (qdrant/qdrant:v1.7.4) on ports 6333/6334
+- Health check integration (`depends_on: service_healthy`)
+- Environment variables: `QDRANT_HOST`, `QDRANT_PORT`, `QDRANT_COLLECTION`, `EL_HAREZMI_ROLLOUT`, `ENABLE_KG_VALIDATION`, `ENABLE_LLM_EXTRACTION`, `FALLBACK_ON_ERROR`
 
 ---
 
@@ -395,6 +466,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| **2.0.0** | **2026-02-18** | **🚀 El-Harezmi pipeline, Qdrant migration, 15 intents, 40 tests** |
+| 1.8.0 | 2026-01-07 | Triple-path retrieval, dynamic query expansion |
+| 1.7.0 | 2026-01-06 | General RAG quality improvements |
 | 1.6.0 | 2026-01-05 | Intelligent product filtering, ChromaDB where clause |
 | 1.5.0 | 2026-01-04 | Freshdesk ticket integration |
 | 1.4.0 | 2025-12-31 | Source citation enhancement |
@@ -414,7 +488,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/fatihhbayram/desoutter-assistant/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.8.0...v2.0.0
+[1.8.0]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.7.0...v1.8.0
+[1.7.0]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.3.0...v1.4.0

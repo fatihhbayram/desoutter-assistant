@@ -200,12 +200,18 @@ class ConfidenceScorer:
         # Intent type weights (some intents are easier to answer accurately)
         intent_weights = {
             'error_code': 0.9,      # Very specific, easy to verify
-            'specifications': 0.85,  # Factual, from docs
+            'specification': 0.85,   # Factual, from docs
             'calibration': 0.8,      # Procedural, documented
             'installation': 0.75,    # Procedural
             'maintenance': 0.75,     # Procedural
             'connection': 0.7,       # Can be complex
-            'troubleshooting': 0.65, # Can require inference
+            'troubleshoot': 0.65,    # Can require inference
+            'configuration': 0.8,    # Procedural, documented 
+            'compatibility': 0.85,   # Factual from matrix
+            'procedure': 0.75,       # Procedural
+            'firmware': 0.7,         # Procedural
+            'capability_query': 0.8, # Factual
+            'accessory_query': 0.8,  # Factual
             'general': 0.5           # Vague queries
         }
         
@@ -326,7 +332,7 @@ if __name__ == "__main__":
     # Test case 2: Mediocre response
     result2 = scorer.calculate_confidence(
         sources=[{"similarity": 0.4}, {"similarity": 0.3}],
-        intent="troubleshooting",
+        intent="troubleshoot",
         intent_confidence=0.6,
         response_text="Check the motor connections and ensure power supply is working.",
         sufficiency_score=0.4,

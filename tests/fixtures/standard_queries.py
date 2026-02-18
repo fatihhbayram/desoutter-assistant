@@ -14,15 +14,26 @@ from enum import Enum
 
 
 class ExpectedIntent(str, Enum):
-    """Expected intent types matching IntentDetector"""
-    TROUBLESHOOTING = "troubleshooting"
-    SPECIFICATIONS = "specifications"
+    """Expected intent types matching IntentDetector / El-Harezmi"""
+    # Legacy intents (aligned to El-Harezmi values)
+    TROUBLESHOOTING = "troubleshoot"
+    SPECIFICATIONS = "specification"
     INSTALLATION = "installation"
     CALIBRATION = "calibration"
     MAINTENANCE = "maintenance"
     CONNECTION = "connection"
     ERROR_CODE = "error_code"
     GENERAL = "general"
+    
+    # El-Harezmi expanded intents
+    CONFIGURATION = "configuration"
+    COMPATIBILITY = "compatibility"
+    PROCEDURE = "procedure"
+    CAPABILITY_QUERY = "capability_query"
+    ACCESSORY_QUERY = "accessory_query"
+    FIRMWARE = "firmware"
+    COMPARISON = "comparison"
+    SPECIFICATION = "specification"
 
 
 @dataclass
@@ -55,7 +66,7 @@ STANDARD_TEST_QUERIES: List[Dict] = [
         "query": "Motor won't start",
         "product": "6151656060",  # EAD20 - Cable tool (NOT battery)
         "language": "en",
-        "expected_intent": "troubleshooting",
+        "expected_intent": "troubleshoot",
         "min_confidence": 0.5,
         "must_contain": ["motor"],
         "must_not_contain": [],  # Removed - LLM might mention "no battery" which is correct
@@ -69,7 +80,7 @@ STANDARD_TEST_QUERIES: List[Dict] = [
         "query": "Tool overheating during operation",
         "product": "6151659030",
         "language": "en",
-        "expected_intent": "troubleshooting",
+        "expected_intent": "troubleshoot",
         "min_confidence": 0.5,
         "must_contain": ["temperature", "cool"],
         "must_not_contain": [],
@@ -83,7 +94,7 @@ STANDARD_TEST_QUERIES: List[Dict] = [
         "query": "Grinding noise from the tool",
         "product": "6151660870",
         "language": "en",
-        "expected_intent": "troubleshooting",
+        "expected_intent": "troubleshoot",
         "min_confidence": 0.5,
         "must_contain": ["noise"],  # Removed 'bearing' - could be gear, bearing, or other
         "must_not_contain": [],
@@ -97,7 +108,7 @@ STANDARD_TEST_QUERIES: List[Dict] = [
         "query": "Alet çalışmıyor, motor sesi geliyor",
         "product": "6151659770",
         "language": "tr",
-        "expected_intent": "troubleshooting",
+        "expected_intent": "troubleshoot",
         "min_confidence": 0.5,
         "must_contain": ["motor"],
         "must_not_contain": [],
@@ -111,7 +122,7 @@ STANDARD_TEST_QUERIES: List[Dict] = [
         "query": "Tool stops randomly during use",
         "product": "6159326910",
         "language": "en",
-        "expected_intent": "troubleshooting",
+        "expected_intent": "troubleshoot",
         "min_confidence": 0.5,
         "must_contain": ["check"],  # Removed 'connection' - could be power, overheating, etc.
         "must_not_contain": [],
@@ -189,7 +200,7 @@ STANDARD_TEST_QUERIES: List[Dict] = [
         "query": "What is the maximum torque of this tool?",
         "product": "6151659770",
         "language": "en",
-        "expected_intent": "specifications",
+        "expected_intent": "specification",
         "min_confidence": 0.6,
         "must_contain": ["torque", "Nm"],
         "must_not_contain": [],
@@ -203,7 +214,7 @@ STANDARD_TEST_QUERIES: List[Dict] = [
         "query": "Tool dimensions and weight",
         "product": "6151660870",
         "language": "en",
-        "expected_intent": "specifications",
+        "expected_intent": "specification",
         "min_confidence": 0.5,
         "must_contain": ["weight"],
         "must_not_contain": [],
@@ -217,7 +228,7 @@ STANDARD_TEST_QUERIES: List[Dict] = [
         "query": "RPM range for this screwdriver",
         "product": "6151659030",
         "language": "en",
-        "expected_intent": "specifications",
+        "expected_intent": "specification",
         "min_confidence": 0.5,
         "must_contain": ["rpm", "speed"],
         "must_not_contain": [],
@@ -429,6 +440,236 @@ STANDARD_TEST_QUERIES: List[Dict] = [
         "must_not_contain": [],
         "description": "Installation procedure query",
         "category": "basic",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    
+    # -------------------------------------------------------------------------
+    # CONFIGURATION QUERIES (3) - El-Harezmi New Intent
+    # -------------------------------------------------------------------------
+    {
+        "id": "CONFIG_001",
+        "query": "EABC-3000 pset ayarı nasıl yapılır?",
+        "product": "6151659770",
+        "language": "tr",
+        "expected_intent": "configuration",
+        "min_confidence": 0.5,
+        "must_contain": ["pset"],
+        "must_not_contain": [],
+        "description": "Turkish pset configuration query",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    {
+        "id": "CONFIG_002",
+        "query": "How to set torque to 50 Nm?",
+        "product": "6151659770",
+        "language": "en",
+        "expected_intent": "configuration",
+        "min_confidence": 0.5,
+        "must_contain": ["torque"],
+        "must_not_contain": [],
+        "description": "Torque setting configuration",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    {
+        "id": "CONFIG_003",
+        "query": "Angle control parametreleri nasıl ayarlanır?",
+        "product": "6151660870",
+        "language": "tr",
+        "expected_intent": "configuration",
+        "min_confidence": 0.5,
+        "must_contain": [],
+        "must_not_contain": [],
+        "description": "Turkish angle control parameter configuration",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    
+    # -------------------------------------------------------------------------
+    # COMPATIBILITY QUERIES (3) - El-Harezmi New Intent
+    # -------------------------------------------------------------------------
+    {
+        "id": "COMPAT_001",
+        "query": "EABC-3000 hangi CVI3 versiyonuyla çalışır?",
+        "product": "6151659770",
+        "language": "tr",
+        "expected_intent": "compatibility",
+        "min_confidence": 0.5,
+        "must_contain": ["CVI3"],
+        "must_not_contain": [],
+        "description": "Turkish controller compatibility query",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    {
+        "id": "COMPAT_002",
+        "query": "Which controller is compatible with this tool?",
+        "product": "6151660870",
+        "language": "en",
+        "expected_intent": "compatibility",
+        "min_confidence": 0.5,
+        "must_contain": ["controller"],
+        "must_not_contain": [],
+        "description": "General controller compatibility query",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    {
+        "id": "COMPAT_003",
+        "query": "Bu tool hangi dok ile uyumlu?",
+        "product": "6151659030",
+        "language": "tr",
+        "expected_intent": "compatibility",
+        "min_confidence": 0.5,
+        "must_contain": [],
+        "must_not_contain": [],
+        "description": "Turkish dock compatibility query",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    
+    # -------------------------------------------------------------------------
+    # PROCEDURE QUERIES (3) - El-Harezmi New Intent
+    # -------------------------------------------------------------------------
+    {
+        "id": "PROC_001",
+        "query": "Firmware update nasıl yapılır?",
+        "product": "6151659770",
+        "language": "tr",
+        "expected_intent": "procedure",
+        "min_confidence": 0.5,
+        "must_contain": ["firmware"],
+        "must_not_contain": [],
+        "description": "Turkish firmware update procedure",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    {
+        "id": "PROC_002",
+        "query": "Step by step calibration procedure",
+        "product": "6159326910",
+        "language": "en",
+        "expected_intent": "procedure",
+        "min_confidence": 0.5,
+        "must_contain": ["step"],
+        "must_not_contain": [],
+        "description": "English step-by-step calibration procedure",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    {
+        "id": "PROC_003",
+        "query": "İlk kurulum adımları nelerdir?",
+        "product": "6151659030",
+        "language": "tr",
+        "expected_intent": "procedure",
+        "min_confidence": 0.5,
+        "must_contain": [],
+        "must_not_contain": [],
+        "description": "Turkish initial setup procedure",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    
+    # -------------------------------------------------------------------------
+    # CAPABILITY QUERIES (3) - El-Harezmi New Intent
+    # -------------------------------------------------------------------------
+    {
+        "id": "CAP_001",
+        "query": "EABC-3000 maksimum tork nedir?",
+        "product": "6151659770",
+        "language": "tr",
+        "expected_intent": "capability_query",
+        "min_confidence": 0.5,
+        "must_contain": ["Nm"],
+        "must_not_contain": [],
+        "description": "Turkish max torque capability query",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    {
+        "id": "CAP_002",
+        "query": "Does this tool support WiFi?",
+        "product": "6151660870",
+        "language": "en",
+        "expected_intent": "capability_query",
+        "min_confidence": 0.5,
+        "must_contain": ["wifi"],
+        "must_not_contain": [],
+        "description": "English WiFi capability query",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    {
+        "id": "CAP_003",
+        "query": "Batarya kapasitesi ne kadar?",
+        "product": "6151659030",
+        "language": "tr",
+        "expected_intent": "capability_query",
+        "min_confidence": 0.5,
+        "must_contain": [],
+        "must_not_contain": [],
+        "description": "Turkish battery capacity query",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    
+    # -------------------------------------------------------------------------
+    # ACCESSORY QUERIES (3) - El-Harezmi New Intent
+    # -------------------------------------------------------------------------
+    {
+        "id": "ACC_001",
+        "query": "EABC-3000 hangi batarya ile çalışır?",
+        "product": "6151659770",
+        "language": "tr",
+        "expected_intent": "accessory_query",
+        "min_confidence": 0.5,
+        "must_contain": [],
+        "must_not_contain": [],
+        "description": "Turkish battery accessory query",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    {
+        "id": "ACC_002",
+        "query": "Uyumlu doklar nelerdir?",
+        "product": "6151660870",
+        "language": "tr",
+        "expected_intent": "accessory_query",
+        "min_confidence": 0.5,
+        "must_contain": [],
+        "must_not_contain": [],
+        "description": "Turkish dock accessory query",
+        "category": "el_harezmi",
+        "expect_idk": False,
+        "max_response_time_ms": 60000
+    },
+    {
+        "id": "ACC_003",
+        "query": "Which cable should I use for CVI3 connection?",
+        "product": "6159326910",
+        "language": "en",
+        "expected_intent": "accessory_query",
+        "min_confidence": 0.5,
+        "must_contain": ["cable"],
+        "must_not_contain": [],
+        "description": "English cable accessory query",
+        "category": "el_harezmi",
         "expect_idk": False,
         "max_response_time_ms": 60000
     },

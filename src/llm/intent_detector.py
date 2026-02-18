@@ -39,9 +39,9 @@ class QueryIntent(str, Enum):
         CONFIGURATION, COMPATIBILITY, PROCEDURE, FIRMWARE,
         COMPARISON, CAPABILITY_QUERY, ACCESSORY_QUERY
     """
-    # Original intents (8)
-    TROUBLESHOOTING = "troubleshooting"   # Error, fault, problem diagnosis
-    SPECIFICATIONS = "specifications"      # Torque, speed, weight, dimensions
+    # Original intents (8) - values aligned with El-Harezmi IntentType
+    TROUBLESHOOTING = "troubleshoot"       # Error, fault, problem diagnosis
+    SPECIFICATIONS = "specification"       # Torque, speed, weight, dimensions
     INSTALLATION = "installation"          # Setup, assembly, first-time config
     CALIBRATION = "calibration"            # Calibrate, adjust, zero setting
     MAINTENANCE = "maintenance"            # Clean, lubricate, replace parts
@@ -55,8 +55,8 @@ class QueryIntent(str, Enum):
     PROCEDURE = "procedure"                # Step-by-step instructions
     FIRMWARE = "firmware"                  # Firmware update/downgrade
     COMPARISON = "comparison"              # Model comparison, "hangisi daha iyi"
-    CAPABILITY_QUERY = "capability"        # "WiFi var mı?", "Max tork nedir?"
-    ACCESSORY_QUERY = "accessory"          # Battery, dock, adapter questions
+    CAPABILITY_QUERY = "capability_query"  # "WiFi var mı?", "Max tork nedir?"
+    ACCESSORY_QUERY = "accessory_query"    # Battery, dock, adapter questions
 
 
 @dataclass
@@ -103,7 +103,7 @@ class IntentDetector:
         # Intent keyword lists - using simple substring matching
         # Order in dict determines tie-breaker priority
         self.intent_keywords = {
-            'troubleshooting': [
+            'troubleshoot': [
                 # English - Operation issues
                 'stop', 'stops', 'stopped', 'stopping',
                 'not working', "won't", "wont", "doesn't", "doesnt",
@@ -124,7 +124,7 @@ class IntentDetector:
                 'durdu', 'duruyor',
             ],
             
-            'specifications': [
+            'specification': [
                 # English
                 'torque', 'rpm', 'speed',
                 'power', 'watt', 'voltage', 'volt', 'amp', 'amperage',
@@ -258,7 +258,7 @@ class IntentDetector:
                 'hangisi', 'arasındaki fark', 'mı yoksa', 'daha iyi',
             ],
             
-            'capability': [
+            'capability_query': [
                 # English - Feature/capability questions
                 'does it have', 'can it', 'is there', 'has',
                 'feature', 'capability', 'able to', 'capable',
@@ -270,7 +270,7 @@ class IntentDetector:
                 'maksimum', 'minimum', 'sınır', 'aralık',
             ],
             
-            'accessory': [
+            'accessory_query': [
                 # English - Accessory questions
                 'battery', 'batteries', 'charger', 'charging',
                 'dock', 'docking', 'adapter', 'cable', 'cables',
@@ -429,12 +429,12 @@ if __name__ == "__main__":
     
     test_cases = [
         # Original test cases
-        ("Motor won't start", "troubleshooting"),
-        ("Motor stops during operation", "troubleshooting"),
-        ("Tool turns off randomly", "troubleshooting"),
-        ("Grinding noise from the tool", "troubleshooting"),
-        ("Tool overheating during operation", "troubleshooting"),
-        ("What is the maximum torque?", "specifications"),
+        ("Motor won't start", "troubleshoot"),
+        ("Motor stops during operation", "troubleshoot"),
+        ("Tool turns off randomly", "troubleshoot"),
+        ("Grinding noise from the tool", "troubleshoot"),
+        ("Tool overheating during operation", "troubleshoot"),
+        ("What is the maximum torque?", "specification"),
         ("Error code E804", "error_code"),
         ("E047 hata kodu ne anlama geliyor?", "error_code"),
         ("How to calibrate torque settings?", "calibration"),
@@ -474,15 +474,15 @@ if __name__ == "__main__":
         ("Compare EABC-3000 and EABC-2500", "comparison"),
         
         # NEW: Capability intent
-        ("Does this tool have WiFi feature?", "capability"),
-        ("Bu alette bluetooth var mı?", "capability"),
-        ("What features does EABC-3000 have?", "capability"),
+        ("Does this tool have WiFi feature?", "capability_query"),
+        ("Bu alette bluetooth var mı?", "capability_query"),
+        ("What features does EABC-3000 have?", "capability_query"),
         
         # NEW: Accessory intent
-        ("Which battery works with EPBC?", "accessory"),
-        ("Hangi batarya ile çalışır?", "accessory"),
-        ("What charger should I use for ELC?", "accessory"),
-        ("Hangi şarj cihazı kullanmalıyım?", "accessory"),
+        ("Which battery works with EPBC?", "accessory_query"),
+        ("Hangi batarya ile çalışır?", "accessory_query"),
+        ("What charger should I use for ELC?", "accessory_query"),
+        ("Hangi şarj cihazı kullanmalıyım?", "accessory_query"),
     ]
     
     print("=" * 70)

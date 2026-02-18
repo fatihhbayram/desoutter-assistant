@@ -10,8 +10,8 @@ except ImportError:
     # Fallback if intent_detector not yet available
     from enum import Enum
     class QueryIntent(str, Enum):
-        TROUBLESHOOTING = "troubleshooting"
-        SPECIFICATIONS = "specifications"
+        TROUBLESHOOTING = "troubleshoot"
+        SPECIFICATIONS = "specification"
         INSTALLATION = "installation"
         CALIBRATION = "calibration"
         MAINTENANCE = "maintenance"

@@ -1,0 +1,343 @@
+# =============================================================================
+# AI STACK - Docker Compose Configuration
+# =============================================================================
+# Proxmox AI Infrastructure for Desoutter Repair Assistant
+# 
+# Services:
+#   - Ollama: Local LLM inference with GPU acceleration
+#   - Open WebUI: Chat interface for Ollama models
+#   - n8n: Workflow automation platform
+#   - MongoDB: Document database for products/users
+#   - Mongo Express: MongoDB web admin interface
+#   - Desoutter API: FastAPI RAG-powered repair assistant
+#   - Desoutter Frontend: React web application
+#
+# Usage:
+#   docker compose -f ai-stack.yml up -d              # Start all services
+#   docker compose -f ai-stack.yml up -d --build     # Rebuild and start
+#   docker compose -f ai-stack.yml logs -f           # View logs
+#   docker compose -f ai-stack.yml down              # Stop all services
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # OLLAMA - Local LLM Inference Server
+  # GPU-accelerated inference for qwen2.5:7b-instruct and llama3
+  # API: http://localhost:11434
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    runtime: nvidia
+    ports:
+      - "0.0.0.0:11434:11434"
+    volumes:
+      - ollama:/root/.ollama                    # Persistent model storage
+    networks:
+      - ai-net
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - OLLAMA_KEEP_ALIVE=24h                   # Keep model loaded for 24 hours
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # OLLAMA MODEL PRELOADER - Auto-loads model on startup
+  # Ensures qwen2.5:7b-instruct is ready immediately after boot
+  # ---------------------------------------------------------------------------
+  ollama-preload:
+    image: curlimages/curl:latest
+    container_name: ollama-preload
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - ai-net
+    restart: "no"
+    entrypoint: >
+      sh -c "echo 'Waiting for Ollama...' && sleep 5 &&
+             echo 'Preloading qwen2.5:7b-instruct model...' &&
+             curl -s http://ollama:11434/api/generate -d '{\"model\":\"qwen2.5:7b-instruct\",\"prompt\":\"hello\",\"stream\":false}' &&
+             echo 'Model preloaded successfully!'"
+
+
+  # ---------------------------------------------------------------------------
+  # OPEN WEBUI - Chat Interface for Ollama (DISABLED - use profiles: [webui] to enable)
+  # Web-based UI for interacting with local LLMs
+  # URL: http://localhost:3000
+  # ---------------------------------------------------------------------------
+  open-webui:
+    profiles:
+      - webui  # Only starts with: docker compose --profile webui up
+    image: ghcr.io/open-webui/open-webui:cuda
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:3000:8080"
+    volumes:
+      - open-webui:/app/backend/data            # Chat history and settings
+    networks:
+      - ai-net
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434     # Internal Ollama connection
+      - WEBUI_URL=https://ai.adentechio.dev
+      - NVIDIA_VISIBLE_DEVICES=all
+    depends_on:
+      - ollama
+    runtime: nvidia
+
+  # ---------------------------------------------------------------------------
+  # N8N - Workflow Automation Platform (DISABLED - use profiles: [n8n] to enable)
+  # Low-code automation for AI workflows
+  # URL: http://localhost:5678
+  # ---------------------------------------------------------------------------
+  n8n:
+    profiles:
+      - n8n  # Only starts with: docker compose --profile n8n up
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n                # Workflows and credentials
+    networks:
+      - ai-net
+    environment:
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - WEBHOOK_URL=https://n8n.adentechio.dev/
+      - N8N_EDITOR_BASE_URL=https://n8n.adentechio.dev
+      - N8N_PROTOCOL=https
+      - NODE_ENV=production
+      - N8N_SECURE_COOKIE=false
+
+  # ---------------------------------------------------------------------------
+  # MONGODB - Document Database
+  # Stores products, users, and application data
+  # Port: 27017
+  # ---------------------------------------------------------------------------
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:27017:27017"
+    volumes:
+      - mongodb_data:/data/db                   # Database files
+      - mongodb_config:/data/configdb           # Configuration
+    networks:
+      - ai-net
+    environment:
+      - MONGO_INITDB_DATABASE=desoutter
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # ---------------------------------------------------------------------------
+  # MONGO EXPRESS - MongoDB Web Admin
+  # Web-based database management interface
+  # URL: http://localhost:8081 (admin/desoutter123)
+  # ---------------------------------------------------------------------------
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8081:8081"
+    networks:
+      - ai-net
+    environment:
+      - ME_CONFIG_MONGODB_URL=mongodb://mongodb:27017/
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=desoutter123
+      - ME_CONFIG_MONGODB_ENABLE_ADMIN=true
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+
+    # ---------------------------------------------------------------------------
+  # QDRANT - Vector Database for El-Harezmi RAG
+  # REST API: http://localhost:6333
+  # ---------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:6333:6333"
+      - "0.0.0.0:6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - ai-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # DESOUTTER API - RAG-Powered Repair Assistant
+  # FastAPI backend with Qdrant + ChromaDB vector search and Ollama LLM
+  # API: http://localhost:8000
+  # Docs: http://localhost:8000/docs
+  # ---------------------------------------------------------------------------
+  desoutter-api:
+    build:
+      context: /home/adentechio/desoutter-assistant
+      dockerfile: Dockerfile
+    image: desoutter-api:latest
+    container_name: desoutter-api
+    restart: unless-stopped
+    runtime: nvidia
+    ports:
+      - "0.0.0.0:8000:8000"
+    volumes:
+      - desoutter_data:/app/data                # Application data and logs (includes ticket_pdfs)
+      - /home/adentechio/desoutter-assistant/documents:/app/documents  # PDF manuals/bulletins
+      - /home/adentechio/desoutter-assistant/scripts:/app/scripts      # Ingest and utility scripts
+      - /home/adentechio/desoutter-assistant/src:/app/src              # Source code (hot reload)
+      - /home/adentechio/desoutter-assistant/config:/app/config    # Config files
+      - huggingface_cache:/root/.cache/huggingface  # Cached embedding models
+    networks:
+      - ai-net
+    environment:
+      # Database Configuration
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_DATABASE=desoutter
+      - MONGO_URI=mongodb://mongodb:27017/
+      # LLM Configuration (Ollama)
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=qwen2.5:7b-instruct        # Available: qwen2.5:7b-instruct, llama3:latest
+      - OLLAMA_TEMPERATURE=0.1                  # Lower = more focused responses
+      - OLLAMA_TIMEOUT=120
+      # Embedding Configuration
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - EMBEDDING_DEVICE=cuda                   # GPU acceleration enabled
+      - EMBEDDING_BATCH_SIZE=64
+      # RAG Configuration
+      - RAG_TOP_K=5                             # Number of context chunks to retrieve
+      - RAG_SIMILARITY_THRESHOLD=0.30           # Original: needs improvement but shows best available matches
+      - CHUNK_SIZE=500                          # Document chunk size in tokens
+      - CHUNK_OVERLAP=50
+      # API Configuration
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_RELOAD=false
+      - DEFAULT_LANGUAGE=tr
+      # Logging
+      - LOG_LEVEL=INFO
+      - LOG_FILE=/app/data/logs/scraper.log
+      # Freshdesk Ticket Scraper
+      - FRESHDESK_BASE_URL=https://support.desouttertools.com
+      - FRESHDESK_EMAIL=${FRESHDESK_EMAIL:-}
+      - FRESHDESK_PASSWORD=${FRESHDESK_PASSWORD:-}
+      - TICKET_DOWNLOAD_PDFS=true
+      - TICKET_REQUEST_DELAY=0.5
+      # Qdrant Vector Database (El-Harezmi Pipeline)
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION=desoutter_docs_v2
+      # El-Harezmi Pipeline Configuration
+      - EL_HAREZMI_ROLLOUT=1.0
+      - ENABLE_KG_VALIDATION=true
+      - ENABLE_LLM_EXTRACTION=true
+      - FALLBACK_ON_ERROR=true
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ---------------------------------------------------------------------------
+  # DESOUTTER FRONTEND - React Web Application
+  # Vite-powered React app with admin and technician interfaces
+  # URL: http://localhost:3001
+  # ---------------------------------------------------------------------------
+  desoutter-frontend:
+    build:
+      context: /home/adentechio/desoutter-assistant/frontend
+      dockerfile: Dockerfile
+    image: desoutter-frontend:latest
+    container_name: desoutter-frontend
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:3001:3001"
+    networks:
+      - ai-net
+    environment:
+      - VITE_API_URL=https://harezmi-api.adentechio.dev  # External API URL (works locally and externally via CF Tunnel)
+    depends_on:
+      - desoutter-api
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  ai-net:
+    name: ai-net
+    external: true                              # Pre-created external network
+
+# =============================================================================
+# VOLUMES - Persistent Data Storage
+# =============================================================================
+volumes:
+  ollama:
+    name: ollama
+    external: true                              # LLM model files
+  open-webui:
+    name: open-webui
+    external: true                              # Chat history
+  n8n_data:
+    name: n8n_data
+    external: true                              # Workflow data
+  mongodb_data:
+    name: mongodb_data
+    external: true                              # Database files
+  mongodb_config:
+    name: mongodb_config
+    external: true                              # MongoDB config
+  desoutter_data:
+    name: desoutter_data
+    external: true                              # App data, ChromaDB, logs
+  huggingface_cache:
+    name: huggingface_cache
+    external: true                              # Cached embedding models
+  qdrant_data:
+    name: qdrant_data
+    external: true                              # Vector database files
+  
