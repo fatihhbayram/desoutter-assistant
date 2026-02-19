@@ -129,14 +129,14 @@ class IntentDetector:
                 'torque', 'rpm', 'speed',
                 'power', 'watt', 'voltage', 'volt', 'amp', 'amperage',
                 'weight', 'dimension', 'size', 'length', 'width', 'height',
-                'capacity', 'specification', 'specs', 'spec',
+                'rated capacity', 'specification', 'specs', 'spec',
                 'what is the', 'what are the',
                 'how much', 'how many', 'how heavy', 'how fast',
                 'maximum', 'minimum', 'max', 'min',
-                'rated', 'nominal', 'range',
+                'rated', 'nominal',
                 # Turkish
                 'tork', 'hiz', 'hız', 'guc', 'güç', 'agirlik', 'ağırlık', 'boyut',
-                'ne kadar', 'kac', 'kaç',
+                'kac', 'kaç',
             ],
             
             'calibration': [
@@ -172,14 +172,14 @@ class IntentDetector:
                 'wifi', 'wi-fi', 'wireless',
                 'network', 'ethernet', 'lan',
                 'connect', 'connection', 'connectivity', 'disconnect',
-                'cable', 'wire', 'wiring',
+                'cable connection', 'wire connection',
                 'plug', 'socket', 'port',
                 'communication', 'signal',
                 'pair', 'pairing', 'link',
                 'ip address', 'network setting',
                 'cannot connect',
                 # Turkish
-                'baglanti', 'bağlantı', 'kablosuz', 'kablo', 'ag', 'ağ',
+                'baglanti', 'bağlantı', 'kablosuz', 'ag', 'ağ',
             ],
             
             'installation': [
@@ -217,13 +217,13 @@ class IntentDetector:
             'compatibility': [
                 # English - Tool/Controller matching
                 'compatible', 'compatibility', 'work with', 'works with',
-                'support', 'supports', 'supported',
                 'which controller', 'which version', 'what version',
                 'can i use', 'is it compatible', 'does it work',
                 'require', 'requirement', 'needed for',
                 # Turkish
                 'uyumlu', 'uyumluluk', 'çalışır mı', 'ile çalışır',
                 'hangi controller', 'hangi versiyon', 'hangi sürüm',
+                'versiyonuyla', 'versiyonu',
                 'gerekli mi', 'gereksinim', 'destekliyor mu',
             ],
             
@@ -234,17 +234,18 @@ class IntentDetector:
                 'process', 'method', 'way to', 'how do i',
                 'walkthrough', 'steps to', 'sequence',
                 # Turkish
-                'adım adım', 'prosedür', 'nasıl yapılır', 'yapılır mı',
+                'adım adım', 'adımları', 'adımlar',
+                'prosedür', 'nasıl yapılır', 'yapılır mı',
                 'talimat', 'rehber', 'yöntem', 'işlem', 'sıra',
             ],
             
             'firmware': [
-                # English - Software/Firmware updates
-                'firmware', 'update', 'upgrade', 'downgrade',
-                'version', 'flash', 'software update', 'software version',
-                'latest version', 'new version', 'update firmware',
+                # English - Software/Firmware updates (specific composites)
+                'firmware', 'firmware update', 'firmware upgrade', 'firmware downgrade',
+                'flash', 'software update', 'software version',
+                'firmware version', 'latest firmware', 'update firmware',
                 # Turkish
-                'yazılım', 'güncelleme', 'güncelle', 'versiyon', 'sürüm',
+                'yazılım', 'güncelleme', 'güncelle',
                 'yazılım güncelleme', 'firmware güncelleme',
             ],
             
@@ -260,30 +261,54 @@ class IntentDetector:
             
             'capability_query': [
                 # English - Feature/capability questions
-                'does it have', 'can it', 'is there', 'has',
+                'does it have', 'does it support', 'does this tool support',
+                'can it', 'is there',
                 'feature', 'capability', 'able to', 'capable',
-                'support wifi', 'has bluetooth', 'has wifi',
-                'maximum', 'minimum', 'limit', 'range',
+                'support wifi', 'support bluetooth',
+                'has bluetooth', 'has wifi',
+                'capacity', 'limit',
                 # Turkish
                 'var mı', 'yapabilir mi', 'özellik', 'özelliği',
                 'wifi var mı', 'bluetooth var mı', 'destekler mi',
+                'kapasitesi', 'ne kadar',
                 'maksimum', 'minimum', 'sınır', 'aralık',
             ],
             
             'accessory_query': [
                 # English - Accessory questions
                 'battery', 'batteries', 'charger', 'charging',
-                'dock', 'docking', 'adapter', 'cable', 'cables',
-                'which battery', 'which charger', 'accessory', 'accessories',
+                'dock', 'docking', 'adapter',
+                'cable', 'cables', 'wire', 'wiring',
+                'which battery', 'which charger', 'which cable',
+                'accessory', 'accessories',
                 'spare part', 'replacement part',
                 # Turkish
                 'batarya', 'pil', 'şarj', 'şarj cihazı', 'şarj aleti',
-                'dok', 'adaptör', 'kablo', 'aksesuar',
+                'dok', 'doklar', 'adaptör', 'kablo', 'aksesuar',
+                'uyumlu dok', 'uyumlu batarya', 'uyumlu kablo',
                 'hangi batarya', 'hangi şarj', 'yedek parça',
             ],
         }
         
-        logger.info("IntentDetector initialized (v2.0 - keyword-based)")
+        # Intent priority weights for tie-breaking
+        # Higher = more specific intent, wins when match count + specificity are equal
+        self.intent_priority = {
+            'accessory_query': 10,    # Most specific — about physical items
+            'capability_query': 9,     # Feature/spec questions
+            'compatibility': 8,        # Tool-controller matching
+            'firmware': 7,             # Software updates
+            'procedure': 6,            # Step-by-step guides
+            'configuration': 5,        # Parameter setup
+            'calibration': 4,          # Calibration procedures
+            'installation': 3,         # Setup
+            'maintenance': 3,          # Service
+            'connection': 2,           # Network/connectivity
+            'troubleshoot': 1,         # Problem diagnosis
+            'specification': 1,        # Technical specs
+            'comparison': 1,           # Comparisons
+        }
+        
+        logger.info("IntentDetector initialized (v2.1 - keyword-based with priority weights)")
     
     def detect_intent(
         self,
@@ -304,7 +329,7 @@ class IntentDetector:
             >>> detector = IntentDetector()
             >>> result = detector.detect_intent("Motor stops during operation")
             >>> result.intent.value
-            'troubleshooting'
+            'troubleshoot'
         """
         query_lower = query.lower()
         logger.debug(f"[INTENT] Analyzing query: '{query}'")
@@ -347,10 +372,14 @@ class IntentDetector:
         # Determine winner based on match count, then specificity
         # =====================================================================
         if intent_scores:
-            # Sort by: 1) match count (desc), 2) specificity (desc)
+            # Sort by: 1) match count (desc), 2) specificity (desc), 3) priority (desc)
             best_intent = max(
                 intent_scores.keys(),
-                key=lambda k: (intent_scores[k]['count'], intent_scores[k]['specificity'])
+                key=lambda k: (
+                    intent_scores[k]['count'], 
+                    intent_scores[k]['specificity'],
+                    self.intent_priority.get(k, 0)
+                )
             )
             match_info = intent_scores[best_intent]
             
