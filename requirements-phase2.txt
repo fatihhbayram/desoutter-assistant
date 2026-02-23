@@ -34,8 +34,7 @@ transformers==4.36.2
 huggingface_hub==0.19.3
 
 # Vector Database
-
-# Alternative: qdrant-client==1.7.0
+qdrant-client==1.7.0
 
 # LLM Integration
 ollama==0.1.6
