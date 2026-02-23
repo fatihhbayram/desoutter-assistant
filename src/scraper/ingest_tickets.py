@@ -2,7 +2,7 @@
 """
 Ingest Freshdesk Support Tickets into Vector Database for RAG
 
-This script processes scraped tickets and adds them to ChromaDB
+This script processes scraped tickets and adds them to Qdrant
 for RAG retrieval. Tickets provide valuable Q&A pairs from real
 support cases.
 
@@ -32,7 +32,7 @@ from src.database import MongoDBClient
 from src.database.models import TicketModel
 from src.documents.embeddings import EmbeddingsGenerator
 from src.documents.semantic_chunker import SemanticChunker
-from src.vectordb.chroma_client import ChromaDBClient
+from src.vectordb.qdrant_client import QdrantDBClient
 from src.utils.logger import setup_logger
 from config.settings import DATA_DIR
 
@@ -187,13 +187,12 @@ def main():
     # Initialize components
     logger.info("\n🔧 Initializing components...")
     embeddings_gen = EmbeddingsGenerator()
-    vectordb = ChromaDBClient()
+    vectordb = QdrantDBClient()  # Qdrant (migrated from ChromaDB)
     
     # Optional: Clear existing ticket embeddings
     if args.clear:
         logger.info("🗑️  Clearing existing ticket embeddings...")
-        # Note: This requires filtering by doc_type in ChromaDB
-        # For now, we'll rely on deduplication
+        # Note: Use reingest_adaptive.py --delete-first for full Qdrant cleanup
     
     # Chunk content
     if args.no_chunk:
@@ -227,17 +226,27 @@ def main():
     
     # Add to vector database
     logger.info("\n💾 Storing in vector database...")
-    vectordb.add_documents(prepared_chunks, embeddings, check_duplicates=True)
+    docs_to_upsert = []
+    for chunk, emb in zip(prepared_chunks, embeddings):
+        docs_to_upsert.append({
+            'id': chunk['chunk_id'],
+            'text': chunk['text'],
+            'embedding': emb,
+            'metadata': chunk['metadata']
+        })
+    vectordb.upsert(docs_to_upsert)
     
     # Summary
     elapsed = (datetime.now() - start_time).total_seconds()
+    
+    info = vectordb.get_collection_info() or {}
     
     logger.info("\n" + "=" * 70)
     logger.info("✅ TICKET INGESTION COMPLETE!")
     logger.info(f"   Time: {elapsed:.1f} seconds")
     logger.info(f"   Tickets processed: {len(rag_docs)}")
     logger.info(f"   Chunks created: {len(prepared_chunks)}")
-    logger.info(f"   Total in DB: {vectordb.get_count()}")
+    logger.info(f"   Total in DB: {info.get('points_count', 0)}")
     logger.info("=" * 70)
 
 

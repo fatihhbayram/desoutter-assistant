@@ -53,9 +53,7 @@ except ImportError:
 # CONFIGURATION
 # =============================================================================
 
-QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
-QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
-COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "desoutter_docs_v2")
+from config.ai_settings import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION
 VECTOR_SIZE = 384  # all-MiniLM-L6-v2 embedding dimension
 
 
@@ -84,7 +82,7 @@ class QdrantDBClient:
         self,
         host: str = QDRANT_HOST,
         port: int = QDRANT_PORT,
-        collection_name: str = COLLECTION_NAME
+        collection_name: str = QDRANT_COLLECTION
     ):
         """
         Initialize Qdrant client.
@@ -457,7 +455,7 @@ if __name__ == "__main__":
         
         # Ensure collection
         if client.ensure_collection():
-            print(f"✅ Collection '{COLLECTION_NAME}' ready")
+            print(f"✅ Collection '{QDRANT_COLLECTION}' ready")
         
         # Get info
         info = client.get_collection_info()

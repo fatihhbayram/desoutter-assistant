@@ -166,7 +166,7 @@ desoutter-assistant/
          │                    │                           │
          ▼                    ▼                           ▼
 ┌─────────────────┐  ┌─────────────────┐         ┌─────────────────┐
-│    MongoDB      │  │     Ollama      │         │    ChromaDB     │
+│    MongoDB      │  │     Ollama      │         │     Qdrant      │
 │    (27017)      │  │    (11434)      │         │   (Embedded)    │
 │  • users        │  │  Qwen2.5:7b     │         │  28,414 chunks  │
 │  • feedback     │  │  GPU-accelerated│         │  384-dim vectors│
@@ -238,7 +238,7 @@ The heart of the system - each query passes through 14 stages for high-quality r
 | Component | Technology | Purpose |
 |-----------|------------|---------|
 | **LLM** | Ollama + Qwen2.5:7b-instruct | Natural language understanding & generation |
-| **Vector DB** | ChromaDB 0.4.22 | Semantic document storage and retrieval |
+| **Vector DB** | Qdrant | Fast, scalable semantic document storage and payload filtering |
 | **Embeddings** | Sentence Transformers (all-MiniLM-L6-v2) | 384-dimensional vector generation |
 | **Keyword Search** | BM25 (Custom Implementation) | Fast keyword-based retrieval |
 | **Orchestration** | LangChain 0.1 | RAG workflow management |
@@ -367,7 +367,7 @@ curl -X POST http://localhost:8000/diagnose \
 |--------|-------|
 | **Test Pass Rate** | 88% (22/25 scenarios) |
 | **Total Products** | 451 (71 wireless, 380 cable) |
-| **ChromaDB Chunks** | 28,414 semantic chunks |
+| **Qdrant Vector DB** | 26,513 semantic chunks with rich metadata |
 | **Indexed Documents** | 541 (121 PDF + 420 Word) |
 | **Freshdesk Tickets** | 2,249 processed |
 | **BM25 Index Terms** | 19,032 unique terms |
@@ -750,7 +750,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - **Ollama** - Local LLM serving infrastructure
-- **ChromaDB** - High-performance vector database
+- **Qdrant** - High-performance scalable vector database with metadata filtering
 - **HuggingFace** - Sentence transformers and model hub
 - **FastAPI** - Modern Python web framework
 - **LangChain** - RAG orchestration framework
@@ -758,7 +758,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <p align="center">
-  <strong>Powered by</strong> Ollama | ChromaDB | FastAPI | React | BM25
+  <strong>Powered by</strong> Ollama | Qdrant | FastAPI | React | BM25
   <br><br>
   <em>Production-Ready Enterprise RAG System v1.8.0</em>
 </p>

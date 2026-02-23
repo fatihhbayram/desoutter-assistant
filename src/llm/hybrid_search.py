@@ -6,7 +6,7 @@ Combines semantic search (dense) with BM25 keyword search (sparse)
 for improved retrieval coverage.
 
 Features:
-- Semantic search via ChromaDB embeddings
+- Semantic search via Qdrant embeddings
 - BM25 keyword search for exact term matching
 - Reciprocal Rank Fusion (RRF) for score combination
 - Metadata-based filtering
@@ -24,7 +24,7 @@ from typing import List, Dict, Optional, Set, Tuple
 from collections import defaultdict
 from dataclasses import dataclass
 
-from src.vectordb.chroma_client import ChromaDBClient
+from src.vectordb.qdrant_client import QdrantDBClient
 from src.documents.embeddings import EmbeddingsGenerator
 from src.utils.logger import setup_logger
 
@@ -383,11 +383,11 @@ class HybridSearcher:
     Hybrid search combining semantic and keyword (BM25) retrieval.
     
     Uses Reciprocal Rank Fusion (RRF) to combine rankings from:
-    - Dense retrieval: ChromaDB semantic embeddings
+    - Dense retrieval: Qdrant semantic embeddings
     - Sparse retrieval: BM25 keyword matching
     
     Features:
-    - Automatic BM25 index building from ChromaDB
+    - Automatic BM25 index building from Qdrant
     - Query expansion with domain synonyms
     - Metadata-based filtering and boosting
     - Configurable fusion weights
@@ -413,46 +413,64 @@ class HybridSearcher:
         self.semantic_weight = semantic_weight
         self.bm25_weight = bm25_weight
         
-        # Initialize components
+        # Initialize components (Qdrant initialized lazily)
         self.embeddings = EmbeddingsGenerator()
-        self.chromadb = ChromaDBClient()
+        self._qdrant = None
         self.bm25_index = BM25Index()
         self.query_expander = QueryExpander()
         self.metadata_filter = MetadataFilter()
         
-        # Build BM25 index from ChromaDB
-        self._build_bm25_index()
+        # Build BM25 index from Qdrant if possible
+        try:
+            self._build_bm25_index()
+        except Exception as e:
+            logger.warning(f"Could not build BM25 index during init: {e}")
         
         logger.info("✅ HybridSearcher initialized")
     
+    @property
+    def qdrant(self):
+        """Lazy initialization of Qdrant client"""
+        if self._qdrant is None:
+            self._qdrant = QdrantDBClient()
+        return self._qdrant
+    
     def _build_bm25_index(self):
-        """Build BM25 index from ChromaDB documents"""
+        """Build BM25 index from Qdrant documents"""
         try:
-            # Get all documents from ChromaDB
-            collection = self.chromadb.collection
-            count = collection.count()
-            
-            if count == 0:
-                logger.warning("ChromaDB is empty, BM25 index will be empty")
+            info = self.qdrant.get_collection_info()
+            if not info:
+                logger.warning("Could not get Qdrant info, BM25 index will be empty")
                 return
             
-            # Fetch documents in batches
+            count = info.get("points_count", 0)
+            
+            if count == 0:
+                logger.warning("Qdrant is empty, BM25 index will be empty")
+                return
+            
+            # Fetch documents from Qdrant in batches
             batch_size = 1000
             all_docs = []
+            offset = None
             
-            for offset in range(0, count, batch_size):
-                results = collection.get(
+            while True:
+                results, next_offset = self.qdrant.client.scroll(
+                    collection_name=self.qdrant.collection_name,
                     limit=batch_size,
                     offset=offset,
-                    include=["documents", "metadatas"]
+                    with_payload=True
                 )
-                
-                for i, doc_id in enumerate(results['ids']):
+                for point in results:
+                    payload = point.payload or {}
                     all_docs.append({
-                        'id': doc_id,
-                        'content': results['documents'][i] if results['documents'] else '',
-                        'metadata': results['metadatas'][i] if results['metadatas'] else {}
+                        'id': str(point.id),
+                        'content': payload.get('text', ''),
+                        'metadata': payload
                     })
+                if next_offset is None:
+                    break
+                offset = next_offset
             
             # Build BM25 index
             self.bm25_index.add_documents(all_docs)
@@ -586,43 +604,29 @@ class HybridSearcher:
         where_filter: Optional[Dict],
         min_similarity: float
     ) -> List[SearchResult]:
-        """Perform semantic search via ChromaDB"""
+        """Perform semantic search via Qdrant"""
         try:
-            # Generate query embedding
             query_embedding = self.embeddings.generate_embeddings([query])[0]
-            
-            # Query ChromaDB
-            results = self.chromadb.query(
-                query_text=query,
-                query_embedding=query_embedding,
-                n_results=top_k,
-                where=where_filter
+            results = self.qdrant.client.search(
+                collection_name=self.qdrant.collection_name,
+                query_vector=("dense", query_embedding),
+                limit=top_k,
+                query_filter=where_filter
             )
-            
             search_results = []
-            for i, (doc_id, doc, metadata, distance) in enumerate(zip(
-                results.get('ids', [[]])[0],
-                results.get('documents', [[]])[0],
-                results.get('metadatas', [[]])[0],
-                results.get('distances', [[]])[0]
-            )):
-                # L2 distance to similarity conversion
-                # L2 distance range: [0, 2] (for normalized vectors)
-                # Similarity range: [0, 1]
-                similarity = max(0, 1 - (distance / 2))
-                
+            for point in results:
+                payload = point.payload or {}
+                similarity = point.score
                 if similarity >= min_similarity:
                     search_results.append(SearchResult(
-                        id=doc_id,
-                        content=doc,
-                        metadata=metadata or {},
+                        id=str(point.id),
+                        content=payload.get('text', ''),
+                        metadata=payload,
                         score=similarity,
                         source='semantic',
                         similarity=similarity
                     ))
-            
             return search_results
-            
         except Exception as e:
             logger.error(f"Semantic search failed: {e}")
             return []

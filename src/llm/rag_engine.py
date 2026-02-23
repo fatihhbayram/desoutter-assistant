@@ -15,11 +15,12 @@ import time
 import re
 
 from src.documents.embeddings import EmbeddingsGenerator
-from src.vectordb.chroma_client import ChromaDBClient
+from src.vectordb.qdrant_client import QdrantDBClient
+from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny
 from src.llm.ollama_client import OllamaClient
 from src.llm.prompts import get_system_prompt, build_rag_prompt, build_fallback_response
 from src.llm.context_optimizer import ContextOptimizer, optimize_context_for_rag
-from src.documents.product_extractor import ProductExtractor, IntelligentProductExtractor  # Metadata Enrichment
+from src.documents.product_extractor import ProductExtractor, IntelligentProductExtractor
 from src.llm.performance_metrics import get_performance_monitor, QueryTimer, QueryMetrics
 from src.database import MongoDBClient
 from config.ai_settings import (
@@ -30,7 +31,7 @@ from config.ai_settings import (
     ENABLE_METADATA_BOOST, SERVICE_BULLETIN_BOOST, PROCEDURE_BOOST,
     WARNING_BOOST, IMPORTANCE_BOOST_FACTOR,
     ENABLE_DOMAIN_EMBEDDINGS, ENABLE_FAULT_FILTERING,
-    LLM_TIMEOUT_SECONDS, CHROMADB_TIMEOUT_SECONDS
+    LLM_TIMEOUT_SECONDS
 )
 from src.utils.logger import setup_logger
 
@@ -77,12 +78,19 @@ class RAGEngine:
         'için', 'ile', 'veya', 'ama', 'fakat', 'mı', 'mi', 'mu', 'mü'
     ]
     
+    @property
+    def vectordb(self):
+        """Lazy initialization of Vector DB client"""
+        if self._vectordb is None:
+            self._vectordb = QdrantDBClient()
+        return self._vectordb
+        
     def __init__(self):
         """Initialize RAG engine"""
         logger.info("Initializing RAG Engine...")
         
         self.embeddings = EmbeddingsGenerator()
-        self.vectordb = ChromaDBClient()
+        self._vectordb = None  # Lazy initialization due to connection checks
         self.llm = OllamaClient()
         self.mongodb = None
         self.feedback_engine = None
@@ -813,15 +821,15 @@ class RAGEngine:
             families_to_include.extend(FAMILY_ALIASES[detected_family])
             logger.info(f"[FILTER] Including aliases: {FAMILY_ALIASES[detected_family]}")
         
-        # Build OR conditions for all families
-        family_conditions = [{"product_family": {"$eq": f}} for f in families_to_include]
-        family_conditions.extend([
-            {"product_family": {"$eq": "GENERAL"}},
-            {"product_family": {"$eq": "UNKNOWN"}},
-            {"is_generic": {"$eq": True}}
-        ])
+        # Build OR conditions using Qdrant Filter
+        allowed_families = families_to_include + ["GENERAL", "UNKNOWN"]
         
-        where_filter = {"$or": family_conditions}
+        where_filter = Filter(
+            should=[
+                FieldCondition(key="product_family", match=MatchAny(any=allowed_families)),
+                FieldCondition(key="is_generic", match=MatchValue(value=True))
+            ]
+        )
         
         logger.info(f"[FILTER] Applying filter for family: {detected_family}")
         return where_filter

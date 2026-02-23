@@ -5,7 +5,7 @@ Phase 2 Configuration - AI & RAG Components
 This module contains all AI-related configuration settings for the
 Desoutter Repair Assistant, including:
 - Document storage paths (manuals, bulletins)
-- Vector database settings (ChromaDB)
+- Vector database settings (Qdrant)
 - Embedding model configuration (HuggingFace sentence-transformers)
 - LLM settings (Ollama with qwen2.5:7b-instruct)
 - RAG (Retrieval Augmented Generation) parameters
@@ -47,22 +47,18 @@ for directory in [DOCUMENTS_DIR, MANUALS_DIR, BULLETINS_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
 # =============================================================================
-# VECTOR DATABASE CONFIGURATION (ChromaDB)
+# VECTOR DATABASE CONFIGURATION (Qdrant)
 # =============================================================================
-# ChromaDB stores document embeddings for semantic search
-# The vector database enables fast similarity search for RAG retrieval
+# Qdrant stores document embeddings for semantic search (migrated from ChromaDB)
+# Qdrant runs as a Docker service — see ai-stack.yml
 
 VECTORDB_DIR = DATA_DIR / "vectordb"
 VECTORDB_DIR.mkdir(parents=True, exist_ok=True)
 
-# Database type: 'chroma' (default) or 'qdrant' (alternative)
-VECTOR_DB_TYPE = os.getenv("VECTOR_DB_TYPE", "chroma")
-
-# ChromaDB persistence directory - stores the vector index on disk
-CHROMA_PERSIST_DIR = str(VECTORDB_DIR / "chroma")
-
-# Collection name within ChromaDB - logical grouping of documents
-CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", "desoutter_docs")
+# Qdrant connection settings (set via environment in ai-stack.yml)
+QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
+QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "desoutter_docs_v2")
 
 # =============================================================================
 # EMBEDDING MODEL CONFIGURATION (HuggingFace)
@@ -401,7 +397,3 @@ FIXED_CHUNK_SIZE = int(os.getenv("FIXED_CHUNK_SIZE", "600"))
 # LLM generation timeout in seconds
 # If LLM takes longer, return error instead of waiting
 LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "10"))
-
-# ChromaDB query timeout in seconds
-# If vector search takes longer, return error
-CHROMADB_TIMEOUT_SECONDS = int(os.getenv("CHROMADB_TIMEOUT_SECONDS", "3"))

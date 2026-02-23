@@ -1,4 +1,4 @@
 """Vector database module"""
-from .chroma_client import ChromaDBClient
+from .qdrant_client import QdrantDBClient
 
-__all__ = ['ChromaDBClient']
+__all__ = ['QdrantDBClient']

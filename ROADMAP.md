@@ -64,7 +64,7 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 | Date | Milestone | Description |
 |------|-----------|-------------|
 | Nov 28 | Authentication | JWT-based login with role management |
-| Nov 27 | RAG Engine | PDF processing, ChromaDB integration |
+| Nov 27 | RAG Engine | PDF processing, Qdrant integration |
 | Nov 26 | Ollama Integration | Local LLM with GPU support |
 | Nov 22 | Project Start | Initial setup, scraper, MongoDB |
 
@@ -76,7 +76,7 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 
 - [x] **Intelligent Product Filtering** ✅ (Jan 5)
   - Pattern-based `IntelligentProductExtractor` (40+ regex patterns)
-  - ChromaDB `where` clause filtering at query time
+  - Qdrant `where` clause filtering at query time
   - CVI3 query → Only CVI3 documents returned
   - 91.7% test pass rate
 

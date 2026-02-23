@@ -34,7 +34,7 @@ from src.documents.chunkers import (
     Chunk
 )
 from src.documents.document_classifier import DocumentClassifier
-from src.vectordb.qdrant_client import QdrantVectorDB
+from src.vectordb.qdrant_client import QdrantDBClient
 
 # Configure logging
 logging.basicConfig(
@@ -89,7 +89,7 @@ class AdaptiveIngestionPipeline:
         
         # Initialize Qdrant (only if not dry run)
         if not dry_run:
-            self.qdrant = QdrantVectorDB(
+            self.qdrant = QdrantDBClient(
                 host=qdrant_url,
                 port=qdrant_port,
                 collection_name=collection_name,
