@@ -167,8 +167,8 @@ desoutter-assistant/
          ▼                    ▼                           ▼
 ┌─────────────────┐  ┌─────────────────┐         ┌─────────────────┐
 │    MongoDB      │  │     Ollama      │         │     Qdrant      │
-│    (27017)      │  │    (11434)      │         │   (Embedded)    │
-│  • users        │  │  Qwen2.5:7b     │         │  28,414 chunks  │
+│    (27017)      │  │    (11434)      │         │    (v1.7.4)     │
+│  • users        │  │  Qwen2.5:7b     │         │  26,513 chunks  │
 │  • feedback     │  │  GPU-accelerated│         │  384-dim vectors│
 │  • mappings     │  └─────────────────┘         └─────────────────┘
 └─────────────────┘
@@ -691,7 +691,7 @@ python scripts/test_product_filtering.py
 - [x] Multi-turn Conversation
 - [x] GPU Acceleration with RTX A2000
 - [x] Intelligent Product Filtering
-- [x] 28,414 chunks re-ingested with product metadata
+- [x] 26,513 chunks ingested with product metadata (Qdrant v1.7.4)
 
 ### In Progress (Q1 2026)
 - [ ] Freshdesk Ticket Integration
@@ -699,7 +699,7 @@ python scripts/test_product_filtering.py
 
 ### Planned (Q2 2026)
 - [ ] Field Installation Support (extend beyond repair to on-site tool setup and commissioning)
-- [ ] Qdrant Migration (10x scalability, 100M+ vectors)
+- [ ] Qdrant Scaling (scale to 100M+ vectors for multi-tenant deployment)
 - [ ] Prompt Caching (40% latency reduction)
 - [ ] Async Ingestion Queue (Celery + Redis)
 - [ ] Fine-tuned Embeddings (15-20% accuracy improvement)

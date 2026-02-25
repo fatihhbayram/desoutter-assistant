@@ -761,15 +761,15 @@ class RAGEngine:
     
     def _build_product_filter(self, query: str, product_info: Dict = None) -> Optional[Dict]:
         """
-        Build ChromaDB filter based on product context.
+        Build Qdrant filter based on product context.
         NEW: Applies filtering at query time for efficient retrieval.
-        
+
         Args:
             query: User's query text
             product_info: Selected product info from database (if available)
-        
+
         Returns:
-            ChromaDB where clause or None for no filtering
+            Qdrant filter dict or None for no filtering
         """
         detected_family = None
         
@@ -794,7 +794,7 @@ class RAGEngine:
             logger.info("[FILTER] No product context detected - searching all documents")
             return None
         
-        # Build ChromaDB where filter
+        # Build Qdrant metadata filter
         # Include: matching family + aliases + GENERAL (generic docs) + UNKNOWN (unclassified)
         
         # Family aliases for cross-product retrieval
@@ -989,7 +989,7 @@ class RAGEngine:
         if part_number:
             product_info = self.get_product_info(part_number)
         
-        # NEW: Build product filter for ChromaDB
+        # Build product filter for Qdrant
         product_filter = self._build_product_filter(query, product_info)
         
         # Still get target categories for client-side filtering (fallback)
@@ -1041,18 +1041,18 @@ class RAGEngine:
         top_k: int, 
         original_query: str = None,
         target_categories: List[str] = None,
-        product_filter: Optional[Dict] = None  # NEW: ChromaDB where clause
+        product_filter: Optional[Dict] = None  # Qdrant metadata filter
     ) -> Dict:
         """Retrieve using hybrid search (semantic + BM25) with metadata filtering and self-learning"""
-        # Pass product_filter to hybrid searcher for ChromaDB filtering
+        # Pass product_filter to hybrid searcher for Qdrant filtering
         if product_filter:
-            logger.info("[HYBRID] Product filter active, passing to ChromaDB query")
+            logger.info("[HYBRID] Product filter active, passing to Qdrant query")
         results = self.hybrid_searcher.search(
             query=query,
             top_k=top_k * 2,  # Get more candidates for boosting/reranking
             expand_query=ENABLE_QUERY_EXPANSION,
             use_hybrid=True,
-            where_filter=product_filter,  # NEW: Pass product filter to ChromaDB
+            where_filter=product_filter,  # Pass product filter to Qdrant
             min_similarity=RAG_SIMILARITY_THRESHOLD
         )
         
@@ -1158,7 +1158,7 @@ class RAGEngine:
         part_number: Optional[str],
         top_k: int,
         target_categories: List[str] = None,
-        product_filter: Optional[Dict] = None  # NEW: ChromaDB where clause
+        product_filter: Optional[Dict] = None  # Qdrant metadata filter
     ) -> Dict:
         """Fallback: retrieve using standard semantic search with product filtering"""
         

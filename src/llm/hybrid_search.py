@@ -284,17 +284,17 @@ class MetadataFilter:
         fault_keywords: Optional[List[str]] = None
     ) -> Optional[Dict]:
         """
-        Build ChromaDB where filter from criteria.
-        
+        Build Qdrant metadata filter from criteria.
+
         Args:
             doc_types: Allowed document types
             min_importance: Minimum importance score
             require_warning: Only warning content
             require_procedure: Only procedural content
             fault_keywords: Required fault keywords
-            
+
         Returns:
-            ChromaDB where filter dict or None
+            Qdrant metadata filter dict or None
         """
         conditions = []
         
@@ -497,7 +497,7 @@ class HybridSearcher:
             top_k: Number of results to return
             expand_query: Whether to expand query with synonyms
             use_hybrid: Whether to use hybrid (True) or semantic-only (False)
-            where_filter: ChromaDB metadata filter
+            where_filter: Qdrant metadata filter
             min_similarity: Minimum similarity threshold
             
         Returns:
