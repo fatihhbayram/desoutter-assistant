@@ -156,7 +156,9 @@ OLLAMA_MAX_TOKENS = int(os.getenv("OLLAMA_MAX_TOKENS", "512"))
 
 # Number of most similar chunks to retrieve for context
 # Higher = more context but may include less relevant information
-RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
+# Priority 1.3: Increased from 5 to 7 for better multi-step procedure coverage
+# Reason: Procedure steps can be split across chunks (Step 1, 2, 3...)
+RAG_TOP_K = int(os.getenv("RAG_TOP_K", "7"))
 
 # Minimum similarity score (0.0-1.0) to consider a chunk relevant
 # Higher = stricter matching, may miss relevant info

@@ -491,7 +491,7 @@ class HybridSearcher:
     ) -> List[SearchResult]:
         """
         Perform hybrid search with symptom synonym expansion and bulletin prioritization.
-        
+
         Args:
             query: Search query
             top_k: Number of results to return
@@ -499,10 +499,22 @@ class HybridSearcher:
             use_hybrid: Whether to use hybrid (True) or semantic-only (False)
             where_filter: Qdrant metadata filter
             min_similarity: Minimum similarity threshold
-            
+
         Returns:
             List of SearchResult sorted by hybrid score
         """
+        # Priority 1.1: Dynamic weight adjustment based on query type
+        from config.ai_settings import get_dynamic_weights
+        bm25_weight, semantic_weight = get_dynamic_weights(query)
+
+        # Override instance weights for this query
+        original_bm25_weight = self.bm25_weight
+        original_semantic_weight = self.semantic_weight
+        self.bm25_weight = bm25_weight
+        self.semantic_weight = semantic_weight
+
+        logger.info(f"Dynamic weights for '{query[:30]}...': BM25={bm25_weight:.2f}, Semantic={semantic_weight:.2f}")
+
         # Query expansion with domain synonyms
         queries = [query]
         if expand_query:
@@ -559,6 +571,11 @@ class HybridSearcher:
                     break
         
         logger.info(f"Hybrid search '{query[:50]}...' -> {len(unique_results)} results")
+
+        # Restore original weights
+        self.bm25_weight = original_bm25_weight
+        self.semantic_weight = original_semantic_weight
+
         return unique_results
     
     def _deduplicate_bulletins(self, results: List[SearchResult]) -> List[SearchResult]:

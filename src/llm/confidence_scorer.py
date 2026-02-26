@@ -30,19 +30,44 @@ class ConfidenceScorer:
     2. Intent match (how well we understand the query)
     3. Response quality (length, structure)
     4. Context sufficiency (from grounding check)
-    
+
     Thresholds:
     - HIGH: >= 0.7
-    - MEDIUM: >= 0.5
+    - MEDIUM: >= 0.5 (or 0.4 for narrow-scope intents - Priority 1.2)
     - LOW: < 0.5
     """
-    
+
     # Thresholds for confidence levels
     HIGH_THRESHOLD = 0.7
     MEDIUM_THRESHOLD = 0.5
+
+    # Priority 1.2: Intent-specific thresholds
+    # Narrow-scope intents need lower threshold (more tolerant)
+    NARROW_SCOPE_INTENTS = {
+        'compatibility', 'connection', 'specification',
+        'calibration', 'configuration'
+    }
+    NARROW_SCOPE_THRESHOLD = 0.4  # More tolerant than default 0.5
     
     def __init__(self):
         logger.info("ConfidenceScorer initialized")
+
+    def get_threshold_for_intent(self, intent: Optional[str]) -> float:
+        """
+        Priority 1.2: Get intent-specific confidence threshold.
+
+        Narrow-scope intents (compatibility, connection, specification)
+        use a lower threshold (0.4) to be more tolerant.
+
+        Args:
+            intent: Detected intent type
+
+        Returns:
+            Threshold value (0.4 for narrow-scope, 0.5 for others)
+        """
+        if intent and intent.lower() in self.NARROW_SCOPE_INTENTS:
+            return self.NARROW_SCOPE_THRESHOLD
+        return self.MEDIUM_THRESHOLD
     
     def calculate_confidence(
         self,
@@ -108,11 +133,14 @@ class ConfidenceScorer:
         }
         
         total_score = sum(factors[k] * weights[k] for k in weights.keys())
-        
+
+        # Priority 1.2: Use intent-specific threshold
+        medium_threshold = self.get_threshold_for_intent(intent)
+
         # Determine level
         if total_score >= self.HIGH_THRESHOLD:
             level = "high"
-        elif total_score >= self.MEDIUM_THRESHOLD:
+        elif total_score >= medium_threshold:
             level = "medium"
         else:
             level = "low"
