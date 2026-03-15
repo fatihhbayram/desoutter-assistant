@@ -38,6 +38,13 @@ TROUBLESHOOTING_SYSTEM_PROMPT_EN = """You are a technical support engineer speci
 - NEVER guess or assume - ONLY state facts from documents
 - ALWAYS cite which document section you're referencing (e.g., "Manual Section 4.2")
 
+**KEY TERMS REPETITION:**
+- If the user query contains specific product names, error codes, or technical terms, INCLUDE them in your response
+- Example: Query mentions "CVI3" → Your response must mention "CVI3"
+- Example: Query mentions "overheating" → Your response must mention "heat", "temperature", or "overheat"
+- Example: Query mentions "E06" → Your response must mention "E06"
+- This helps users verify you understood their exact question
+
 **Response Structure (When Bulletin Found):**
 1. **⚠️ KNOWN ISSUE**: Bulletin ID and title
 2. **Affected Products**: Serial number ranges if specified
@@ -278,6 +285,12 @@ GENERAL_SYSTEM_PROMPT_EN = """You are an expert technician assistant for Desoutt
 - Suggest contacting Desoutter support for undocumented queries
 - NEVER guess or provide information not in context
 
+**KEY TERMS REPETITION:**
+- If the user query contains specific product names, error codes, or technical terms, INCLUDE them in your response
+- Example: Query mentions "CVI3" → Your response must mention "CVI3"
+- Example: Query mentions "WiFi" → Your response must mention "WiFi" or "wireless"
+- This helps users verify you understood their exact question
+
 **CRITICAL: Response Length Limits (Priority 2.1)**
 - Maximum 4 bullet points OR 4 sentences per section
 - For procedures: List ONLY main steps (not sub-details)
@@ -322,6 +335,12 @@ YANITLAMA KURALLARI:
 3. ✅ Sayılar ve birimler aynen kalabilir (5.2 Nm, 1800 rpm)
 4. ❌ İngilizce cümle veya paragraf YAZMA
 5. ❌ "The tool", "Check the", "If error" gibi İngilizce ifadeler KULLANMA
+
+**ÖNEMLİ TERİMLERİ TEKRARLA:**
+- Kullanıcının sorusunda geçen ürün isimleri, hata kodları veya teknik terimleri cevabında MUTLAKA kullan
+- Örnek: Soru "CVI3" içeriyorsa → Cevabın "CVI3" içermeli
+- Örnek: Soru "WiFi" içeriyorsa → Cevabın "WiFi" veya "kablosuz" içermeli
+- Bu kullanıcının tam olarak anlaşıldığını gösterir
 
 Genel Kurallar:
 - Açık, teknik dil kullan

@@ -12,17 +12,19 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 
 ## 📊 Current Status
 
-**Phase**: Production-Ready RAG System with Self-Learning
+**Phase**: Phase 6 - Tuning & Accuracy Improvements (In Progress)
 
 | Metric | Value |
 |--------|-------|
-| Test Pass Rate | 96% (24/25 scenarios) |
+| Test Pass Rate | 85% (34/40 scenarios) |
+| Timeout Rate | 0% (all resolved) |
 | Products Indexed | 451 |
 | Documents Processed | 541 |
 | Freshdesk Tickets | 2,249 |
-| Semantic Chunks | ~26,528 |
+| Semantic Chunks | 26,513 (Qdrant) |
 | BM25 Terms | 19,032 |
 | Domain Terms | 351 |
+| Intent Types | 15 (expanded) |
 
 ---
 
@@ -71,6 +73,30 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 ---
 
 ## 🔄 In Progress
+
+### March 2026 - Phase 6: Tuning & Accuracy
+
+- [x] **Test Suite Quality Improvements** ✅ (Mar 15)
+  - Fixed fake error codes in tests (E123 → E06)
+  - Converted vague queries to specific technical questions
+  - Expanded test coverage: 25 → 40 scenarios
+  - Relaxed overly strict expectations
+
+- [x] **Timeout Elimination** ✅ (Mar 15)
+  - All 3 timeout issues resolved (TROUBLE_002, GEN_001, CALIB_002)
+  - Timeout rate: 7.5% → 0%
+  - Avg response time: 23.6s
+
+- [x] **Prompt Hardening** ⚠️ (Mar 15)
+  - Added "KEY TERMS REPETITION" rule to prompts
+  - LLM now echoes important terms from queries
+  - Mixed results: +3 fixed, -3 broken (net zero improvement)
+  - Status: Under review
+
+- [ ] **Error Code Investigation** (Next)
+  - Verify E804, E06 exist in knowledge base
+  - Fix ERROR_001, ERROR_002 low confidence issues
+  - Target: 90% pass rate (36/40)
 
 ### January 2026
 

@@ -7,9 +7,9 @@
 [![React](https://img.shields.io/badge/React-18.2+-61DAFB?logo=react&logoColor=white)](https://reactjs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-88%25%20Passing-success)](test_results/)
+[![Tests](https://img.shields.io/badge/Tests-85%25%20Passing-success)](test_results/)
 
-An intelligent **Retrieval-Augmented Generation (RAG)** system that provides context-aware repair and troubleshooting assistance for Desoutter industrial tools. Features a self-learning feedback loop, 14-stage quality pipeline, and production-grade architecture achieving **88% test pass rate**.
+An intelligent **Retrieval-Augmented Generation (RAG)** system that provides context-aware repair and troubleshooting assistance for Desoutter industrial tools. Features a self-learning feedback loop, 14-stage quality pipeline, and production-grade architecture achieving **85% test pass rate** (34/40 scenarios).
 
 ---
 
@@ -365,7 +365,8 @@ curl -X POST http://localhost:8000/diagnose \
 
 | Metric | Value |
 |--------|-------|
-| **Test Pass Rate** | 88% (22/25 scenarios) |
+| **Test Pass Rate** | 85% (34/40 scenarios) |
+| **Timeout Rate** | 0% (all resolved) |
 | **Total Products** | 451 (71 wireless, 380 cable) |
 | **Qdrant Vector DB** | 26,513 semantic chunks with rich metadata |
 | **Indexed Documents** | 541 (121 PDF + 420 Word) |
@@ -374,7 +375,8 @@ curl -X POST http://localhost:8000/diagnose \
 | **Domain Terms** | 351 Desoutter-specific |
 | **Cache Speedup** | ~100,000x for repeated queries |
 | **Hallucination Rate** | <2% |
-| **Intent Categories** | 8 specialized types |
+| **Intent Categories** | 15 types (troubleshoot, error_code, spec, config, compat, etc.) |
+| **Avg Response Time** | 23.6s (non-cached) |
 
 ---
 
