@@ -56,7 +56,8 @@ except ImportError:
     EXCEL_AVAILABLE = False
 
 # Semantic chunking for Phase 1-2 enhancement
-from src.documents.semantic_chunker import SemanticChunker, DocumentType, ChunkMetadata
+from src.documents.chunkers.semantic_chunker import SemanticChunker
+from src.documents.document_classifier import DocumentType
 from src.documents.product_extractor import ProductExtractor
 
 logger = setup_logger(__name__)
