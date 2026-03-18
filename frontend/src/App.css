@@ -3375,6 +3375,7 @@ html, body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1rem;
+  overflow: hidden;
 }
 
 .chart-card {
@@ -3382,6 +3383,7 @@ html, body {
   border-radius: 12px;
   padding: 1.5rem;
   box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
 .chart-card h3 {
@@ -3397,6 +3399,7 @@ html, body {
   justify-content: space-between;
   height: 150px;
   padding-top: 20px;
+  overflow: hidden;
 }
 
 .chart-bar-item {
@@ -3409,6 +3412,7 @@ html, body {
 .chart-bar {
   width: 30px;
   min-height: 10px;
+  max-height: 150px;
   border-radius: 4px 4px 0 0;
   display: flex;
   justify-content: center;

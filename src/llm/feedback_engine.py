@@ -586,7 +586,7 @@ class FeedbackLearningEngine:
         """
         self._ensure_connection()
         from datetime import datetime, timedelta
-        
+
         # =====================================================================
         # TIME RANGES
         # =====================================================================

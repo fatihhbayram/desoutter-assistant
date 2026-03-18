@@ -412,6 +412,22 @@ class QdrantDBClient:
             logger.error(f"Failed to get collection info: {e}")
             return None
     
+    def get_count(self) -> int:
+        """
+        Get total number of documents in the collection.
+
+        Returns:
+            Total document count, or 0 if collection doesn't exist
+        """
+        try:
+            info = self.client.get_collection(self.collection_name)
+            # Handle different Qdrant client versions
+            points_count = getattr(info, 'points_count', 0)
+            return points_count if points_count is not None else 0
+        except Exception as e:
+            logger.error(f"Failed to get document count: {e}")
+            return 0
+
     def health_check(self) -> bool:
         """Check if Qdrant is healthy"""
         try:

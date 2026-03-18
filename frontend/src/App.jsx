@@ -791,20 +791,34 @@ function App() {
             <div className="chart-card">
               <h3>📈 Daily Trend (Last 7 Days)</h3>
               <div className="chart-bar-container">
-                {dashboardData.daily_trend?.map((day, i) => (
-                  <div key={i} className="chart-bar-item">
-                    <div
-                      className="chart-bar"
-                      style={{
-                        height: `${Math.max(day.count * 20, 10)}px`,
-                        backgroundColor: day.count > 0 ? 'var(--primary)' : '#e0e0e0'
-                      }}
-                    >
-                      <span className="bar-value">{day.count}</span>
-                    </div>
-                    <span className="bar-label">{day.day}</span>
-                  </div>
-                ))}
+                {(() => {
+                  // Calculate max count once for all bars
+                  const maxCount = Math.max(...(dashboardData.daily_trend?.map(d => d.count) || [0]), 1);
+                  const MAX_HEIGHT = 120; // Maximum bar height in pixels
+                  const MIN_HEIGHT = 10;  // Minimum bar height in pixels
+
+                  return dashboardData.daily_trend?.map((day, i) => {
+                    // Scale proportionally: highest value gets MAX_HEIGHT
+                    const height = day.count > 0
+                      ? Math.max(MIN_HEIGHT, (day.count / maxCount) * MAX_HEIGHT)
+                      : MIN_HEIGHT;
+
+                    return (
+                      <div key={i} className="chart-bar-item">
+                        <div
+                          className="chart-bar"
+                          style={{
+                            height: `${height}px`,
+                            backgroundColor: day.count > 0 ? 'var(--primary)' : '#e0e0e0'
+                          }}
+                        >
+                          <span className="bar-value">{day.count}</span>
+                        </div>
+                        <span className="bar-label">{day.day}</span>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
 
