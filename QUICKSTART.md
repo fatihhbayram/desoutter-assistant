@@ -1,10 +1,10 @@
-# ⚡ Quick Start Guide
+# Quick Start Guide
 
 Get Desoutter Assistant running in under 10 minutes.
 
 ---
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before you begin, ensure you have the following installed:
 
@@ -13,14 +13,14 @@ Before you begin, ensure you have the following installed:
 | Docker | 20.10+ | `docker --version` |
 | Docker Compose | 2.0+ | `docker compose version` |
 | Git | 2.30+ | `git --version` |
-| NVIDIA Driver | 525+ | `nvidia-smi` |
-| NVIDIA Container Toolkit | Latest | `nvidia-ctk --version` |
+| NVIDIA Driver | 525+ (optional) | `nvidia-smi` |
+| NVIDIA Container Toolkit | Latest (optional) | `nvidia-ctk --version` |
 
 > **Note**: GPU is optional but recommended for faster LLM inference.
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ### Step 1: Clone the Repository
 
@@ -48,51 +48,43 @@ MONGO_DATABASE=desoutter
 # Ollama LLM Configuration
 OLLAMA_BASE_URL=http://ollama:11434
 OLLAMA_MODEL=qwen2.5:7b-instruct
+OLLAMA_TEMPERATURE=0.1
+
+# Qdrant Vector Database
+QDRANT_HOST=qdrant
+QDRANT_PORT=6333
+QDRANT_COLLECTION=desoutter_docs_v2
 
 # Embeddings Configuration
 EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 EMBEDDING_DEVICE=cuda  # Use 'cpu' if no GPU
 
 # RAG Configuration
+RAG_TOP_K=7
 RAG_SIMILARITY_THRESHOLD=0.30
 USE_HYBRID_SEARCH=true
+HYBRID_SEMANTIC_WEIGHT=0.6
+HYBRID_BM25_WEIGHT=0.4
 
 # JWT Secret (change in production!)
 JWT_SECRET=your-secure-secret-key-here
+
+# API Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
 ```
 
 ### Step 3: Launch Services
 
-#### Option A: Docker Compose (Recommended)
-
 ```bash
 # Start all services
-docker compose up -d
+docker-compose up -d
 
 # Verify all containers are running
-docker compose ps
-```
+docker-compose ps
 
-#### Option B: Individual Containers
-
-```bash
-# Start API container
-docker run -d --name desoutter-api \
-  --network ai-net \
-  -p 8000:8000 \
-  -e MONGO_HOST=mongodb \
-  -e OLLAMA_BASE_URL=http://ollama:11434 \
-  -e OLLAMA_MODEL=qwen2.5:7b-instruct \
-  -v desoutter_data:/app/data \
-  -v $(pwd)/documents:/app/documents \
-  -v huggingface_cache:/root/.cache/huggingface \
-  --gpus all \
-  desoutter-api
-
-# Start Frontend container
-cd frontend
-docker build -t desoutter-frontend .
-docker run -d --name desoutter-frontend -p 3001:3001 desoutter-frontend
+# Check service health
+docker-compose logs -f desoutter-api
 ```
 
 ### Step 4: Verify Installation
@@ -108,15 +100,18 @@ curl http://localhost:8000/health
 curl http://localhost:11434/api/tags
 # Expected: {"models":[{"name":"qwen2.5:7b-instruct",...}]}
 
-# Check MongoDB (from inside container)
-docker exec -it desoutter-api python3 -c \
-  "from src.database import MongoDBClient; db=MongoDBClient(); db.connect(); print('Products:', db.count_products())"
-# Expected: Products: 451
+# Check if documents are indexed (requires auth)
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin123"}' | jq -r '.access_token')
+
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/admin/dashboard
+# Expected: Dashboard statistics with product count, document count, etc.
 ```
 
 ---
 
-## 🎯 First Query
+## First Query
 
 ### Login
 
@@ -148,7 +143,7 @@ curl -X POST http://localhost:8000/diagnose \
 {
   "diagnosis_id": "diag_abc123",
   "suggestion": "Based on the documentation, here are the steps to troubleshoot...",
-  "confidence": "high",
+  "confidence": 0.89,
   "sources": [
     {
       "document": "EPB_Troubleshooting_Guide.pdf",
@@ -184,35 +179,34 @@ curl -X POST http://localhost:8000/conversation/start \
 
 ---
 
-## 🌐 Access Points
+## Access Points
 
 | Service | URL | Description |
 |---------|-----|-------------|
 | **Frontend** | http://localhost:3001 | Main user interface |
 | **API Docs** | http://localhost:8000/docs | Swagger documentation |
-| **Simple UI** | http://localhost:8000/ui | Lightweight web interface |
-| **Mongo Express** | http://localhost:8081 | Database admin (if enabled) |
+| **API Health** | http://localhost:8000/health | Health check endpoint |
 
 ---
 
-## 👤 Default Users
+## Default Users
 
 | Username | Password | Role | Permissions |
 |----------|----------|------|-------------|
 | `admin` | `admin123` | Admin | Full access, user management, document upload |
 | `tech` | `tech123` | Technician | Diagnosis, feedback, conversation |
 
-> ⚠️ **Security Warning**: Change these passwords before deploying to production!
+> **Security Warning**: Change these passwords before deploying to production!
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Container Not Starting
 
 ```bash
 # Check container logs
-docker logs desoutter-api
+docker-compose logs desoutter-api
 
 # Common issues:
 # - MongoDB not reachable: Check MONGO_HOST setting
@@ -229,14 +223,7 @@ nvidia-smi
 # Verify container can see GPU
 docker run --rm --gpus all nvidia/cuda:11.8-base-ubuntu22.04 nvidia-smi
 
-# If using Docker Compose, ensure deploy section is correct:
-# deploy:
-#   resources:
-#     reservations:
-#       devices:
-#         - driver: nvidia
-#           count: all
-#           capabilities: [gpu]
+# If using Docker Compose, ensure deploy section includes GPU resources
 ```
 
 ### Slow First Request
@@ -244,46 +231,60 @@ docker run --rm --gpus all nvidia/cuda:11.8-base-ubuntu22.04 nvidia-smi
 The first request may take 30-60 seconds as:
 1. Ollama loads the model into GPU memory
 2. Embeddings are initialized
-3. ChromaDB indexes are loaded
+3. Qdrant indexes are loaded
 
-Subsequent requests should be much faster (2-5 seconds).
+Subsequent requests should be much faster (2-5 seconds for non-cached queries).
 
 ### Empty Search Results
 
 ```bash
 # Check if documents are ingested
 curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8000/admin/documents
+  http://localhost:8000/admin/dashboard
 
-# If empty, run document ingestion
+# If vector DB is empty, ingest documents
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   http://localhost:8000/admin/documents/ingest
 ```
 
+### Connection Refused Errors
+
+```bash
+# Check all services are running
+docker-compose ps
+
+# Restart services if needed
+docker-compose restart
+
+# Check network connectivity
+docker network inspect ai-net
+```
+
 ---
 
-## 📚 Next Steps
+## Next Steps
 
 1. **Upload Documents**: Add your technical manuals and service bulletins via the Admin panel
 2. **Configure Users**: Create technician accounts with appropriate permissions
 3. **Explore API**: Review the [API documentation](http://localhost:8000/docs) for all endpoints
 4. **Production Deployment**: See [PROXMOX_DEPLOYMENT.md](PROXMOX_DEPLOYMENT.md) for infrastructure setup
+5. **Review Roadmap**: Check [ROADMAP.md](ROADMAP.md) for upcoming features
 
 ---
 
-## 📖 Additional Documentation
+## Additional Documentation
 
 | Document | Description |
 |----------|-------------|
 | [README.md](README.md) | Project overview and features |
-| [PROXMOX_DEPLOYMENT.md](PROXMOX_DEPLOYMENT.md) | Production deployment guide |
-| [RAG_QUALITY_IMPROVEMENT.md](RAG_QUALITY_IMPROVEMENT.md) | Technical RAG documentation |
 | [ROADMAP.md](ROADMAP.md) | Development roadmap |
+| [PROXMOX_DEPLOYMENT.md](PROXMOX_DEPLOYMENT.md) | Production deployment guide |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 
 ---
 
-## 🆘 Getting Help
+## Getting Help
 
 - **GitHub Issues**: [Report bugs or request features](https://github.com/fatihhbayram/desoutter-assistant/issues)
 - **API Documentation**: http://localhost:8000/docs (when running)
+- **Configuration**: Review [config/ai_settings.py](config/ai_settings.py) for all available settings

@@ -18,7 +18,7 @@ An intelligent **Retrieval-Augmented Generation (RAG)** system that provides con
 When a technician encounters an issue with a Desoutter tool:
 
 1. **Asks a question**: "My EPBC8-1800-4Q shows error code E018"
-2. **System searches**: Finds relevant information from 28,000+ document chunks
+2. **System searches**: Hybrid retrieval across 26,513 document chunks
 3. **Generates response**: AI-powered solution with cited sources
 4. **Learns**: Continuously improves from user feedback
 
@@ -42,12 +42,10 @@ When a technician encounters an issue with a Desoutter tool:
 - [Performance Metrics](#performance-metrics)
 - [Feedback System](#feedback-system)
 - [Self-Learning System](#self-learning-system)
-- [Local Development](#local-development)
 - [Docker Services](#docker-services)
 - [Testing](#testing)
 - [Key Files Reference](#key-files-reference)
 - [Security Considerations](#security-considerations)
-- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -68,13 +66,17 @@ When a technician encounters an issue with a Desoutter tool:
 git clone https://github.com/fatihhbayram/desoutter-assistant.git
 cd desoutter-assistant
 
-# 2. Start all services
-docker-compose -f docker-compose.desoutter.yml up -d
+# 2. Configure environment
+cp .env.example .env
+# Edit .env with your settings (MongoDB, Ollama, Qdrant URLs)
 
-# 3. Wait for services to initialize (~60 seconds)
+# 3. Start all services
+docker-compose up -d
+
+# 4. Wait for services to initialize (~60 seconds)
 sleep 60
 
-# 4. Access the application
+# 5. Access the application
 # Frontend: http://localhost:3001
 # API Docs: http://localhost:8000/docs
 ```
@@ -97,46 +99,38 @@ desoutter-assistant/
 │
 ├── src/                          # Main source code
 │   ├── api/                      # FastAPI REST endpoints
-│   │   └── main.py              # API entry point and route definitions
 │   ├── database/                 # MongoDB connection and models
-│   │   └── mongo_client.py      # Database operations
 │   ├── documents/                # Document processing pipeline
-│   │   ├── document_processor.py # PDF/DOCX/PPTX extraction
-│   │   └── semantic_chunker.py   # Intelligent text segmentation
 │   ├── llm/                      # RAG engine and AI components
-│   │   ├── rag_engine.py        # 14-stage main pipeline (81KB)
+│   │   ├── rag_engine.py        # 14-stage main pipeline
 │   │   ├── hybrid_search.py     # Semantic + BM25 search fusion
 │   │   ├── self_learning.py     # Feedback learning system
-│   │   ├── intent_detector.py   # 8-category query classification
+│   │   ├── intent_detector.py   # 15-category query classification
 │   │   ├── response_validator.py # Hallucination detection
-│   │   ├── confidence_scorer.py  # Confidence score calculation
+│   │   ├── confidence_scorer.py  # Confidence calculation
 │   │   ├── context_optimizer.py  # Token budget management
 │   │   └── response_cache.py     # LRU + TTL caching
+│   ├── vectordb/                 # Qdrant vector database client
+│   ├── el_harezmi/               # 5-stage pipeline (in progress)
 │   ├── scraper/                  # Web scraping modules
 │   └── utils/                    # Helper functions, logging
 │
 ├── frontend/                     # React 18 user interface
 │   ├── src/
 │   │   ├── App.jsx              # Main application (auth, routing)
-│   │   ├── TechWizard.jsx       # Technician chat interface
-│   │   └── MetricsDashboard.jsx # Admin dashboard
+│   │   └── TechWizard.jsx       # Technician chat interface
 │   └── package.json
 │
-├── scripts/                      # Utility scripts (42+ scripts)
-│   ├── run_api.py               # Start API server
-│   ├── ingest_documents.py      # Document processing
-│   └── run_baseline_test.sh     # Test suite runner
-│
+├── scripts/                      # Utility scripts
 ├── documents/                    # PDF manuals and service bulletins
-├── data/                         # Runtime data (vectordb, logs, cache)
+├── data/                         # Runtime data (logs, cache)
 ├── tests/                        # Test files and fixtures
 ├── config/                       # Configuration files
 │   └── ai_settings.py           # RAG parameters
 │
-├── docker-compose.desoutter.yml  # Multi-container orchestration
+├── docker-compose.yml            # Multi-container orchestration
 ├── Dockerfile                    # Backend container image
-├── requirements.txt              # Python dependencies (Phase 1)
-├── requirements-phase2.txt       # AI/RAG dependencies (Phase 2)
+├── requirements.txt              # Python dependencies
 └── .env.example                  # Environment variables template
 ```
 
@@ -167,7 +161,7 @@ desoutter-assistant/
          ▼                    ▼                           ▼
 ┌─────────────────┐  ┌─────────────────┐         ┌─────────────────┐
 │    MongoDB      │  │     Ollama      │         │     Qdrant      │
-│    (27017)      │  │    (11434)      │         │    (v1.7.4)     │
+│    (27017)      │  │    (11434)      │         │    (6333)       │
 │  • users        │  │  Qwen2.5:7b     │         │  26,513 chunks  │
 │  • feedback     │  │  GPU-accelerated│         │  384-dim vectors│
 │  • mappings     │  └─────────────────┘         └─────────────────┘
@@ -189,45 +183,11 @@ The heart of the system - each query passes through 14 stages for high-quality r
 | 7 | **Capability Filtering** | WiFi/Battery content filtering |
 | 8 | **Context Grounding** | Returns "I don't know" if uncertain (threshold < 0.35) |
 | 9 | **Context Optimization** | 8K token budget, semantic deduplication |
-| 10 | **Intent Detection** | 8 query categories (troubleshooting, specs, etc.) |
+| 10 | **Intent Detection** | 15 query categories (troubleshooting, specs, etc.) |
 | 11 | **LLM Generation** | GPU-accelerated response generation with Qwen2.5:7b |
 | 12 | **Response Validation** | Hallucination and forbidden content detection |
 | 13 | **Confidence Scoring** | Multi-factor confidence calculation |
 | 14 | **Save & Cache** | MongoDB persistence + LRU cache update |
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                       USER QUERY                             │
-└──────────────────────────────────────────────────────────────┘
-                              │
-    ┌─────────────────────────┼─────────────────────────────┐
-    │                         ▼                             │
-    │  ┌────────────────────────────────────────────────┐  │
-    │  │ STAGE 1-4: PRE-PROCESSING                      │  │
-    │  │ Off-topic → Language → Cache → Self-Learning   │  │
-    │  └────────────────────────────────────────────────┘  │
-    │                         │                             │
-    │  ┌────────────────────────────────────────────────┐  │
-    │  │ STAGE 5-7: RETRIEVAL                           │  │
-    │  │ Hybrid Search → Product Filter → Capability    │  │
-    │  └────────────────────────────────────────────────┘  │
-    │                         │                             │
-    │  ┌────────────────────────────────────────────────┐  │
-    │  │ STAGE 8-10: CONTEXT PROCESSING                 │  │
-    │  │ Grounding → Optimization → Intent Detection    │  │
-    │  └────────────────────────────────────────────────┘  │
-    │                         │                             │
-    │  ┌────────────────────────────────────────────────┐  │
-    │  │ STAGE 11-14: GENERATION & VALIDATION           │  │
-    │  │ LLM → Validation → Confidence → Cache          │  │
-    │  └────────────────────────────────────────────────┘  │
-    └─────────────────────────┼─────────────────────────────┘
-                              ▼
-┌──────────────────────────────────────────────────────────────┐
-│                       AI RESPONSE                            │
-│              (With confidence score & sources)               │
-└──────────────────────────────────────────────────────────────┘
-```
 
 ---
 
@@ -238,7 +198,7 @@ The heart of the system - each query passes through 14 stages for high-quality r
 | Component | Technology | Purpose |
 |-----------|------------|---------|
 | **LLM** | Ollama + Qwen2.5:7b-instruct | Natural language understanding & generation |
-| **Vector DB** | Qdrant | Fast, scalable semantic document storage and payload filtering |
+| **Vector DB** | Qdrant (v1.7.4) | Semantic document storage with metadata filtering |
 | **Embeddings** | Sentence Transformers (all-MiniLM-L6-v2) | 384-dimensional vector generation |
 | **Keyword Search** | BM25 (Custom Implementation) | Fast keyword-based retrieval |
 | **Orchestration** | LangChain 0.1 | RAG workflow management |
@@ -346,7 +306,7 @@ curl -X POST http://localhost:8000/diagnose \
       "snippet": "E018 indicates transducer fault - check cable assembly connector type..."
     }
   ],
-  "intent": "troubleshooting"
+  "intent": "error_code"
 }
 ```
 
@@ -367,12 +327,11 @@ curl -X POST http://localhost:8000/diagnose \
 |--------|-------|
 | **Test Pass Rate** | 85% (34/40 scenarios) |
 | **Timeout Rate** | 0% (all resolved) |
-| **Total Products** | 451 (71 wireless, 380 cable) |
-| **Qdrant Vector DB** | 26,513 semantic chunks with rich metadata |
+| **Total Products** | 451 indexed |
+| **Vector DB** | Qdrant - 26,513 semantic chunks (384-dim) |
 | **Indexed Documents** | 541 (121 PDF + 420 Word) |
 | **Freshdesk Tickets** | 2,249 processed |
 | **BM25 Index Terms** | 19,032 unique terms |
-| **Domain Terms** | 351 Desoutter-specific |
 | **Cache Speedup** | ~100,000x for repeated queries |
 | **Hallucination Rate** | <2% |
 | **Intent Categories** | 15 types (troubleshoot, error_code, spec, config, compat, etc.) |
@@ -404,30 +363,7 @@ After each AI response, users can submit feedback:
 │  │ ○ Missing important details                          │   │
 │  │ ○ Wrong product/context                              │   │
 │  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│  Additional comments:                                       │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ [Free text input...]                                 │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│  [ Submit Feedback ]                                        │
 └─────────────────────────────────────────────────────────────┘
-```
-
-### Feedback API
-
-```bash
-# Submit feedback
-curl -X POST http://localhost:8000/diagnose/feedback \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "diagnosis_id": "diag_abc123",
-    "rating": "helpful",
-    "reason": "solved_problem",
-    "comment": "The cable connector was indeed the issue",
-    "part_number": "6151659000"
-  }'
 ```
 
 ### Feedback Types
@@ -438,18 +374,6 @@ curl -X POST http://localhost:8000/diagnose/feedback \
 | `partially_helpful` | Some useful information | Minor boost, flag for review |
 | `not_helpful` | Response didn't help | Record negative signal, analyze gaps |
 | `incorrect` | Information was wrong | Flag sources, prevent future use |
-
-### Feedback Reasons
-
-| Reason Code | Description |
-|-------------|-------------|
-| `solved_problem` | Completely resolved the issue |
-| `partially_helpful` | Some parts were useful |
-| `incorrect_info` | Contains factual errors |
-| `missing_details` | Needs more specific information |
-| `wrong_product` | Information for different product |
-| `outdated_info` | Information no longer applicable |
-| `too_generic` | Not specific enough for the problem |
 
 ---
 
@@ -494,97 +418,11 @@ Where:
 
 This prevents sources with few ratings from outranking well-tested sources.
 
-### How Self-Learning Works
-
-1. **Feedback Collection** - User submits 👍/👎 with optional reason and comment
-2. **Signal Processing** - System extracts query patterns, source IDs, and context
-3. **Score Update** - Wilson score recalculated for affected sources
-4. **Pattern Storage** - Successful fault→solution mappings saved to `learned_mappings`
-5. **Future Boost** - Matching patterns get relevance boost (up to 1.5x) in retrieval
-6. **Negative Avoidance** - Low-scoring sources deprioritized in results
-
-### Learning Metrics (Admin Dashboard)
-
-| Metric | Description |
-|--------|-------------|
-| Total Feedback | All-time feedback submissions |
-| Positive Rate | Percentage of helpful ratings |
-| Learning Events | Patterns learned this week |
-| Top Sources | Highest-rated documents |
-| Problem Areas | Topics needing improvement |
-
----
-
-## Local Development
-
-### Environment Setup
-
-```bash
-# Create Python virtual environment
-python3.11 -m venv venv
-source venv/bin/activate
-
-# Install backend dependencies
-pip install -r requirements.txt
-pip install -r requirements-phase2.txt
-
-# Install frontend dependencies
-cd frontend && npm install && cd ..
-```
-
-### Environment Variables
-
-```bash
-# Copy example configuration
-cp .env.example .env
-# Edit .env with your settings
-```
-
-Key variables:
-
-```bash
-# MongoDB
-MONGO_HOST=localhost
-MONGO_PORT=27017
-MONGO_DATABASE=desoutter
-
-# Ollama LLM
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:7b-instruct
-OLLAMA_TEMPERATURE=0.1
-
-# Embeddings
-EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-EMBEDDING_DEVICE=cuda  # or 'cpu'
-
-# API
-API_HOST=0.0.0.0
-API_PORT=8000
-JWT_SECRET=your-secret-key-change-in-production
-
-# RAG Settings
-RAG_TOP_K=5
-RAG_SIMILARITY_THRESHOLD=0.7
-USE_HYBRID_SEARCH=true
-HYBRID_SEMANTIC_WEIGHT=0.6
-HYBRID_BM25_WEIGHT=0.4
-```
-
-### Running Services Locally
-
-```bash
-# Terminal 1: Start backend
-python scripts/run_api.py
-
-# Terminal 2: Start frontend
-cd frontend && npm run dev
-```
-
 ---
 
 ## Docker Services
 
-The `docker-compose.desoutter.yml` orchestrates 4 services:
+The system runs with 4 core services:
 
 | Service | Port | Description | Resources |
 |---------|------|-------------|-----------|
@@ -597,16 +435,16 @@ The `docker-compose.desoutter.yml` orchestrates 4 services:
 
 ```bash
 # Start all services
-docker-compose -f docker-compose.desoutter.yml up -d
+docker-compose up -d
 
 # View logs
-docker-compose -f docker-compose.desoutter.yml logs -f
+docker-compose logs -f
 
 # Stop all services
-docker-compose -f docker-compose.desoutter.yml down
+docker-compose down
 
 # Rebuild after code changes
-docker-compose -f docker-compose.desoutter.yml up -d --build
+docker-compose up -d --build
 ```
 
 ---
@@ -646,17 +484,17 @@ python scripts/test_product_filtering.py
 
 | File | Description |
 |------|-------------|
-| [src/llm/rag_engine.py](src/llm/rag_engine.py) | 14-stage RAG pipeline orchestrator (81KB, main logic) |
+| [src/llm/rag_engine.py](src/llm/rag_engine.py) | 14-stage RAG pipeline orchestrator |
 | [src/llm/hybrid_search.py](src/llm/hybrid_search.py) | BM25 + Semantic search with RRF fusion |
 | [src/llm/self_learning.py](src/llm/self_learning.py) | Feedback learning engine with Wilson scores |
-| [src/llm/intent_detector.py](src/llm/intent_detector.py) | 8-category query classification |
+| [src/llm/intent_detector.py](src/llm/intent_detector.py) | 15-category query classification |
 | [src/llm/response_validator.py](src/llm/response_validator.py) | Hallucination and validation checks |
 | [src/llm/confidence_scorer.py](src/llm/confidence_scorer.py) | Multi-factor confidence calculation |
 | [src/llm/context_optimizer.py](src/llm/context_optimizer.py) | Token budget and deduplication |
 | [src/llm/response_cache.py](src/llm/response_cache.py) | LRU + TTL caching layer |
 | [src/api/main.py](src/api/main.py) | FastAPI routes and middleware |
-| [src/documents/semantic_chunker.py](src/documents/semantic_chunker.py) | Intelligent document segmentation |
-| [src/database/mongo_client.py](src/database/mongo_client.py) | MongoDB operations and models |
+| [src/vectordb/qdrant_client.py](src/vectordb/qdrant_client.py) | Qdrant vector database operations |
+| [src/el_harezmi/pipeline.py](src/el_harezmi/pipeline.py) | 5-stage pipeline (in progress) |
 | [config/ai_settings.py](config/ai_settings.py) | RAG parameters and thresholds |
 | [frontend/src/App.jsx](frontend/src/App.jsx) | Main React component |
 
@@ -684,40 +522,14 @@ python scripts/test_product_filtering.py
 
 ---
 
-## Roadmap
-
-### Completed (January 2026)
-- [x] 14-stage RAG Pipeline with 88% test pass rate
-- [x] Hybrid Search (BM25 + Semantic + RRF)
-- [x] Self-Learning Feedback Loop
-- [x] Multi-turn Conversation
-- [x] GPU Acceleration with RTX A2000
-- [x] Intelligent Product Filtering
-- [x] 26,513 chunks ingested with product metadata (Qdrant v1.7.4)
-
-### In Progress (Q1 2026)
-- [ ] Freshdesk Ticket Integration
-- [ ] Controller Units Scraping
-
-### Planned (Q2 2026)
-- [ ] Field Installation Support (extend beyond repair to on-site tool setup and commissioning)
-- [ ] Qdrant Scaling (scale to 100M+ vectors for multi-tenant deployment)
-- [ ] Prompt Caching (40% latency reduction)
-- [ ] Async Ingestion Queue (Celery + Redis)
-- [ ] Fine-tuned Embeddings (15-20% accuracy improvement)
-- [ ] Advanced KPI Dashboard
-- [ ] Service Management System Integration
-
----
-
 ## Additional Documentation
 
 | Document | Description |
 |----------|-------------|
-| [TECHNICAL_ANALYSIS.md](TECHNICAL_ANALYSIS.md) | Deep-dive architecture and implementation details |
 | [QUICKSTART.md](QUICKSTART.md) | Rapid deployment guide |
 | [ROADMAP.md](ROADMAP.md) | Detailed development roadmap |
 | [CHANGELOG.md](CHANGELOG.md) | Version history and changes |
+| [PROXMOX_DEPLOYMENT.md](PROXMOX_DEPLOYMENT.md) | Infrastructure deployment guide |
 
 ---
 
@@ -752,7 +564,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - **Ollama** - Local LLM serving infrastructure
-- **Qdrant** - High-performance scalable vector database with metadata filtering
+- **Qdrant** - High-performance scalable vector database
 - **HuggingFace** - Sentence transformers and model hub
 - **FastAPI** - Modern Python web framework
 - **LangChain** - RAG orchestration framework
