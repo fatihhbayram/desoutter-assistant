@@ -26,9 +26,9 @@ API Documentation: /docs (Swagger UI) or /redoc
 # -----------------------------------------------------------------------------
 # IMPORTS
 # -----------------------------------------------------------------------------
-from fastapi import FastAPI, HTTPException, Header, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Header, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
+from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List
 import json
@@ -36,10 +36,15 @@ import os
 import shutil
 from pathlib import Path
 from datetime import datetime, timedelta
+from collections import defaultdict
+import threading
 
 # Authentication libraries
 import jwt
 from passlib.context import CryptContext
+
+# Security libraries
+import secrets
 
 # Async support for blocking operations
 import asyncio
@@ -49,6 +54,7 @@ from functools import partial
 from src.llm.rag_engine import RAGEngine  # RAG engine for AI responses
 from src.database import MongoDBClient     # MongoDB client wrapper
 from src.utils.logger import setup_logger  # Logging utility
+from src.utils.brute_force_protection import BruteForceProtection  # Brute force attack protection
 from src.documents.document_processor import DocumentProcessor, SUPPORTED_EXTENSIONS  # Document text extraction
 # from src.documents.chunker import TextChunker  # REMOVED: Now using SemanticChunker via DocumentProcessor
 from src.documents.embeddings import EmbeddingsGenerator  # Embedding generation
@@ -76,14 +82,153 @@ app.include_router(el_harezmi_router)
 # CORS MIDDLEWARE CONFIGURATION
 # -----------------------------------------------------------------------------
 # Enable Cross-Origin Resource Sharing for frontend access
-# NOTE: In production, replace "*" with specific frontend domain(s)
+# Restrict origins to specific domains for security
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3001,http://192.168.1.125:3001,https://harezmi.adentechio.dev").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: Restrict to frontend domain in production
+    allow_origins=CORS_ORIGINS,  # Only allow specified origins
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, DELETE, etc.)
-    allow_headers=["*"],  # Allow all headers (including Authorization)
+    allow_methods=["GET", "POST", "PUT", "DELETE"],  # Only allow necessary methods
+    allow_headers=["Content-Type", "Authorization"],  # Only allow necessary headers
 )
+
+# -----------------------------------------------------------------------------
+# REQUEST SIZE LIMIT MIDDLEWARE
+# -----------------------------------------------------------------------------
+# Prevent DoS attacks with large payloads
+MAX_REQUEST_SIZE = int(os.getenv("MAX_REQUEST_SIZE", "100000"))  # 100KB default
+
+@app.middleware("http")
+async def limit_request_size(request: Request, call_next):
+    """Reject requests with body size exceeding MAX_REQUEST_SIZE"""
+    if request.method in ["POST", "PUT", "PATCH"]:
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > MAX_REQUEST_SIZE:
+            logger.warning(
+                f"Request rejected: body size {content_length} exceeds limit {MAX_REQUEST_SIZE}"
+            )
+            return JSONResponse(
+                status_code=413,
+                content={
+                    "detail": f"Request body too large. Maximum size: {MAX_REQUEST_SIZE/1000}KB"
+                }
+            )
+    return await call_next(request)
+
+
+# -----------------------------------------------------------------------------
+# RATE LIMITING MIDDLEWARE
+# -----------------------------------------------------------------------------
+# Simple in-memory rate limiting (per IP address)
+# For production: Use Redis-based rate limiting (e.g., slowapi)
+
+# Rate limit storage: {ip: [(timestamp, endpoint), ...]}
+rate_limit_storage = defaultdict(list)
+rate_limit_lock = threading.Lock()
+
+# Rate limit configuration
+RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "1000"))  # Max requests (increased for development)
+RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))  # Time window in seconds
+RATE_LIMITING_ENABLED = os.getenv("RATE_LIMITING_ENABLED", "true").lower() == "true"
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """
+    Simple rate limiting per IP address.
+
+    Limits:
+    - RATE_LIMIT_REQUESTS requests per RATE_LIMIT_WINDOW seconds per IP
+    - Cleans old entries to prevent memory leaks
+    - Can be disabled by setting RATE_LIMITING_ENABLED=false
+    """
+    # Skip rate limiting if disabled
+    if not RATE_LIMITING_ENABLED:
+        return await call_next(request)
+
+    client_ip = request.client.host
+    now = datetime.utcnow()
+
+    with rate_limit_lock:
+        # Clean old entries (older than window)
+        cutoff = now - timedelta(seconds=RATE_LIMIT_WINDOW)
+        rate_limit_storage[client_ip] = [
+            (ts, endpoint) for ts, endpoint in rate_limit_storage[client_ip]
+            if ts > cutoff
+        ]
+
+        # Check rate limit
+        if len(rate_limit_storage[client_ip]) >= RATE_LIMIT_REQUESTS:
+            logger.warning(f"Rate limit exceeded for IP: {client_ip}")
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "detail": f"Rate limit exceeded. Max {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW} seconds."
+                },
+                headers={
+                    "Retry-After": str(RATE_LIMIT_WINDOW)
+                }
+            )
+
+        # Record this request
+        rate_limit_storage[client_ip].append((now, request.url.path))
+
+    response = await call_next(request)
+
+    # Add rate limit headers
+    with rate_limit_lock:
+        remaining = max(0, RATE_LIMIT_REQUESTS - len(rate_limit_storage[client_ip]))
+
+    response.headers["X-RateLimit-Limit"] = str(RATE_LIMIT_REQUESTS)
+    response.headers["X-RateLimit-Remaining"] = str(remaining)
+    response.headers["X-RateLimit-Window"] = str(RATE_LIMIT_WINDOW)
+
+    return response
+
+
+# -----------------------------------------------------------------------------
+# SECURITY HEADERS MIDDLEWARE
+# -----------------------------------------------------------------------------
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """
+    Add security headers to all responses.
+
+    Headers:
+    - X-Content-Type-Options: Prevent MIME type sniffing
+    - X-Frame-Options: Prevent clickjacking
+    - X-XSS-Protection: Enable XSS filtering in older browsers
+    - Strict-Transport-Security: Enforce HTTPS (if enabled)
+    - Content-Security-Policy: Restrict resource loading
+    """
+    response = await call_next(request)
+
+    # Prevent MIME type sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+
+    # Prevent clickjacking
+    response.headers["X-Frame-Options"] = "DENY"
+
+    # XSS protection for older browsers
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+
+    # HSTS (HTTP Strict Transport Security) - only if HTTPS is enabled
+    if os.getenv("ENABLE_HSTS", "false").lower() == "true":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+    # Content Security Policy
+    # Allow frontend to connect to API (both local and external URLs)
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        "connect-src 'self' http://192.168.1.125:8000 https://harezmi-api.adentechio.dev"
+    )
+    response.headers["Content-Security-Policy"] = csp
+
+    return response
 
 # -----------------------------------------------------------------------------
 # GLOBAL STATE
@@ -277,6 +422,13 @@ class CreateUserRequest(BaseModel):
     username: str                    # New user's username
     password: str                    # New user's password
     role: str = "technician"         # Role: 'admin' or 'technician'
+
+
+class ChangePasswordRequest(BaseModel):
+    """Request body for changing password."""
+    current_password: str            # User's current password
+    new_password: str                # New password to set
+    confirm_password: str            # Confirmation of new password
 
 
 # -----------------------------------------------------------------------------
@@ -671,20 +823,59 @@ async def get_dashboard(authorization: str = Header(...)):
 
 # Auth endpoints
 @app.post("/auth/login", response_model=TokenResponse)
-async def auth_login(req: LoginRequest):
+async def auth_login(req: LoginRequest, request: Request):
+    """
+    User login with brute force protection.
+
+    Security features:
+    - Progressive ban system (5/10/15 failed attempts)
+    - IP-based and username-based tracking
+    - Automatic cleanup of successful logins
+    """
     try:
+        username = (req.username or "").strip().lower()
+        password = (req.password or "").strip()
+        client_ip = request.client.host if request.client else "unknown"
+
+        # STEP 1: Check brute force protection
+        bf_check = BruteForceProtection.check_and_block(username, client_ip)
+        if bf_check["blocked"]:
+            logger.warning(
+                f"🚫 Login blocked (brute force) - Username: {username}, IP: {client_ip}, "
+                f"Retry in: {bf_check['retry_after']} min"
+            )
+            raise HTTPException(
+                status_code=429,
+                detail=f"Too many failed attempts. Try again in {bf_check['retry_after']} minutes."
+            )
+
+        # STEP 2: Verify credentials
         with MongoDBClient() as db:
             users = db.get_collection("users")
-            username = (req.username or "").strip().lower()
             user = users.find_one({"username": username})
+
             if not user:
+                # Record failed attempt (user not found)
+                BruteForceProtection.record_failed_attempt(username, client_ip)
+                logger.warning(f"⚠️  Failed login (user not found) - Username: {username}, IP: {client_ip}")
                 raise HTTPException(status_code=401, detail="Invalid credentials")
-            password = (req.password or "").strip()
+
             if not verify_password(password, user.get("password_hash", "")):
+                # Record failed attempt (wrong password)
+                BruteForceProtection.record_failed_attempt(username, client_ip)
+                logger.warning(f"⚠️  Failed login (wrong password) - Username: {username}, IP: {client_ip}")
                 raise HTTPException(status_code=401, detail="Invalid credentials")
-            role = user.get("role", "technician")
-            token = create_access_token({"sub": username, "role": role})
-            return {"access_token": token, "role": role, "token_type": "bearer"}
+
+        # STEP 3: Successful login - clear failed attempts
+        BruteForceProtection.clear_attempts(username, client_ip)
+
+        # STEP 4: Generate token
+        role = user.get("role", "technician")
+        token = create_access_token({"sub": username, "role": role})
+
+        logger.info(f"✅ Successful login - Username: {username}, Role: {role}, IP: {client_ip}")
+        return {"access_token": token, "role": role, "token_type": "bearer"}
+
     except HTTPException:
         raise
     except Exception as e:
@@ -706,6 +897,138 @@ async def auth_me(authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Token expired")
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+@app.post("/auth/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    authorization: str = Header(...)
+):
+    """
+    Change user password with advanced security validation.
+
+    Security Features:
+    - Current password verification
+    - Password complexity requirements (12+ chars, mixed case, digits, special)
+    - Password history check (prevents reuse of last 5 passwords)
+    - Automatic password history rotation
+
+    Returns:
+        Success message with password strength score
+    """
+    from src.utils.password_validator import PasswordValidator
+    from src.utils.password_history import PasswordHistoryManager
+
+    # Extract and validate JWT token
+    try:
+        if not authorization.lower().startswith("bearer "):
+            raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+        token = authorization.split(" ", 1)[1]
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+        username = payload.get("sub")
+
+        if not username:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception as e:
+        logger.error(f"Token validation error: {e}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
+
+    # Verify new passwords match
+    if request.new_password != request.confirm_password:
+        raise HTTPException(
+            status_code=400,
+            detail="New password and confirmation do not match"
+        )
+
+    # Verify new password is different from current
+    if request.current_password == request.new_password:
+        raise HTTPException(
+            status_code=400,
+            detail="New password must be different from current password"
+        )
+
+    try:
+        with MongoDBClient() as db:
+            users = db.get_collection("users")
+            user = users.find_one({"username": username})
+
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            # Verify current password
+            if not verify_password(request.current_password, user.get("password_hash", "")):
+                logger.warning(f"⚠️  Failed password change attempt (wrong current password): {username}")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Current password is incorrect"
+                )
+
+            # Validate new password complexity
+            is_valid, errors = PasswordValidator.validate(request.new_password)
+            if not is_valid:
+                logger.warning(f"⚠️  Password complexity validation failed for: {username}")
+                raise HTTPException(
+                    status_code=400,
+                    detail={"message": "Password does not meet complexity requirements", "errors": errors}
+                )
+
+            # Check password history (prevent reuse)
+            if PasswordHistoryManager.is_password_reused(username, request.new_password):
+                logger.warning(f"⚠️  Password reuse attempt blocked: {username}")
+                raise HTTPException(
+                    status_code=400,
+                    detail="This password was used recently. Please choose a different password."
+                )
+
+            # Save current password to history BEFORE updating
+            current_hash = user.get("password_hash", "")
+            if current_hash:
+                PasswordHistoryManager.add_to_history(username, current_hash)
+
+            # Hash and update new password
+            new_hash = get_password_hash(request.new_password)
+
+            users.update_one(
+                {"username": username},
+                {
+                    "$set": {
+                        "password_hash": new_hash,
+                        "must_change_password": False,
+                        "password_changed_at": datetime.utcnow()
+                    }
+                }
+            )
+
+            # Calculate password strength for response
+            strength_score = PasswordValidator.strength_score(request.new_password)
+            strength_label = PasswordValidator.strength_label(strength_score)
+
+            logger.info(f"✅ Password changed successfully for user: {username} (strength: {strength_score}/100)")
+
+            return {
+                "status": "success",
+                "message": "Password changed successfully",
+                "password_strength": {
+                    "score": strength_score,
+                    "label": strength_label
+                },
+                "changed_at": datetime.utcnow().isoformat()
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Password change error for {username}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Password change failed. Please try again later."
+        )
 
 
 # Simple HTML UI
@@ -844,25 +1167,70 @@ async def startup_event():
     # This pre-loads embedding model and BM25 index
     await asyncio.to_thread(get_rag_engine)
     
-    # Seed default users if missing
+    # Seed default users if missing with SECURE random passwords
     try:
         with MongoDBClient() as db:
             users = db.get_collection("users")
-            # normalize usernames to lowercase
+
+            # Check if admin user exists
             if not users.find_one({"username": "admin"}):
+                # Generate secure random password (22 chars, URL-safe)
+                admin_password = secrets.token_urlsafe(16)
+
                 users.insert_one({
                     "username": "admin",
-                    "password_hash": get_password_hash("admin123"),
-                    "role": "admin"
+                    "password_hash": get_password_hash(admin_password),
+                    "role": "admin",
+                    "must_change_password": True,
+                    "created_at": datetime.utcnow()
                 })
+
+                # Save initial credentials to file (ONE TIME ONLY)
+                credentials_file = Path("/app/data/.initial_credentials.txt")
+                credentials_file.parent.mkdir(parents=True, exist_ok=True)
+
+                with open(credentials_file, "w") as f:
+                    f.write("=" * 70 + "\n")
+                    f.write("DESOUTTER ASSISTANT - INITIAL CREDENTIALS\n")
+                    f.write("=" * 70 + "\n")
+                    f.write(f"Generated: {datetime.utcnow().isoformat()}\n\n")
+                    f.write("⚠️  DELETE THIS FILE AFTER FIRST LOGIN!\n")
+                    f.write("⚠️  CHANGE PASSWORDS IMMEDIATELY!\n\n")
+                    f.write(f"Admin Username: admin\n")
+                    f.write(f"Admin Password: {admin_password}\n\n")
+
+                logger.warning("=" * 70)
+                logger.warning("🔐 SECURITY: Initial admin password generated!")
+                logger.warning(f"🔐 Admin Password: {admin_password}")
+                logger.warning(f"🔐 Password saved to: {credentials_file}")
+                logger.warning("⚠️  CHANGE THIS PASSWORD IMMEDIATELY AFTER FIRST LOGIN!")
+                logger.warning("=" * 70)
+
+            # Check if tech user exists
             if not users.find_one({"username": "tech"}):
+                # Generate secure random password
+                tech_password = secrets.token_urlsafe(16)
+
                 users.insert_one({
                     "username": "tech",
-                    "password_hash": get_password_hash("tech123"),
-                    "role": "technician"
+                    "password_hash": get_password_hash(tech_password),
+                    "role": "technician",
+                    "must_change_password": True,
+                    "created_at": datetime.utcnow()
                 })
+
+                # Append to credentials file
+                credentials_file = Path("/app/data/.initial_credentials.txt")
+                with open(credentials_file, "a") as f:
+                    f.write(f"Tech Username: tech\n")
+                    f.write(f"Tech Password: {tech_password}\n")
+                    f.write("\n" + "=" * 70 + "\n")
+
+                logger.warning("🔐 Tech password generated and saved to credentials file")
+                logger.warning(f"🔐 Tech Password: {tech_password}")
     except Exception as e:
-        logger.warning(f"User seed failed: {e}")
+        logger.error(f"❌ User seed failed: {e}")
+
     logger.info("✅ API ready")
 
 
@@ -918,24 +1286,48 @@ async def admin_list_users(authorization: Optional[str] = Header(None)):
 
 @app.post("/admin/users")
 async def admin_create_user(req: CreateUserRequest, authorization: Optional[str] = Header(None)):
-    """Create a new user (admin only)"""
+    """Create a new user (admin only) with password validation"""
+    from src.utils.password_validator import PasswordValidator
+
     verify_admin_token(authorization or "")
     username = (req.username or "").strip().lower()
     if not username or not req.password:
         raise HTTPException(status_code=400, detail="Username and password required")
     if req.role not in ["admin", "technician"]:
         raise HTTPException(status_code=400, detail="Role must be admin or technician")
+
+    # Validate password complexity
+    is_valid, errors = PasswordValidator.validate(req.password)
+    if not is_valid:
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "Password does not meet complexity requirements", "errors": errors}
+        )
+
     try:
         with MongoDBClient() as db:
             users_col = db.get_collection("users")
             if users_col.find_one({"username": username}):
                 raise HTTPException(status_code=400, detail="User already exists")
+
+            # Calculate password strength for logging
+            strength_score = PasswordValidator.strength_score(req.password)
+
             users_col.insert_one({
                 "username": username,
                 "password_hash": get_password_hash(req.password),
-                "role": req.role
+                "role": req.role,
+                "created_at": datetime.utcnow(),
+                "password_history": [],
+                "must_change_password": False
             })
-            return {"status": "ok", "username": username}
+
+            logger.info(f"✅ User created: {username} (role: {req.role}, password strength: {strength_score}/100)")
+            return {
+                "status": "ok",
+                "username": username,
+                "password_strength": strength_score
+            }
     except HTTPException:
         raise
     except Exception as e:
@@ -962,6 +1354,53 @@ async def admin_delete_user(username: str, authorization: Optional[str] = Header
         raise HTTPException(status_code=500, detail="Failed to delete user")
 
 
+class ResetPasswordRequest(BaseModel):
+    """Request body for admin password reset."""
+    new_password: str
+
+
+@app.patch("/admin/users/{username}/password")
+async def admin_reset_user_password(
+    username: str,
+    req: ResetPasswordRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """Reset password for any user (admin only) with password validation."""
+    from src.utils.password_validator import PasswordValidator
+
+    verify_admin_token(authorization or "")
+    username = username.strip().lower()
+
+    if not req.new_password:
+        raise HTTPException(status_code=400, detail="new_password is required")
+
+    # Validate password complexity
+    is_valid, errors = PasswordValidator.validate(req.new_password)
+    if not is_valid:
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "Password does not meet complexity requirements", "errors": errors}
+        )
+
+    try:
+        with MongoDBClient() as db:
+            users_col = db.get_collection("users")
+            result = users_col.update_one(
+                {"username": username},
+                {"$set": {"password_hash": get_password_hash(req.new_password), "updated_at": datetime.utcnow()}}
+            )
+            if result.matched_count == 0:
+                raise HTTPException(status_code=404, detail="User not found")
+
+        logger.info(f"✅ Password reset by admin for user: {username}")
+        return {"status": "ok", "username": username, "message": "Password updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Reset password error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to reset password")
+
+
 @app.post("/admin/scrape")
 async def admin_trigger_scrape(authorization: Optional[str] = Header(None)):
     """Trigger scraping (admin only) - placeholder"""
@@ -969,6 +1408,136 @@ async def admin_trigger_scrape(authorization: Optional[str] = Header(None)):
     # This is a placeholder - actual scraping would be async/background
     logger.info("Scrape triggered by admin")
     return {"status": "ok", "message": "Scrape job queued (placeholder)"}
+
+
+# =============================================================================
+# BRUTE FORCE PROTECTION ADMIN ENDPOINTS
+# =============================================================================
+
+@app.get("/admin/security/brute-force/stats")
+async def get_brute_force_stats(authorization: str = Header(...)):
+    """
+    Get brute force protection statistics (admin only).
+
+    Returns:
+    - Total tracked records
+    - Currently blocked IPs/usernames
+    - Recent attempts (24h)
+    - Configuration settings
+    """
+    verify_admin_token(authorization)
+
+    try:
+        stats = BruteForceProtection.get_stats()
+        return stats
+    except Exception as e:
+        logger.error(f"Error getting brute force stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/security/brute-force/blocked")
+async def get_blocked_list(
+    authorization: str = Header(...),
+    limit: int = 50
+):
+    """
+    Get list of currently blocked IPs/usernames (admin only).
+
+    Args:
+        limit: Maximum number of records to return (default: 50)
+
+    Returns:
+        List of blocked records with retry times
+    """
+    verify_admin_token(authorization)
+
+    try:
+        blocked = BruteForceProtection.get_blocked_list(limit=limit)
+        return {
+            "blocked": blocked,
+            "count": len(blocked)
+        }
+    except Exception as e:
+        logger.error(f"Error getting blocked list: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/admin/security/brute-force/unblock")
+async def unblock_user_or_ip(
+    authorization: str = Header(...),
+    username: Optional[str] = None,
+    ip_address: Optional[str] = None
+):
+    """
+    Manually unblock a username or IP address (admin only).
+
+    Args:
+        username: Username to unblock (optional)
+        ip_address: IP address to unblock (optional)
+
+    Returns:
+        Number of records unblocked
+    """
+    verify_admin_token(authorization)
+
+    if not username and not ip_address:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one of 'username' or 'ip_address' must be provided"
+        )
+
+    try:
+        count = BruteForceProtection.unblock(username=username, ip_address=ip_address)
+
+        if count > 0:
+            logger.info(f"🔓 Admin unblocked - Username: {username}, IP: {ip_address}, Count: {count}")
+            return {
+                "status": "ok",
+                "message": f"Successfully unblocked {count} record(s)",
+                "unblocked_count": count
+            }
+        else:
+            return {
+                "status": "not_found",
+                "message": "No matching blocked records found",
+                "unblocked_count": 0
+            }
+
+    except Exception as e:
+        logger.error(f"Error unblocking: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/security/brute-force/cleanup")
+async def cleanup_old_brute_force_records(
+    authorization: str = Header(...),
+    days: int = 30
+):
+    """
+    Clean up old brute force records (admin only).
+
+    Args:
+        days: Delete records older than this many days (default: 30)
+
+    Returns:
+        Number of records deleted
+    """
+    verify_admin_token(authorization)
+
+    try:
+        count = BruteForceProtection.cleanup_old_records(days=days)
+
+        logger.info(f"🧹 Admin cleanup - Deleted {count} old brute force records (>{days} days)")
+        return {
+            "status": "ok",
+            "message": f"Cleaned up {count} old record(s)",
+            "deleted_count": count,
+            "days_threshold": days
+        }
+
+    except Exception as e:
+        logger.error(f"Error cleaning up brute force records: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =============================================================================

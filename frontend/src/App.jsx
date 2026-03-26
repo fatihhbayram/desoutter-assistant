@@ -36,6 +36,7 @@ import './TechWizard.css';
 import MetricsDashboard from './components/MetricsDashboard';
 import LearningInsights from './components/LearningInsights';
 import DomainManagement from './components/DomainManagement';
+import BruteForcePanel from './components/BruteForcePanel';
 import './components/Dashboard.css';
 
 // =============================================================================
@@ -113,6 +114,17 @@ function App() {
   // Toast notifications
   const [toast, setToast] = useState(null);
 
+  // Password change modal
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordStrength, setPasswordStrength] = useState(0);
+  const [passwordErrors, setPasswordErrors] = useState([]);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
   // Product filtering and pagination
   const [filterSeries, setFilterSeries] = useState('');
   const [filterWirelessOnly, setFilterWirelessOnly] = useState(false);
@@ -125,8 +137,13 @@ function App() {
   // Admin panel states - User Management
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminNewUser, setAdminNewUser] = useState({ username: '', password: '', role: 'technician' });
+  const [adminNewUserPasswordStrength, setAdminNewUserPasswordStrength] = useState(0);
   const [adminLoadingUsers, setAdminLoadingUsers] = useState(false);
   const [adminScraping, setAdminScraping] = useState(false);
+  const [adminResetPasswordModal, setAdminResetPasswordModal] = useState(null); // {username}
+  const [adminResetPasswordValue, setAdminResetPasswordValue] = useState('');
+  const [adminResetPasswordStrength, setAdminResetPasswordStrength] = useState(0);
+  const [adminResetPasswordLoading, setAdminResetPasswordLoading] = useState(false);
 
   // Admin panel states - Document Management (RAG)
   const [adminDocuments, setAdminDocuments] = useState([]);
@@ -343,12 +360,28 @@ function App() {
       return;
     }
     try {
-      await api.post('/admin/users', adminNewUser);
-      setToast({ type: 'info', message: `User ${adminNewUser.username} created` });
+      const response = await api.post('/admin/users', adminNewUser);
+      const strengthScore = response.data?.password_strength || 0;
+      setToast({
+        type: 'success',
+        message: `User ${adminNewUser.username} created successfully! Password strength: ${strengthScore}/100`
+      });
       setAdminNewUser({ username: '', password: '', role: 'technician' });
+      setAdminNewUserPasswordStrength(0);  // Reset password strength
       loadAdminUsers();  // Refresh user list
     } catch (err) {
-      setToast({ type: 'error', message: err.response?.data?.detail || 'Failed to create user' });
+      const errorDetail = err.response?.data?.detail;
+
+      // Handle password validation errors
+      if (errorDetail && typeof errorDetail === 'object' && errorDetail.errors) {
+        const errorMsg = errorDetail.errors.join('\n• ');
+        setToast({
+          type: 'error',
+          message: `Password validation failed:\n• ${errorMsg}`
+        });
+      } else {
+        setToast({ type: 'error', message: errorDetail || 'Failed to create user' });
+      }
     }
   };
 
@@ -363,6 +396,42 @@ function App() {
       loadAdminUsers();  // Refresh user list
     } catch (err) {
       setToast({ type: 'error', message: err.response?.data?.detail || 'Failed to delete user' });
+    }
+  };
+
+  /**
+   * Handle admin password reset for another user
+   */
+  const handleAdminResetPassword = async (e) => {
+    e.preventDefault();
+    if (!adminResetPasswordValue) return;
+    // Basic validation
+    const errors = [];
+    if (adminResetPasswordValue.length < 12) errors.push('Minimum 12 characters');
+    if (!/[A-Z]/.test(adminResetPasswordValue)) errors.push('At least 1 uppercase letter');
+    if (!/[a-z]/.test(adminResetPasswordValue)) errors.push('At least 1 lowercase letter');
+    if (!/\d/.test(adminResetPasswordValue)) errors.push('At least 1 number');
+    if (!/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/~`]/.test(adminResetPasswordValue)) errors.push('At least 1 special character');
+    if (errors.length > 0) {
+      setToast({ type: 'error', message: 'Password: ' + errors.join(', ') });
+      return;
+    }
+    setAdminResetPasswordLoading(true);
+    try {
+      await api.patch(`/admin/users/${adminResetPasswordModal}/password`, { new_password: adminResetPasswordValue });
+      setToast({ type: 'success', message: `Password updated for ${adminResetPasswordModal}` });
+      setAdminResetPasswordModal(null);
+      setAdminResetPasswordValue('');
+      setAdminResetPasswordStrength(0);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setToast({
+        type: 'error', message: (detail && typeof detail === 'object' && detail.errors)
+          ? 'Password: ' + detail.errors.join(', ')
+          : detail || 'Failed to reset password'
+      });
+    } finally {
+      setAdminResetPasswordLoading(false);
     }
   };
 
@@ -518,6 +587,142 @@ function App() {
     localStorage.removeItem('auth_username');
     setSelectedProduct(null);
     setResult(null);
+  };
+
+  /**
+   * Calculate password strength score (0-100)
+   */
+  const calculatePasswordStrength = (password) => {
+    let score = 0;
+    if (password.length >= 12) score += 25;
+    if (password.length >= 16) score += 10;
+    if (password.length >= 20) score += 5;
+    if (/[A-Z]/.test(password)) score += 15;
+    if (/[a-z]/.test(password)) score += 15;
+    if (/\d/.test(password)) score += 15;
+    if (/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/~`]/.test(password)) score += 20;
+    return Math.min(score, 100);
+  };
+
+  /**
+   * Get password strength label based on score
+   */
+  const getPasswordStrengthLabel = (score) => {
+    if (score < 40) return 'Very Weak';
+    if (score < 60) return 'Weak';
+    if (score < 75) return 'Fair';
+    if (score < 90) return 'Strong';
+    return 'Very Strong';
+  };
+
+  /**
+   * Get password strength color based on score
+   */
+  const getPasswordStrengthColor = (score) => {
+    if (score < 40) return '#ff4444';
+    if (score < 60) return '#ff8800';
+    if (score < 75) return '#ffbb00';
+    if (score < 90) return '#88cc00';
+    return '#00cc44';
+  };
+
+  /**
+   * Validate password requirements in real-time
+   */
+  const validatePasswordRequirements = (password) => {
+    const errors = [];
+    if (password.length < 12) errors.push('Minimum 12 characters required');
+    if (!/[A-Z]/.test(password)) errors.push('At least 1 uppercase letter required');
+    if (!/[a-z]/.test(password)) errors.push('At least 1 lowercase letter required');
+    if (!/\d/.test(password)) errors.push('At least 1 number required');
+    if (!/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/~`]/.test(password)) errors.push('At least 1 special character required');
+    return errors;
+  };
+
+  /**
+   * Handle password change form submission
+   */
+  const handlePasswordChange = async (e) => {
+    e?.preventDefault();
+
+    const { currentPassword, newPassword, confirmPassword } = passwordData;
+
+    // Validation
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setToast({ type: 'error', message: 'All fields are required' });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setToast({ type: 'error', message: 'New passwords do not match' });
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      setToast({ type: 'error', message: 'New password must be different from current password' });
+      return;
+    }
+
+    // Check password requirements
+    const errors = validatePasswordRequirements(newPassword);
+    if (errors.length > 0) {
+      setPasswordErrors(errors);
+      setToast({ type: 'error', message: 'Password does not meet complexity requirements' });
+      return;
+    }
+
+    setPasswordLoading(true);
+
+    try {
+      const response = await api.post('/auth/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+        confirm_password: confirmPassword
+      });
+
+      const { password_strength } = response.data || {};
+
+      setToast({
+        type: 'success',
+        message: `Password changed successfully! Strength: ${password_strength?.label || 'Good'}`
+      });
+
+      // Reset form and close modal
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setPasswordStrength(0);
+      setPasswordErrors([]);
+      setShowPasswordModal(false);
+
+    } catch (err) {
+      const errorDetail = err.response?.data?.detail;
+
+      // Handle validation errors
+      if (errorDetail && typeof errorDetail === 'object' && errorDetail.errors) {
+        setPasswordErrors(errorDetail.errors);
+        setToast({ type: 'error', message: errorDetail.message || 'Password validation failed' });
+      } else {
+        setToast({ type: 'error', message: errorDetail || err.message || 'Password change failed' });
+      }
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  /**
+   * Handle password input change with real-time validation
+   */
+  const handlePasswordInput = (field, value) => {
+    setPasswordData({ ...passwordData, [field]: value });
+
+    // Update strength score if new password field
+    if (field === 'newPassword') {
+      const strength = calculatePasswordStrength(value);
+      setPasswordStrength(strength);
+
+      // Update errors in real-time
+      const errors = validatePasswordRequirements(value);
+      setPasswordErrors(errors);
+    }
   };
 
   // ---------------------------------------------------------------------------
@@ -1015,6 +1220,12 @@ function App() {
         >
           📚 Domain
         </button>
+        <button
+          className={`admin-tab ${adminTab === 'security' ? 'active' : ''}`}
+          onClick={() => setAdminTab('security')}
+        >
+          🛡️ Security
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -1065,27 +1276,69 @@ function App() {
               <h3>Add New User</h3>
               <div className="form-row">
                 <input
+                  id="new-username"
+                  name="username"
                   type="text"
                   placeholder="Username"
                   value={adminNewUser.username}
                   onChange={(e) => setAdminNewUser({ ...adminNewUser, username: e.target.value })}
+                  autoComplete="username"
                 />
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={adminNewUser.password}
-                  onChange={(e) => setAdminNewUser({ ...adminNewUser, password: e.target.value })}
-                />
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <input
+                    id="new-password"
+                    name="password"
+                    type="password"
+                    placeholder="Password (min 12 chars, uppercase, lowercase, number, special)"
+                    value={adminNewUser.password}
+                    onChange={(e) => {
+                      const newPassword = e.target.value;
+                      console.log('Password changed:', newPassword);
+                      setAdminNewUser({ ...adminNewUser, password: newPassword });
+                      const strength = calculatePasswordStrength(newPassword);
+                      console.log('Calculated strength:', strength);
+                      setAdminNewUserPasswordStrength(strength);
+                    }}
+                    autoComplete="new-password"
+                    style={{ width: '100%' }}
+                  />
+                  {adminNewUser.password && (
+                    <div style={{ fontSize: '0.75rem', marginTop: '4px', color: adminNewUserPasswordStrength >= 75 ? '#4CAF50' : adminNewUserPasswordStrength >= 50 ? '#ff8800' : '#ff4444', fontWeight: '500' }}>
+                      💪 Strength: {getPasswordStrengthLabel(adminNewUserPasswordStrength)} ({adminNewUserPasswordStrength}/100)
+                    </div>
+                  )}
+                </div>
                 <select
+                  id="new-user-role"
+                  name="role"
                   value={adminNewUser.role}
                   onChange={(e) => setAdminNewUser({ ...adminNewUser, role: e.target.value })}
                 >
                   <option value="technician">Technician</option>
                   <option value="admin">Admin</option>
                 </select>
-                <button type="submit" className="btn-primary btn-sm">+ Add</button>
+                <button
+                  type="submit"
+                  className="btn-primary btn-sm"
+                  disabled={adminNewUserPasswordStrength < 75 && adminNewUser.password.length > 0}
+                  title={adminNewUserPasswordStrength < 75 && adminNewUser.password.length > 0 ? 'Password too weak' : ''}
+                >
+                  + Add
+                </button>
               </div>
             </form>
+
+            {/* Password Requirements hint for new user form */}
+            <div style={{ marginTop: '8px', padding: '10px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '0.78rem', color: '#aaa' }}>
+              <strong style={{ color: '#ccc' }}>⚠️ Password Requirements:</strong>
+              <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
+                <li style={{ color: adminNewUser.password.length >= 12 ? '#4CAF50' : '#aaa' }}>{adminNewUser.password.length >= 12 ? '✓' : '○'} Minimum 12 characters</li>
+                <li style={{ color: /[A-Z]/.test(adminNewUser.password) ? '#4CAF50' : '#aaa' }}>{/[A-Z]/.test(adminNewUser.password) ? '✓' : '○'} At least 1 uppercase letter</li>
+                <li style={{ color: /[a-z]/.test(adminNewUser.password) ? '#4CAF50' : '#aaa' }}>{/[a-z]/.test(adminNewUser.password) ? '✓' : '○'} At least 1 lowercase letter</li>
+                <li style={{ color: /\d/.test(adminNewUser.password) ? '#4CAF50' : '#aaa' }}>{/\d/.test(adminNewUser.password) ? '✓' : '○'} At least 1 number</li>
+                <li style={{ color: /[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/~`]/.test(adminNewUser.password) ? '#4CAF50' : '#aaa' }}>{/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/~`]/.test(adminNewUser.password) ? '✓' : '○'} At least 1 special character</li>
+              </ul>
+            </div>
 
             <div className="users-list">
               <h3>Current Users</h3>
@@ -1112,14 +1365,25 @@ function App() {
                           </span>
                         </td>
                         <td>
-                          {user.username !== auth.username && (
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <button
-                              className="btn-danger btn-sm"
-                              onClick={() => handleAdminDeleteUser(user.username)}
+                              className="btn-sm"
+                              style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontSize: '0.8rem' }}
+                              onClick={() => { setAdminResetPasswordModal(user.username); setAdminResetPasswordValue(''); setAdminResetPasswordStrength(0); }}
                             >
-                              Delete
+                              🔑 Reset PW
                             </button>
-                          )}
+                            {user.username !== auth.username ? (
+                              <button
+                                className="btn-danger btn-sm"
+                                onClick={() => handleAdminDeleteUser(user.username)}
+                              >
+                                🗑️ Delete
+                              </button>
+                            ) : (
+                              <span style={{ color: '#999', fontSize: '0.85rem' }}>(You)</span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1127,6 +1391,60 @@ function App() {
                 </table>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Reset Password Modal */}
+      {adminResetPasswordModal && (
+        <div className="modal-overlay" onClick={() => { setAdminResetPasswordModal(null); setAdminResetPasswordValue(''); setAdminResetPasswordStrength(0); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+            <div className="modal-header">
+              <h2>🔑 Reset Password — <em>{adminResetPasswordModal}</em></h2>
+              <button className="modal-close" onClick={() => { setAdminResetPasswordModal(null); setAdminResetPasswordValue(''); setAdminResetPasswordStrength(0); }}>×</button>
+            </div>
+            <form onSubmit={handleAdminResetPassword} className="password-form">
+              <div className="form-group">
+                <label htmlFor="admin-reset-pw">New Password</label>
+                <input
+                  id="admin-reset-pw"
+                  type="password"
+                  placeholder="Enter new password"
+                  value={adminResetPasswordValue}
+                  onChange={(e) => {
+                    setAdminResetPasswordValue(e.target.value);
+                    setAdminResetPasswordStrength(calculatePasswordStrength(e.target.value));
+                  }}
+                  required
+                  autoComplete="new-password"
+                />
+                {adminResetPasswordValue && (
+                  <div style={{ marginTop: '6px' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: '500', color: adminResetPasswordStrength >= 75 ? '#4CAF50' : adminResetPasswordStrength >= 50 ? '#ff8800' : '#ff4444' }}>
+                      💪 Strength: {getPasswordStrengthLabel(adminResetPasswordStrength)} ({adminResetPasswordStrength}/100)
+                    </div>
+                    <div style={{ height: '6px', background: '#333', borderRadius: '3px', marginTop: '4px' }}>
+                      <div style={{ height: '100%', width: `${adminResetPasswordStrength}%`, background: getPasswordStrengthColor(adminResetPasswordStrength), borderRadius: '3px', transition: 'all 0.3s' }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="password-requirements" style={{ marginTop: '10px', fontSize: '0.78rem' }}>
+                <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                  <li style={{ color: adminResetPasswordValue.length >= 12 ? '#4CAF50' : '#aaa' }}>{adminResetPasswordValue.length >= 12 ? '✓' : '○'} Minimum 12 characters</li>
+                  <li style={{ color: /[A-Z]/.test(adminResetPasswordValue) ? '#4CAF50' : '#aaa' }}>{/[A-Z]/.test(adminResetPasswordValue) ? '✓' : '○'} At least 1 uppercase letter</li>
+                  <li style={{ color: /[a-z]/.test(adminResetPasswordValue) ? '#4CAF50' : '#aaa' }}>{/[a-z]/.test(adminResetPasswordValue) ? '✓' : '○'} At least 1 lowercase letter</li>
+                  <li style={{ color: /\d/.test(adminResetPasswordValue) ? '#4CAF50' : '#aaa' }}>{/\d/.test(adminResetPasswordValue) ? '✓' : '○'} At least 1 number</li>
+                  <li style={{ color: /[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/~`]/.test(adminResetPasswordValue) ? '#4CAF50' : '#aaa' }}>{/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/~`]/.test(adminResetPasswordValue) ? '✓' : '○'} At least 1 special character</li>
+                </ul>
+              </div>
+              <div className="modal-actions" style={{ marginTop: '16px' }}>
+                <button type="button" className="btn-secondary" onClick={() => { setAdminResetPasswordModal(null); setAdminResetPasswordValue(''); setAdminResetPasswordStrength(0); }} disabled={adminResetPasswordLoading}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={adminResetPasswordLoading || adminResetPasswordStrength < 75}>
+                  {adminResetPasswordLoading ? 'Saving...' : '✅ Update Password'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -1310,6 +1628,7 @@ function App() {
       {adminTab === 'metrics' && <MetricsDashboard token={localStorage.getItem('auth_token')} />}
       {adminTab === 'learning' && <LearningInsights token={localStorage.getItem('auth_token')} />}
       {adminTab === 'domain' && <DomainManagement token={localStorage.getItem('auth_token')} />}
+      {adminTab === 'security' && <BruteForcePanel />}
     </div>
   );
 
@@ -1902,7 +2221,16 @@ function App() {
           <>
             <div className="role-bar">
               <span>Signed in as <strong>{auth.username}</strong> ({auth.role})</span>
-              <button className="btn-secondary" onClick={handleLogout}>Sign Out</button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  className="btn-secondary"
+                  onClick={() => setShowPasswordModal(true)}
+                  style={{ background: '#4CAF50' }}
+                >
+                  🔐 Change Password
+                </button>
+                <button className="btn-secondary" onClick={handleLogout}>Sign Out</button>
+              </div>
             </div>
             {auth.role === 'admin' ? renderAdminPanel() : renderTechnicianPanel()}
           </>
@@ -1928,6 +2256,146 @@ function App() {
           </div>
         </div>
       </footer>
+
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className="modal-overlay" onClick={() => setShowPasswordModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>🔐 Change Password</h2>
+              <button
+                className="modal-close"
+                onClick={() => setShowPasswordModal(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handlePasswordChange} className="password-form">
+              <div className="form-group">
+                <label htmlFor="current-password">Current Password</label>
+                <input
+                  id="current-password"
+                  type="password"
+                  placeholder="Enter current password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) => handlePasswordInput('currentPassword', e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="new-password">New Password</label>
+                <input
+                  id="new-password"
+                  type="password"
+                  placeholder="Enter new password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => handlePasswordInput('newPassword', e.target.value)}
+                  required
+                  autoComplete="new-password"
+                />
+
+                {/* Password Strength Indicator */}
+                {passwordData.newPassword && (
+                  <div className="password-strength">
+                    <div className="strength-label">
+                      Strength: {getPasswordStrengthLabel(passwordStrength)}
+                      <span style={{ marginLeft: '8px', fontWeight: 'bold' }}>
+                        {passwordStrength}%
+                      </span>
+                    </div>
+                    <div className="strength-bar-container">
+                      <div
+                        className="strength-bar"
+                        style={{
+                          width: `${passwordStrength}%`,
+                          backgroundColor: getPasswordStrengthColor(passwordStrength),
+                          height: '8px',
+                          borderRadius: '4px',
+                          transition: 'all 0.3s ease'
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="confirm-password">Confirm New Password</label>
+                <input
+                  id="confirm-password"
+                  type="password"
+                  placeholder="Confirm new password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => handlePasswordInput('confirmPassword', e.target.value)}
+                  required
+                  autoComplete="new-password"
+                />
+              </div>
+
+              {/* Password Requirements */}
+              <div className="password-requirements">
+                <h4>Password Requirements:</h4>
+                <ul>
+                  <li className={passwordData.newPassword.length >= 12 ? 'valid' : ''}>
+                    {passwordData.newPassword.length >= 12 ? '✓' : '○'} Minimum 12 characters
+                  </li>
+                  <li className={/[A-Z]/.test(passwordData.newPassword) ? 'valid' : ''}>
+                    {/[A-Z]/.test(passwordData.newPassword) ? '✓' : '○'} At least 1 uppercase letter
+                  </li>
+                  <li className={/[a-z]/.test(passwordData.newPassword) ? 'valid' : ''}>
+                    {/[a-z]/.test(passwordData.newPassword) ? '✓' : '○'} At least 1 lowercase letter
+                  </li>
+                  <li className={/\d/.test(passwordData.newPassword) ? 'valid' : ''}>
+                    {/\d/.test(passwordData.newPassword) ? '✓' : '○'} At least 1 number
+                  </li>
+                  <li className={/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/~`]/.test(passwordData.newPassword) ? 'valid' : ''}>
+                    {/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/~`]/.test(passwordData.newPassword) ? '✓' : '○'} At least 1 special character
+                  </li>
+                </ul>
+
+                {/* Show validation errors */}
+                {passwordErrors.length > 0 && (
+                  <div className="password-errors">
+                    <strong>Validation Errors:</strong>
+                    <ul>
+                      {passwordErrors.map((error, idx) => (
+                        <li key={idx} style={{ color: '#ff4444' }}>❌ {error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                    setPasswordErrors([]);
+                  }}
+                  disabled={passwordLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={passwordLoading || passwordErrors.length > 0}
+                >
+                  {passwordLoading ? 'Changing...' : 'Change Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
