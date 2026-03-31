@@ -1,4 +1,4 @@
-# Project Roadmap
+# Desoutter Assistant — Project Roadmap
 
 Strategic development plan for the Desoutter Assistant project.
 
@@ -6,104 +6,100 @@ Strategic development plan for the Desoutter Assistant project.
 
 ## Vision
 
-Build an **enterprise-grade AI support system** that enables technicians to diagnose and repair industrial tools faster, with verified accuracy, while continuously learning from real-world feedback.
+Build an **enterprise-grade, safety-critical AI support system** that enables industrial tool technicians to diagnose faults, access procedures, and verify compatibility — with verified accuracy and continuous learning from real-world feedback.
+
+> **Core principle:** Safety first. Completeness second. Performance third.
 
 ---
 
 ## Current Status
 
-**Phase**: Phase 6 Complete - Production Ready (March 2026)
+**Version:** 2.0.1 — Production Ready  
+**Last Updated:** March 31, 2026  
+**Active Development:** Service Management System (Q3 2026)
 
 | Metric | Value |
 |--------|-------|
 | Test Pass Rate | 85% (34/40 scenarios) |
-| Timeout Rate | 0% (all resolved) |
+| Timeout Rate | 0% |
 | Products Indexed | 451 |
-| Documents Processed | 541 (121 PDF + 420 Word) |
-| Freshdesk Tickets | 2,249 |
-| Vector DB | Qdrant - 26,513 chunks (384-dim) |
-| BM25 Terms | 19,032 |
-| Intent Types | 15 (expanded from 8) |
+| Documents Processed | 541 (121 PDF + 420 DOCX) |
+| Freshdesk Tickets Ingested | 2,249 |
+| Vector DB Chunks | 26,513 (Qdrant, 384-dim) |
+| BM25 Unique Terms | 19,032 |
+| Intent Types | 15 (multi-label) |
+| Supported Languages | Turkish, English |
 
 ---
 
 ## Completed Milestones
 
-### Q1 2026 - Phase 6: Tuning & Accuracy
+### 🏆 Phase 7 — El-Harezmi Pipeline + Qdrant (v2.0.0) — February 2026
 
-#### March 2026
-
-| Date | Milestone | Description |
-|------|-----------|-------------|
-| Mar 15 | **Phase 6 Completion** | 85% pass rate accepted as production-ready |
-| Mar 15 | Timeout Elimination | All 3 timeouts resolved (7.5% → 0%) |
-| Mar 15 | Test Suite Quality | Fake codes fixed, 40 scenarios, realistic expectations |
-| Mar 15 | Prompt Hardening | KEY TERMS REPETITION rule added |
-| Mar 15 | 9 Perfect Categories | Troubleshooting, Specs, Config, Calib at 100% |
-
-#### January 2026
+A complete architectural overhaul: the monolithic 14-stage RAG pipeline was replaced with the **5-stage El-Harezmi architecture**, and ChromaDB was migrated to **Qdrant**.
 
 | Date | Milestone | Description |
 |------|-----------|-------------|
-| Jan 5 | **Intelligent Product Filtering** | Pattern-based extraction, Qdrant filtering, 91.7% test pass |
-| Jan 5 | **Intent Expansion** | 15 intent types (from 8) - added config, compat, procedure, firmware, comparison, capability, accessory |
-| Jan 4 | **Freshdesk Integration Complete** | 2,249 tickets scraped, processed, and ingested |
+| Feb 18 | **El-Harezmi 5-Stage Pipeline** | `stage1_intent_classifier`, `stage2_retrieval_strategy`, `stage3_info_extraction`, `stage4_kg_validation`, `stage5_response_formatter` |
+| Feb 18 | **Qdrant Migration** | ChromaDB → Qdrant v1.7.4; `desoutter_docs_v2` collection; dense + sparse hybrid vectors |
+| Feb 18 | **Adaptive Chunking** | 8 document types → 6 strategies: SemanticChunker, TableAwareChunker, EntityChunker, ProblemSolutionChunker, StepPreservingChunker, HybridChunker |
+| Feb 18 | **15 Intent Types** | Expanded from 8 → 15 multi-label intents with entity extraction |
+| Feb 18 | **Metadata Enrichment** | In-place enrichment of 26,513 Qdrant points (document_type, chunk_type, intent_relevance, error_code, esde_code…) |
+| Feb 18 | **Test Suite Expansion** | 25 → 40 test scenarios, 13 Turkish queries |
 
-### Q4 2025 - Core RAG System
+---
 
-#### December 2025
-
-| Date | Milestone | Description |
-|------|-----------|-------------|
-| Dec 31 | Source Citation Enhancement | Page number extraction, product metadata enrichment |
-| Dec 30 | Intent Detection | 8 intent types with specialized prompts |
-| Dec 30 | Content Deduplication | SHA-256 hash-based duplicate prevention |
-| Dec 30 | Adaptive Chunking | Document type-based chunk sizing |
-| Dec 29 | Context Grounding | "I don't know" logic with context scoring |
-| Dec 29 | Response Validation | Hallucination detection and prevention |
-| Dec 27 | Relevance Filtering | 15 fault categories with keyword filtering |
-| Dec 22 | Performance Metrics | Query latency, cache hit rates, health monitoring |
-| Dec 22 | Multi-turn Conversation | Session management with context preservation |
-| Dec 22 | Self-Learning Loop | Wilson score ranking, source learning |
-| Dec 17 | Context Optimization | 8K token budget management |
-| Dec 17 | Metadata Boosting | Service bulletin prioritization |
-| Dec 17 | GPU Activation | NVIDIA RTX A2000 inference |
-| Dec 16 | **Hybrid Search** | BM25 + Semantic + RRF fusion |
-| Dec 16 | Response Caching | LRU + TTL cache (~100,000x speedup) |
-| Dec 15 | Semantic Chunking | Structure-aware document processing |
-| Dec 14 | TechWizard UI | 4-step wizard interface |
-| Dec 09 | Admin Dashboard | Analytics and feedback statistics |
-| Dec 09 | Feedback System | Self-learning RAG with user feedback |
-
-#### November 2025
+### ✅ Phase 6 — Tuning & Accuracy (v2.0.1) — March 2026
 
 | Date | Milestone | Description |
 |------|-----------|-------------|
-| Nov 28 | Authentication | JWT-based login with role management |
-| Nov 27 | **RAG Engine** | PDF processing, Qdrant integration |
-| Nov 26 | Ollama Integration | Local LLM with GPU support |
-| Nov 22 | Project Start | Initial setup, scraper, MongoDB |
+| Mar 15 | **Timeout Elimination** | All 3 timeout scenarios resolved (7.5% → 0%) |
+| Mar 15 | **Prompt Hardening** | KEY TERMS REPETITION rule added to EN/TR system prompts |
+| Mar 15 | **Test Quality Improvements** | Fake error codes removed, realistic expectations set |
+| Mar 15 | **85% Pass Rate Accepted** | 9 categories at 100%; phase declared production-ready |
+| Mar 24 | **Security Audit** | White-hat Red Team assessment; vulnerabilities documented |
+
+---
+
+### ✅ Phase 5 — Production Features (v1.7.0 – v1.8.0) — January 2026
+
+| Date | Milestone | Description |
+|------|-----------|-------------|
+| Jan 7 | Triple-Path Retrieval | Dedicated bulletin path + general + controller docs |
+| Jan 7 | Dynamic Query Expander | Vector DB-based term expansion (replaced hardcoded synonyms) |
+| Jan 6 | General RAG Quality | Error code boost, phrase/bigram matching, bulletin deduplication |
+| Jan 5 | **Intelligent Product Filtering** | 40+ regex patterns, Qdrant `where` clause filtering |
+| Jan 5 | **Intent Expansion (8 → 15)** | Config, Compat, Procedure, Firmware, Comparison, Capability, Accessory |
+| Jan 4 | **Freshdesk Integration** | 2,249 tickets scraped, processed, and indexed |
+
+---
+
+### ✅ Phase 1–4 — Core RAG System (v0.1.0 – v1.6.0) — Nov–Dec 2025
+
+| Version | Date | Highlights |
+|---------|------|------------|
+| v1.6.0 | Dec 31 | Source citation, product metadata enrichment |
+| v1.5.0 | Dec 30 | Intent detection (8 types), content deduplication |
+| v1.4.0 | Dec 29 | Context grounding ("I don't know" logic), response validation |
+| v1.3.0 | Dec 27 | Relevance filtering, connection architecture mapping |
+| v1.2.0 | Dec 22 | Domain embeddings, self-learning, performance metrics |
+| v1.1.0 | Dec 17 | Hybrid Search (BM25 + Semantic + RRF), response caching |
+| v1.0.0 | Dec 15 | Semantic chunker, TechWizard UI, Admin dashboard, GPU |
+| v0.1.0 | Nov 22 | Initial release: FastAPI, MongoDB, Ollama, RAG, JWT auth |
 
 ---
 
 ## In Progress
 
-### Q2 2026 - El-Harezmi Pipeline Migration
+### 🔄 Q2 2026 — Pipeline Stabilisation & Optimisation
 
-**Status**: Active Development
-
-- [ ] **El-Harezmi 5-Stage Pipeline**
-  - 5-stage intelligent pipeline implementation
-  - A/B testing against Legacy RAG (85% baseline)
-  - Gradual rollout with performance monitoring
-  - Target: Match or exceed 85% accuracy with improved latency
-
-**Components**:
-- `stage1_intent_classifier.py` - Intent detection
-- `stage2_retrieval_strategy.py` - Adaptive retrieval
-- `stage3_info_extraction.py` - Information extraction
-- `stage4_kg_validation.py` - Knowledge graph validation
-- `stage5_response_formatter.py` - Response formatting
+| Priority | Task | Status |
+|----------|------|--------|
+| 🔴 High | A/B test El-Harezmi vs legacy RAG side-by-side | Pending |
+| 🔴 High | Turkish prompt improvements (COMPAT_001 intent mismatch) | In Progress |
+| 🟡 Medium | Cross-Encoder re-ranking (Top-20 → Top-5 semantic re-ranking) | Planned |
+| 🟡 Medium | Controller unit documentation scraping (10 remaining series) | In Progress |
+| 🟢 Low | Admin UI redesign — simplified document management | Planned |
 
 ---
 
@@ -113,96 +109,96 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 
 | Priority | Feature | Description | Effort |
 |----------|---------|-------------|--------|
-| 🔴 High | Cross-Encoder Re-ranking | Top-10 → Top-5 semantic re-ranking | 2 days |
-| 🔴 High | Confidence Score API | Numeric confidence in responses | 1 day |
-| 🟡 Medium | TechWizard Integration | Deploy wizard UI to production | 1 day |
-| 🟡 Medium | Controller Units Scrape | 10 remaining product series | 1 day |
-| 🟢 Low | Admin UI Redesign | Simplified document management | 2 days |
+| 🔴 High | Cross-Encoder Re-ranking | ColBERT / bi-encoder re-ranking on top-K results | 2 days |
+| 🔴 High | Confidence Score in API | Numeric confidence exposed on every response | 1 day |
+| 🔴 High | Rate Limiting | Nginx or FastAPI middleware request throttling | 1 day |
+| 🟡 Medium | TechWizard Production Deploy | Ship wizard UI to production environment | 1 day |
+| 🟡 Medium | CORS Hardening | Restrict `allow_origins` to known domains | 0.5 day |
+| 🟡 Medium | Controller Units Scrape | Remaining 10 controller product series | 1 day |
+| 🟢 Low | Admin UI Redesign | Cleaner document management interface | 2 days |
 
-### Medium-term (Q3-Q4 2026)
+### Medium-term (Q3–Q4 2026)
 
 | Priority | Feature | Description | Effort |
 |----------|---------|-------------|--------|
-| 🔴 High | Service Management System | Service requests, tracking, workflow | 2 weeks |
-| 🔴 High | KPI Dashboard | Supervisor/Manager analytics | 1 week |
-| 🔴 High | Field Installation Support | Extend beyond repair to on-site setup | 1 week |
-| 🟡 Medium | User Profiles | Expertise-based response customization | 3 days |
-| 🟡 Medium | Embedding Fine-tuning | Domain-specific embeddings | 1 week |
-| 🟡 Medium | Vision AI | Photo-based fault detection | 2 weeks |
-| 🟢 Low | Prompt Caching | 40% latency reduction | 3 days |
-| 🟢 Low | Async Ingestion Queue | Celery + Redis background processing | 1 week |
+| 🔴 High | **Service Management System** | End-to-end service request lifecycle — see detail below | 2 weeks |
+| 🔴 High | **KPI Dashboard** | Supervisor/manager analytics with charts | 1 week |
+| 🔴 High | Field Installation Support | Extend AI guidance to on-site installation procedures | 1 week |
+| 🟡 Medium | User Profiles | Expertise-level customisation per user role | 3 days |
+| 🟡 Medium | Embedding Fine-tuning | Domain-specific model training on Desoutter corpus | 1 week |
+| 🟡 Medium | Vision AI | Photo-based fault detection (camera upload) | 2 weeks |
+| 🟡 Medium | Async Ingestion Queue | Celery + Redis background document processing | 1 week |
+| 🟢 Low | Prompt Caching | 40% latency reduction via response memoisation | 3 days |
 
 ### Long-term (2027+)
 
 | Priority | Feature | Description |
 |----------|---------|-------------|
-| 🔴 High | Mobile PWA | Progressive Web App for field use |
-| 🔴 High | Qdrant Scaling | Scale to 100M+ vectors for multi-tenant |
-| 🟡 Medium | SAP Integration | Automatic spare parts ordering |
-| 🟡 Medium | Predictive Maintenance | Failure prediction system |
-| 🟢 Low | Voice Assistant | Hands-free fault reporting |
-| 🟢 Low | Offline Mode | Local inference for disconnected use |
+| 🔴 High | Mobile PWA | Progressive Web App for field technicians |
+| 🔴 High | Qdrant Horizontal Scaling | Scale to 100 M+ vectors for multi-tenant deployment |
+| 🟡 Medium | SAP Integration | Automatic spare parts ordering from diagnosis results |
+| 🟡 Medium | Predictive Maintenance | Failure prediction from historical service patterns |
+| 🟢 Low | Voice Assistant | Hands-free fault reporting for workshop use |
+| 🟢 Low | Offline Mode | Local inference for disconnected / air-gapped environments |
 
 ---
 
-## Service Management System (Planned Q3 2026)
+## Planned: Service Management System (Q3 2026)
 
-### Overview
+A comprehensive module to track repairs, manage customer devices, and generate KPI reports.
 
-A comprehensive service management module to track repairs, manage customers, and analyze performance.
-
-### Components
+### Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    SERVICE MANAGEMENT SYSTEM                    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
-│  │   Device    │  │   Service   │  │       Customer          │ │
-│  │  Registry   │──│   Requests  │──│      Management         │ │
-│  │             │  │             │  │                         │ │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘ │
-│         │                │                      │               │
-│         └────────────────┼──────────────────────┘               │
-│                          │                                      │
-│                          ▼                                      │
-│                  ┌───────────────┐                              │
-│                  │ KPI Dashboard │                              │
-│                  │  • Metrics    │                              │
-│                  │  • Reports    │                              │
-│                  │  • Analytics  │                              │
-│                  └───────────────┘                              │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                  SERVICE MANAGEMENT SYSTEM                   │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐ │
+│  │   Device     │  │   Service    │  │    Customer       │ │
+│  │  Registry    │──│   Requests   │──│   Management      │ │
+│  └──────────────┘  └──────────────┘  └───────────────────┘ │
+│         │                │                    │             │
+│         └────────────────┼────────────────────┘             │
+│                          │                                  │
+│                          ▼                                  │
+│                  ┌───────────────┐                          │
+│                  │ KPI Dashboard │                          │
+│                  │ • Metrics     │                          │
+│                  │ • Reports     │                          │
+│                  │ • Analytics   │                          │
+│                  └───────────────┘                          │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### Database Schema (Planned)
 
-#### devices Collection
+#### `devices` Collection
+
 ```javascript
 {
-  serial_number: String,      // Unique device identifier
-  part_number: String,        // Product part number
-  model_name: String,         // Model name
+  serial_number: String,       // Unique device identifier
+  part_number: String,         // Product part number
+  model_name: String,          // Model name
   customer: { id, name, contact },
   purchase_date: Date,
   warranty_end_date: Date,
-  service_history: [String],  // Service request IDs
+  service_history: [String],   // Service request IDs
   status: "active" | "retired" | "lost"
 }
 ```
 
-#### service_requests Collection
+#### `service_requests` Collection
+
 ```javascript
 {
-  request_id: String,         // SR-YYYYMMDD-XXX
+  request_id: String,          // SR-YYYYMMDD-XXX
   device: { serial_number, part_number, model_name },
   customer: { id, name, reference },
   service_type: "SMART_CARE" | "BASIC_CARE" | "REPAIR" | "CALIBRATION",
   warranty_status: "WARRANTY" | "PAID" | "GOODWILL" | "CONTRACT",
   fault_description: String,
-  ai_diagnosis: { suggestion, confidence, sources },
+  ai_diagnosis: { suggestion, confidence, sources, intent },
   status: "pending" | "in_progress" | "completed" | "delivered",
   assigned_to: String,
   parts_used: [{ part_number, quantity }],
@@ -214,53 +210,54 @@ A comprehensive service management module to track repairs, manage customers, an
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | /api/devices | List devices |
-| POST | /api/devices | Register device |
-| GET | /api/services | List service requests |
-| POST | /api/services | Create service request |
-| PUT | /api/services/{id}/status | Update status |
-| GET | /api/kpi/overview | Dashboard metrics |
-| GET | /api/reports/export | Export to Excel/PDF |
+| GET | `/api/devices` | List registered devices |
+| POST | `/api/devices` | Register new device |
+| GET | `/api/services` | List service requests |
+| POST | `/api/services` | Create service request |
+| PUT | `/api/services/{id}/status` | Update service status |
+| GET | `/api/kpi/overview` | Dashboard KPIs |
+| GET | `/api/reports/export` | Export to Excel / PDF |
 
 ### Role Matrix (Planned)
 
 | Feature | Admin | Manager | Supervisor | Technician |
 |---------|:-----:|:-------:|:----------:|:----------:|
-| Create Service | ✅ | ✅ | ✅ | ✅ |
-| Edit Any Service | ✅ | ✅ | ✅ | ❌ |
-| Delete Service | ✅ | ✅ | ❌ | ❌ |
-| View KPI Dashboard | ✅ | ✅ | ✅ | ❌ |
-| User Management | ✅ | ❌ | ❌ | ❌ |
-| Revenue Reports | ✅ | ✅ | ❌ | ❌ |
+| Create service request | ✅ | ✅ | ✅ | ✅ |
+| Edit any service | ✅ | ✅ | ✅ | ❌ |
+| Delete service | ✅ | ✅ | ❌ | ❌ |
+| View KPI dashboard | ✅ | ✅ | ✅ | ❌ |
+| User management | ✅ | ❌ | ❌ | ❌ |
+| Revenue reports | ✅ | ✅ | ❌ | ❌ |
 
 ---
 
 ## Success Metrics
 
-### Technical Metrics
+### Technical Targets
 
 | Metric | Current | Target | Timeline |
 |--------|---------|--------|----------|
-| Test Pass Rate | 85% | >85% | Maintain |
-| Response Time | 23.6s (non-cached) | <20s | Q2 2026 |
-| Cache Hit Rate | High | >60% | Q2 2026 |
-| Hallucination Rate | <2% | <1% | Q3 2026 |
-| "I don't know" Rate | 12% | 10-15% | Maintain |
+| Test Pass Rate | 85% | ≥ 90% | Q3 2026 |
+| Avg Response Time (non-cached) | 23.6 s | < 15 s | Q3 2026 |
+| Cache Hit Rate | High | > 60% | Q2 2026 |
+| Hallucination Rate | < 2% | < 1% | Q3 2026 |
+| Compatibility Query Accuracy | ~67% | ≥ 90% | Q2 2026 |
+| "I don't know" Rate | 12% | 10–15% | Maintain |
 
-### Business Metrics (Future)
+### Business Targets
 
 | Metric | Target | Timeline |
 |--------|--------|----------|
-| User Satisfaction | >4.5/5.0 | Q3 2026 |
-| First Contact Resolution | >70% | Q3 2026 |
-| Average Diagnosis Time | <2 min | Q3 2026 |
-| Document Coverage | >90% products | Q2 2026 |
+| User Satisfaction | > 4.5 / 5.0 | Q3 2026 |
+| First Contact Resolution | > 70% | Q3 2026 |
+| Average Diagnosis Time | < 2 min | Q3 2026 |
+| Document Coverage | > 90% of products | Q2 2026 |
 
 ---
 
-## Contributing to Roadmap
+## Contributing to the Roadmap
 
-We welcome feature suggestions and contributions!
+We welcome feature suggestions and contributions.
 
 ### How to Suggest Features
 
@@ -271,8 +268,8 @@ We welcome feature suggestions and contributions!
 ### How to Contribute
 
 1. Check the "Planned Features" section for available work
-2. Comment on the issue to claim it
-3. Submit a PR following our contribution guidelines
+2. Comment on the GitHub Issue to claim it
+3. Submit a PR following the contribution guidelines in [README.md](README.md)
 
 ---
 
@@ -280,11 +277,12 @@ We welcome feature suggestions and contributions!
 
 | Document | Description |
 |----------|-------------|
-| [README.md](README.md) | Project overview |
-| [CHANGELOG.md](CHANGELOG.md) | Version history |
-| [QUICKSTART.md](QUICKSTART.md) | Quick setup guide |
-| [PROXMOX_DEPLOYMENT.md](PROXMOX_DEPLOYMENT.md) | Infrastructure guide |
+| [README.md](README.md) | Full project overview |
+| [CHANGELOG.md](CHANGELOG.md) | Full version history (v0.1.0 → v2.0.1) |
+| [QUICKSTART.md](QUICKSTART.md) | Get up and running in < 10 minutes |
+| [ARCHITECTURE_DIAGRAMS.md](ARCHITECTURE_DIAGRAMS.md) | Mermaid diagrams for presentations |
+| [PROXMOX_DEPLOYMENT.md](PROXMOX_DEPLOYMENT.md) | Production infrastructure guide |
 
 ---
 
-*Last Updated: March 23, 2026*
+*Last Updated: March 31, 2026*

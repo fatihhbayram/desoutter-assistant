@@ -9,26 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### In Progress (Phase 6 - Tuning & Accuracy)
-- Test suite quality improvements (85% pass rate, 34/40 scenarios)
-- Prompt hardening with key terms repetition
-- Timeout elimination (3 resolved)
-- Knowledge Graph validation with hard-coded compatibility matrix
-- Controller units scraping (10 units)
+### Planned (Q2 2026)
+- A/B testing: El-Harezmi pipeline vs legacy 14-stage RAG
+- Cross-encoder re-ranking (Top-20 → Top-5) for improved precision
+- Rate limiting middleware (Nginx / FastAPI)
+- CORS hardening — restrict `allow_origins` to known domains
+- Turkish COMPAT intent prompt improvements (COMPAT_001 fix)
+- Controller unit documentation scraping (10 remaining series)
 
 ---
 
-## [2.0.1] - 2026-03-15
+## [2.0.1] - 2026-03-24
 
-### Phase 6: Test Quality & Prompt Improvements
+### Phase 6.1: Security Audit & Test Quality
 
-**Focus**: Eliminating timeouts and improving test suite quality
+**Focus**: White-hat security assessment + timeout elimination + prompt hardening
+
+### Security
+- **White-hat Security Audit** (`security_test_whitebox.py`, `security_test_report_20260324_203526.json`)
+  - Full Red Team adversarial prompt simulation conducted
+  - 40-scenario security test suite created and executed
+  - Identified medium-risk items: open CORS, missing rate limiting, default credentials
+  - Full findings documented in `SECURITY_ASSESSMENT_REPORT_TR.md`
+- **Admin Password Validation** — added frontend validation warnings for weak passwords
+- **Password Update UI** — added password change capability in Admin user management panel
 
 ### Fixed
-- **Timeout Elimination** - All 3 timeout issues resolved
-  - TROUBLE_002: Overheating query (was >60s timeout, now 34s)
-  - GEN_001: General features query (was >60s timeout, now 32s)
-  - CALIB_002: CVI3 calibration (was >60s timeout, now 22s)
+- **Timeout Elimination** - All 3 timeout scenarios resolved
+  - TROUBLE_002: Overheating query (was > 60 s, now 34 s)
+  - GEN_001: General features query (was > 60 s, now 32 s)
+  - CALIB_002: CVI3 calibration (was > 60 s, now 22 s)
 
 ### Changed
 - **Test Suite Quality** (`tests/fixtures/standard_queries.py`)
@@ -37,33 +47,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Relaxed overly strict test expectations (temperature → heat, CVI3 → CVI)
   - Updated test count: 25 → 40 scenarios
 - **Prompt Enhancements** (`src/llm/prompts.py`)
-  - Added "KEY TERMS REPETITION" rule to English prompts
-  - Added "ÖNEMLİ TERİMLERİ TEKRARLA" rule to Turkish prompt
+  - Added KEY TERMS REPETITION rule to English system prompt
+  - Added ÖNEMLİ TERİMLERİ TEKRARLA rule to Turkish system prompt
   - LLM now instructed to echo important terms from user queries
-  - Affects: TROUBLESHOOTING, GENERAL, and Turkish system prompts
+  - Affects: TROUBLESHOOTING, GENERAL, and Turkish prompts
 
 ### Test Results
 - **Pass Rate**: 85% (34/40 scenarios)
 - **Timeout Rate**: 0% (down from 7.5%)
-- **Avg Response Time**: 23.6s (non-cached)
-- **Perfect Scores**: 9 categories with 100% pass rate
-  - Troubleshooting, Specifications, Configuration, Calibration
-  - Procedure, Firmware, Installation, General (IDK), Accessory
+- **Avg Response Time**: 23.6 s (non-cached)
+- **Perfect Scores (100%)**: Troubleshooting, Specifications, Configuration, Calibration, Procedure, Firmware, Installation, General (IDK), Accessory
 
-### Known Issues (Accepted - Not Blocking)
-- **ERROR_001**: "I don't know" response - ROOT CAUSE: E804 error code doesn't exist in docs (invalid test)
-- **ERROR_002**: Low confidence (0.3) - E06 exists but retrieval sub-optimal
-- **MAINT_001**: Missing "lubrication" term - Prompt side effect (acceptable)
-- **ACC_003**: "I don't know" response - System became too conservative (acceptable)
-- **COMPAT_001**: Missing "CVI" term - Turkish prompt issue (low priority)
-- **GEN_002**: Intent mismatch - Classification issue (non-critical)
+### Known Issues (Accepted — Not Blocking)
+- **ERROR_001**: "I don't know" response — E804 does not exist in indexed docs (invalid test case)
+- **ERROR_002**: Low confidence (0.3) — E06 exists but retrieval sub-optimal
+- **MAINT_001**: Missing "lubrication" term — prompt side effect (acceptable)
+- **ACC_003**: "I don't know" response — system too conservative (acceptable)
+- **COMPAT_001**: Missing "CVI" term — Turkish prompt issue (planned fix Q2 2026)
+- **GEN_002**: Intent mismatch — classification edge case (non-critical)
 
 ### Decision
-**✅ Phase 6 COMPLETE** - 85% pass rate accepted as production-ready
-- Core functionality (9 categories) at 100% pass rate
-- All timeouts eliminated (0%)
-- Known issues are edge cases or test bugs
-- System is stable and ready for production or Phase 7
+✅ **Phase 6 COMPLETE** — 85% pass rate accepted as production-ready  
+9 test categories at 100% pass rate. All timeouts resolved. System is stable.
 
 ---
 
@@ -516,30 +521,32 @@ from 8 to 15 types.
 ## Version History Summary
 
 | Version | Date | Highlights |
-|---------|------|------------|
+|---------|------|-----------|
+| **2.0.1** | **2026-03-24** | **🔒 Security audit, timeout elimination, prompt hardening** |
 | **2.0.0** | **2026-02-18** | **🚀 El-Harezmi pipeline, Qdrant migration, 15 intents, 40 tests** |
 | 1.8.0 | 2026-01-07 | Triple-path retrieval, dynamic query expansion |
 | 1.7.0 | 2026-01-06 | General RAG quality improvements |
-| 1.6.0 | 2026-01-05 | Intelligent product filtering, ChromaDB where clause |
-| 1.5.0 | 2026-01-04 | Freshdesk ticket integration |
+| 1.6.0 | 2026-01-05 | Intelligent product filtering, Qdrant where clause |
+| 1.5.0 | 2026-01-04 | Freshdesk ticket integration (2,249 tickets) |
 | 1.4.0 | 2025-12-31 | Source citation enhancement |
-| 1.3.0 | 2025-12-30 | Intent detection, deduplication |
-| 1.2.0 | 2025-12-29 | Context grounding, validation |
+| 1.3.0 | 2025-12-30 | Intent detection (8 types), deduplication |
+| 1.2.0 | 2025-12-29 | Context grounding, hallucination validation |
 | 1.1.0 | 2025-12-27 | Relevance filtering, connection mapping |
 | 1.0.0 | 2025-12-22 | Domain embeddings, self-learning, metrics |
 | 0.9.0 | 2025-12-18 | ProductModel Schema v2 |
-| 0.8.0 | 2025-12-17 | Source feedback, context optimization, GPU |
-| 0.7.0 | 2025-12-16 | Hybrid search, response caching |
-| 0.6.0 | 2025-12-15 | Semantic chunking |
-| 0.5.0 | 2025-12-14 | TechWizard UI |
+| 0.8.0 | 2025-12-17 | Source feedback, context optimisation, GPU |
+| 0.7.0 | 2025-12-16 | Hybrid search (BM25 + Semantic + RRF), response caching |
+| 0.6.0 | 2025-12-15 | Semantic chunker |
+| 0.5.0 | 2025-12-14 | TechWizard 4-step wizard UI |
 | 0.4.0 | 2025-12-09 | Admin dashboard, feedback system |
-| 0.3.0 | 2025-12-04 | Document viewer, multi-format |
+| 0.3.0 | 2025-12-04 | Document viewer, multi-format support |
 | 0.2.0 | 2025-12-02 | Session management, UI polish |
 | 0.1.0 | 2025-11-22 | Initial release |
 
 ---
 
-[Unreleased]: https://github.com/fatihhbayram/desoutter-assistant/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/fatihhbayram/desoutter-assistant/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/fatihhbayram/desoutter-assistant/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.8.0...v2.0.0
 [1.8.0]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/fatihhbayram/desoutter-assistant/compare/v1.6.0...v1.7.0

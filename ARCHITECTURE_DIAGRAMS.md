@@ -1,17 +1,18 @@
-# Desoutter Assistant - Architecture Diagrams
+# Desoutter Assistant — Architecture Diagrams
 
-**Visual representations for presentations and documentation**
+**Visual representations for presentations and documentation (v2.0.1)**
 
 ---
 
 ## Table of Contents
 
 1. [Complete System Architecture](#1-complete-system-architecture)
-2. [RAG Pipeline Flow](#2-rag-pipeline-flow)
-3. [Data Processing Pipeline](#3-data-processing-pipeline)
-4. [Self-Learning Loop](#4-self-learning-loop)
-5. [Deployment Architecture](#5-deployment-architecture)
-6. [Component Interaction Diagram](#6-component-interaction-diagram)
+2. [El-Harezmi 5-Stage Pipeline](#2-el-harezmi-5-stage-pipeline)
+3. [Legacy RAG Pipeline Flow](#3-legacy-rag-pipeline-flow)
+4. [Data Processing Pipeline](#4-data-processing-pipeline)
+5. [Self-Learning Loop](#5-self-learning-loop)
+6. [Deployment Architecture](#6-deployment-architecture)
+7. [Component Interaction Diagram](#7-component-interaction-diagram)
 
 ---
 
@@ -28,13 +29,12 @@ graph TB
         C[JWT Auth<br/>PyJWT + Bcrypt]
     end
 
-    subgraph "RAG Engine Core"
-        D[Query Processor<br/>Language Detection<br/>Intent Classification]
-        E[Hybrid Search<br/>Semantic 60%<br/>BM25 40%<br/>RRF Fusion]
-        F[Context Optimizer<br/>8K Token Budget<br/>Deduplication<br/>Bulletin Boost 4.0x]
-        G[Ollama LLM<br/>Qwen2.5:7b<br/>GPU Accelerated]
-        H[Response Validator<br/>Hallucination Check<br/>Confidence Scoring]
-        I[Response Cache<br/>LRU + TTL<br/>100,000x Speedup]
+    subgraph "El-Harezmi 5-Stage Pipeline"
+        EH1[Stage 1: Intent Classifier<br/>15 Types — Multi-label]
+        EH2[Stage 2: Retrieval Strategy<br/>Intent-Aware Qdrant Search]
+        EH3[Stage 3: Info Extraction<br/>LLM Structured JSON]
+        EH4[Stage 4: KG Validation<br/>Compatibility Matrix]
+        EH5[Stage 5: Response Formatter<br/>Intent-Specific Templates]
     end
 
     subgraph "Self-Learning System"
@@ -43,35 +43,36 @@ graph TB
     end
 
     subgraph "Document Processing"
-        L[Document Processor<br/>PDF/DOCX/PPTX]
-        M[Semantic Chunker<br/>Context-Aware Splitting]
-        N[Product Extractor<br/>Pattern Recognition]
+        L[Document Classifier<br/>8 Document Types]
+        M[Chunker Factory<br/>6 Adaptive Strategies]
+        N[Product Extractor<br/>40+ Regex Patterns]
         O[Embeddings Generator<br/>all-MiniLM-L6-v2]
     end
 
     subgraph "Data Layer"
         P[(MongoDB<br/>Users, Feedback, Mappings)]
-        Q[(ChromaDB<br/>Vector Embeddings<br/>BM25 Index)]
-        R[Ollama Service<br/>Model Storage]
+        Q[(Qdrant<br/>Dense + Sparse Vectors<br/>26,513 Chunks)]
+        R[Ollama<br/>Qwen2.5:7b — GPU]
     end
 
     subgraph "Data Ingestion"
         S[Web Scraper<br/>Products & Tickets]
-        T[Document Upload<br/>Manuals & Bulletins]
+        T[Document Upload<br/>PDF / DOCX / PPTX]
     end
 
     A -->|HTTP/REST| B
     B --> C
-    C --> D
-    D --> I
-    I -->|Cache Miss| E
-    E --> F
-    F --> G
-    G --> H
-    H -->|Store Response| I
-    H -->|User Feedback| J
+    C --> EH1
+    EH1 --> EH2
+    EH2 --> EH3
+    EH3 --> EH4
+    EH4 --> EH5
+
+    EH3 -->|LLM call| R
+    EH2 <-->|Vector search| Q
+    EH5 -->|User Feedback| J
     J --> K
-    K -->|Boost Queries| E
+    K -->|Boost Queries| EH2
 
     S --> L
     T --> L
@@ -80,21 +81,96 @@ graph TB
     N --> O
     O --> Q
 
-    E <--> Q
-    G <--> R
     B <--> P
     K <--> P
 
-    style D fill:#e1f5ff
-    style E fill:#fff9e1
-    style G fill:#ffe1f5
-    style H fill:#e1ffe1
+    style EH1 fill:#e1f5ff
+    style EH2 fill:#fff9e1
+    style EH3 fill:#ffe1f5
+    style EH4 fill:#e1ffe1
+    style EH5 fill:#f5e1ff
     style J fill:#f5e1ff
 ```
 
 ---
 
-## 2. RAG Pipeline Flow
+## 2. El-Harezmi 5-Stage Pipeline
+
+```mermaid
+flowchart TD
+    Q([User Query]) --> S1
+
+    subgraph S1 ["Stage 1: Intent Classification"]
+        direction TB
+        I1[Pattern Matching<br/>TR + EN rules]
+        I2[Multi-label Output<br/>Primary + Secondary intents]
+        I3[Entity Extraction<br/>product, controller, error_code, value]
+        I1 --> I2
+        I2 --> I3
+    end
+
+    S1 --> S1_out{Special<br/>Intent?}
+    S1_out -->|GREETING / OFF_TOPIC| DirectResp[Direct Response]
+    S1_out -->|All others| S2
+
+    subgraph S2 ["Stage 2: Retrieval Strategy"]
+        direction TB
+        R1[Select Strategy<br/>by primary intent]
+        R2[Qdrant Search<br/>Dense + Sparse vectors]
+        R3[Apply Boost Factors<br/>doc_type, chunk_type]
+        R4[RRF Fusion<br/>Semantic + BM25]
+        R1 --> R2 --> R3 --> R4
+    end
+
+    S2 --> S2_out{Chunks<br/>found?}
+    S2_out -->|No| NoResult[No Result Response]
+    S2_out -->|Yes| S3
+
+    subgraph S3 ["Stage 3: Information Extraction"]
+        direction TB
+        E1[Build Intent Prompt<br/>CONFIGURATION / COMPAT...]
+        E2[LLM Call — Qwen2.5:7b<br/>Extract structured JSON]
+        E3[Parse Result<br/>prerequisites, steps, ranges, warnings]
+        E1 --> E2 --> E3
+    end
+
+    S3 --> S4
+
+    subgraph S4 ["Stage 4: KG Validation"]
+        direction TB
+        V1[Check Compatibility Matrix<br/>237+ products]
+        V2{Validation<br/>Status}
+        V2 -->|BLOCK| Block[Block + Explain]
+        V2 -->|WARN| Warn[Allow + Warning]
+        V2 -->|ALLOW| Allow[Proceed]
+        V1 --> V2
+    end
+
+    S4 --> S5
+
+    subgraph S5 ["Stage 5: Response Formatter"]
+        direction TB
+        F1[Select Template<br/>by intent type]
+        F2[Fill Template<br/>structured data]
+        F3[Attach Sources<br/>document citations]
+        F4[Calculate Confidence]
+        F1 --> F2 --> F3 --> F4
+    end
+
+    S5 --> End([Structured Response])
+
+    style S1 fill:#e1f5ff,stroke:#90caf9
+    style S2 fill:#fff9e1,stroke:#ffe082
+    style S3 fill:#ffe1f5,stroke:#f48fb1
+    style S4 fill:#e1ffe1,stroke:#a5d6a7
+    style S5 fill:#f5e1ff,stroke:#ce93d8
+```
+
+---
+
+## 3. Legacy RAG Pipeline Flow
+
+> ⚠️ The legacy 14-stage pipeline is maintained for backward compatibility. New queries are routed through El-Harezmi (Stage 2 above).
 
 ```mermaid
 flowchart TD
@@ -139,7 +215,7 @@ flowchart TD
 
 ---
 
-## 3. Data Processing Pipeline
+## 4. Data Processing Pipeline
 
 ```mermaid
 flowchart LR
@@ -147,44 +223,68 @@ flowchart LR
         A[PDF Manuals]
         B[DOCX Files]
         C[PPTX Slides]
-        D[Web Scraping]
+        D[Freshdesk Tickets]
     end
 
-    subgraph Processing
-        E[Text Extraction<br/>PyPDF2/pdfplumber/docx]
-        F[Semantic Chunking<br/>Context-aware splitting]
-        G[Product Extraction<br/>40+ regex patterns]
-        H[Metadata Enrichment<br/>doc_type, section, importance]
-        I[Embedding Generation<br/>all-MiniLM-L6-v2]
-        J[Deduplication<br/>SHA256 hashing]
+    subgraph Classification
+        CL[DocumentClassifier<br/>8 document types]
+    end
+
+    subgraph Chunking
+        CF[ChunkerFactory]
+        SC[SemanticChunker<br/>Config Guides]
+        TC[TableAwareChunker<br/>Compat Matrices]
+        EC[EntityChunker<br/>Error Code Lists]
+        PC[ProblemSolutionChunker<br/>ESDE Bulletins]
+        SPC[StepPreservingChunker<br/>Procedure Guides]
+        HC[HybridChunker<br/>Fallback]
+    end
+
+    subgraph Enrichment
+        PE[ProductExtractor<br/>40+ regex patterns]
+        ME[Metadata Enrichment<br/>intent_relevance, chunk_type,<br/>error_code, esde_code]
+        EM[Embedding Generation<br/>all-MiniLM-L6-v2]
     end
 
     subgraph Storage
-        K[(ChromaDB<br/>Vector Store)]
-        L[(MongoDB<br/>Metadata)]
+        QD[(Qdrant<br/>Dense + Sparse Vectors)]
+        MG[(MongoDB<br/>Metadata)]
     end
 
-    A --> E
-    B --> E
-    C --> E
-    D --> E
+    A --> CL
+    B --> CL
+    C --> CL
+    D --> CL
 
-    E --> F
-    F --> G
-    G --> H
-    H --> I
-    I --> J
+    CL --> CF
+    CF --> SC
+    CF --> TC
+    CF --> EC
+    CF --> PC
+    CF --> SPC
+    CF --> HC
 
-    J --> K
-    J --> L
+    SC --> PE
+    TC --> PE
+    EC --> PE
+    PC --> PE
+    SPC --> PE
+    HC --> PE
 
-    style F fill:#e1f5ff
-    style I fill:#fff9e1
+    PE --> ME
+    ME --> EM
+    EM --> QD
+    ME --> MG
+
+    style CL fill:#e1f5ff
+    style CF fill:#fff9e1
+    style EM fill:#ffe1f5
+    style QD fill:#e1ffe1
 ```
 
 ---
 
-## 4. Self-Learning Loop
+## 5. Self-Learning Loop
 
 ```mermaid
 graph LR
@@ -210,7 +310,7 @@ graph LR
 
 ---
 
-## 5. Deployment Architecture
+## 6. Deployment Architecture
 
 ```mermaid
 graph TB
@@ -245,53 +345,51 @@ graph TB
 
 ---
 
-## 6. Component Interaction Diagram
+## 7. Component Interaction Diagram
 
 ```mermaid
 sequenceDiagram
     participant User
     participant Frontend
     participant FastAPI
-    participant RAGEngine
-    participant Cache
-    participant HybridSearch
-    participant ChromaDB
+    participant ElHarezmi
+    participant Qdrant
     participant Ollama
     participant MongoDB
 
     User->>Frontend: Submit Query
-    Frontend->>FastAPI: POST /diagnose
-    FastAPI->>RAGEngine: diagnose()
+    Frontend->>FastAPI: POST /el-harezmi/diagnose
+    FastAPI->>ElHarezmi: pipeline.process(query)
 
-    RAGEngine->>Cache: Check cache
-    alt Cache Hit
-        Cache-->>RAGEngine: Return cached response
-    else Cache Miss
-        RAGEngine->>HybridSearch: hybrid_search()
-        HybridSearch->>ChromaDB: Semantic search
-        ChromaDB-->>HybridSearch: Top-K vectors
-        HybridSearch->>ChromaDB: BM25 search
-        ChromaDB-->>HybridSearch: Top-K keywords
-        HybridSearch-->>RAGEngine: Fused results (RRF)
+    Note over ElHarezmi: Stage 1 — Intent Classification
+    ElHarezmi->>ElHarezmi: classify(query) → 15 intent types
 
-        RAGEngine->>Ollama: generate_response()
-        Ollama-->>RAGEngine: LLM response
+    Note over ElHarezmi: Stage 2 — Retrieval Strategy
+    ElHarezmi->>Qdrant: Dense vector search (semantic)
+    Qdrant-->>ElHarezmi: Top-K dense results
+    ElHarezmi->>Qdrant: Sparse vector search (BM25)
+    Qdrant-->>ElHarezmi: Top-K sparse results
+    ElHarezmi->>ElHarezmi: RRF fusion + boost factors
 
-        RAGEngine->>RAGEngine: Validate response
-        RAGEngine->>RAGEngine: Calculate confidence
+    Note over ElHarezmi: Stage 3 — Information Extraction
+    ElHarezmi->>Ollama: LLM extraction prompt
+    Ollama-->>ElHarezmi: Structured JSON response
 
-        RAGEngine->>MongoDB: Save diagnosis
-        RAGEngine->>Cache: Store in cache
-    end
+    Note over ElHarezmi: Stage 4 — KG Validation
+    ElHarezmi->>ElHarezmi: Validate against compatibility matrix
 
-    RAGEngine-->>FastAPI: Response + confidence
-    FastAPI-->>Frontend: JSON response
-    Frontend-->>User: Display answer
+    Note over ElHarezmi: Stage 5 — Response Formatting
+    ElHarezmi->>ElHarezmi: Apply intent-specific template
+
+    ElHarezmi-->>FastAPI: PipelineResult + metrics
+    FastAPI->>MongoDB: Save diagnosis record
+    FastAPI-->>Frontend: JSON response + confidence
+    Frontend-->>User: Structured answer + sources
 
     User->>Frontend: Submit feedback (👍/👎)
     Frontend->>FastAPI: POST /diagnose/feedback
     FastAPI->>MongoDB: Save feedback
-    MongoDB->>MongoDB: Update learned mappings
+    MongoDB->>MongoDB: Update learned mappings (Wilson score)
     MongoDB-->>FastAPI: Success
     FastAPI-->>Frontend: Confirmation
     Frontend-->>User: Thank you message
@@ -306,121 +404,49 @@ sequenceDiagram
 1. **Copy the Mermaid code** from this document
 2. **Paste into:**
    - **Mermaid Live Editor**: https://mermaid.live/
-   - **GitHub/GitLab Markdown**: Renders automatically
+   - **GitHub / GitLab Markdown**: Renders automatically
    - **Notion**: Use `/code` block with `mermaid` language
    - **PowerPoint**: Export as PNG from Mermaid Live
    - **Draw.io**: Import Mermaid syntax
 
-### Customization
+### Customisation
 
-To modify colors, add these lines at the end of any diagram:
+To modify node colours, add to the bottom of any diagram:
 
 ```mermaid
 style NodeName fill:#colorcode
 ```
 
-Color codes used:
-- `#e1f5ff` - Light blue (Query Processing)
-- `#fff9e1` - Light yellow (Retrieval)
-- `#ffe1f5` - Light pink (Generation)
-- `#e1ffe1` - Light green (Validation)
-- `#f5e1ff` - Light purple (Learning)
+Colour palette used:
+- `#e1f5ff` — Light blue (Stage 1: Intent)
+- `#fff9e1` — Light yellow (Stage 2: Retrieval)
+- `#ffe1f5` — Light pink (Stage 3: Extraction / LLM)
+- `#e1ffe1` — Light green (Stage 4: Validation)
+- `#f5e1ff` — Light purple (Stage 5: Formatting / Learning)
 
 ---
 
-## Export Instructions
-
-### Method 1: Mermaid Live Editor
-1. Visit https://mermaid.live/
-2. Paste diagram code
-3. Click "Export" → Choose format (PNG, SVG, PDF)
-
-### Method 2: GitHub README
-Simply paste the Mermaid code block into your README.md - GitHub will render it automatically.
-
-### Method 3: VS Code Extension
-1. Install "Markdown Preview Mermaid Support" extension
-2. Open this file in VS Code
-3. Right-click diagram → "Export to PNG/SVG"
-
----
-
-## Additional Diagrams
-
-### Simplified Overview (For Non-Technical Audiences)
+## Simplified Overview (For Non-Technical Audiences)
 
 ```mermaid
 graph LR
-    A[User Asks Question] --> B[AI Searches<br/>28,414 Documents]
-    B --> C[AI Generates<br/>Answer]
-    C --> D[User Receives<br/>Solution + Sources]
-    D --> E{Was it helpful?}
-    E -->|Yes 👍| F[AI Learns<br/>& Improves]
-    E -->|No 👎| G[AI Adjusts<br/>Strategy]
-    F --> B
-    G --> B
+    A[Technician<br/>Asks Question] --> B[AI Searches<br/>26,513 Document Chunks]
+    B --> C[AI Classifies Intent<br/>15 Types]
+    C --> D[AI Extracts<br/>Structured Answer]
+    D --> E[Compatibility<br/>Check]
+    E --> F[Technician Receives<br/>Solution + Sources]
+    F --> G{Was it helpful?}
+    G -->|Yes 👍| H[AI Learns<br/>& Improves]
+    G -->|No 👎| I[AI Adjusts<br/>Strategy]
+    H --> B
+    I --> B
 
     style B fill:#fff9e1
-    style C fill:#ffe1f5
-    style F fill:#f5e1ff
-```
-
-### Technology Stack Diagram
-
-```mermaid
-graph TB
-    subgraph "Frontend"
-        A[React 18.2]
-        B[Vite 5.0]
-        C[Axios 1.6]
-    end
-
-    subgraph "Backend"
-        D[FastAPI 0.109]
-        E[Python 3.11]
-        F[PyJWT Auth]
-    end
-
-    subgraph "AI/ML"
-        G[Ollama + Qwen2.5:7b]
-        H[LangChain 0.1]
-        I[Sentence Transformers 2.2]
-    end
-
-    subgraph "Data"
-        J[MongoDB 7.0]
-        K[ChromaDB 0.4]
-        L[BM25 Custom]
-    end
-
-    subgraph "Infrastructure"
-        M[Docker + Compose]
-        N[NVIDIA RTX A2000]
-        O[Proxmox VM]
-    end
-
-    A --> D
-    B --> D
-    C --> D
-
-    D --> G
-    D --> J
-    E --> H
-
-    G --> N
-    H --> I
-    I --> K
-
-    K --> L
-
-    M --> O
-
-    style G fill:#ffe1f5
-    style K fill:#fff9e1
-    style N fill:#e1ffe1
+    style D fill:#ffe1f5
+    style H fill:#f5e1ff
 ```
 
 ---
 
-**Last Updated:** January 15, 2026
-**Version:** 1.0.0
+**Last Updated:** March 31, 2026  
+**Version:** 2.0.1
