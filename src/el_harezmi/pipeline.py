@@ -72,18 +72,43 @@ class ElHarezmiPipeline:
         embedding_model=None,
         llm_client=None,
         confidence_threshold: float = 0.75,
-        auto_init_llm: bool = True
+        auto_init_llm: bool = True,
+        auto_init_qdrant: bool = True
     ):
         """
         Initialize El-Harezmi Pipeline.
-        
+
         Args:
             qdrant_client: Qdrant client for vector search
             embedding_model: Embedding model for query encoding
             llm_client: LLM client for extraction
             confidence_threshold: Minimum confidence for intent classification
             auto_init_llm: Auto-initialize LLM client if not provided
+            auto_init_qdrant: Auto-initialize Qdrant client and embedding model if not provided
         """
+        # Auto-initialize Qdrant client if needed
+        if qdrant_client is None and auto_init_qdrant:
+            try:
+                import os
+                from qdrant_client import QdrantClient
+                host = os.getenv("QDRANT_HOST", "localhost")
+                port = int(os.getenv("QDRANT_PORT", "6333"))
+                qdrant_client = QdrantClient(host=host, port=port)
+                logger.info(f"Auto-initialized Qdrant client at {host}:{port}")
+            except Exception as e:
+                logger.warning(f"Failed to auto-initialize Qdrant: {e}")
+
+        # Auto-initialize embedding model if needed
+        if embedding_model is None and auto_init_qdrant:
+            try:
+                import os
+                from sentence_transformers import SentenceTransformer
+                model_name = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+                embedding_model = SentenceTransformer(model_name)
+                logger.info(f"Auto-initialized embedding model: {model_name}")
+            except Exception as e:
+                logger.warning(f"Failed to auto-initialize embedding model: {e}")
+
         # Auto-initialize LLM client if needed
         if llm_client is None and auto_init_llm:
             try:

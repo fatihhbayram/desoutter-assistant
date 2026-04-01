@@ -10,12 +10,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned (Q2 2026)
+- Stage 3 null-extraction fix (nested-null spec table rendering)
+- Stage 2 retrieval relevance improvement (CVIKey false-positive)
 - A/B testing: El-Harezmi pipeline vs legacy 14-stage RAG
 - Cross-encoder re-ranking (Top-20 → Top-5) for improved precision
-- Rate limiting middleware (Nginx / FastAPI)
-- CORS hardening — restrict `allow_origins` to known domains
 - Turkish COMPAT intent prompt improvements (COMPAT_001 fix)
 - Controller unit documentation scraping (10 remaining series)
+
+---
+
+## [2.0.2] - 2026-04-01
+
+### Phase 6.2: El-Harezmi Intent Classifier + Pipeline Auto-Init
+
+**Focus**: Intent classification accuracy, Qdrant auto-initialization, security config hardening
+
+### Fixed
+- **Intent misclassification for parameter queries** (`stage1_intent_classifier.py`)
+  - "CVI3 torque değeri nedir?" → was `general 0.50`, now `specification 0.90`
+  - "What is the torque value?" → was `general 0.50`, now `specification 0.70`
+  - "How do I set the torque to 25 Nm?" → was `how_to`, now `configuration 0.90`
+  - "What torque should I use?" → was `general 0.50`, now `specification 0.90`
+- **`_adjust_by_entities` logic** (`stage1_intent_classifier.py`)
+  - `parameter_type` + `target_value` → promotes to `CONFIGURATION` (was only adding secondary)
+  - `parameter_type` without `target_value` → promotes to `SPECIFICATION` (was missing entirely)
+
+### Added
+- **Pipeline Qdrant auto-init** (`pipeline.py`)
+  - `auto_init_qdrant=True` parameter — reads `QDRANT_HOST`/`QDRANT_PORT`/`EMBEDDING_MODEL` env vars
+  - Mirrors existing `auto_init_llm` pattern; fails gracefully with WARNING log
+- **El-Harezmi `/diagnose` integration** (`main.py`)
+  - El-Harezmi pipeline as primary handler for `/diagnose` endpoint
+  - Legacy RAGEngine retained as automatic fallback on pipeline failure
+  - `pipeline` field added to `DiagnoseResponse` — indicates `"el_harezmi"` or `"legacy_fallback"`
+- **`response_normalizer.py`** (`src/el_harezmi/`)
+  - Bridges `PipelineResult` schema to legacy `DiagnoseResponse` dict format
+  - Maps confidence float → `"high"/"medium"/"low"` string
+  - Builds sources list from retrieval chunks with similarity scores and excerpts
+- **Security config hardening** (`.env.example`)
+  - CORS restricted to known frontend domains (was `*`)
+  - Rate limiting variables documented (`RATE_LIMITING_ENABLED`, `RATE_LIMIT_REQUESTS`)
+  - Brute force protection levels documented (3-level ban system)
+  - HSTS header toggle added
+
+### Changed
+- **`CONFIGURATION` intent patterns** — added `set\s+(?:the\s+)?(?:torque|...)` and `(?:torque|...)\s+(?:to|değerine)\s+\d`
+- **`SPECIFICATION` intent patterns** — added `(?:tork|torque|...)\s*değer`, `değeri?\s*nedir`, `what\s+(?:is\s+)?(?:the\s+)?(?:torque|...)`, `what\s+(?:torque|...)\s+(?:should|do|does)`
+
+### Test Results
+- Intent classification: 12/13 manual test cases passing (up from 8/13)
+- Pipeline end-to-end: Qdrant connected (26,513 vectors), chunks retrieved correctly
 
 ---
 

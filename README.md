@@ -9,7 +9,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-85%25%20Passing-success)](test_results/)
-[![Version](https://img.shields.io/badge/Version-2.0.1-blueviolet)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-2.0.2-blueviolet)](CHANGELOG.md)
 
 An intelligent **Retrieval-Augmented Generation (RAG)** system that provides context-aware diagnostics and troubleshooting assistance for Desoutter industrial tools. The system features a **self-learning feedback loop**, a **5-stage El-Harezmi pipeline**, **15 intent types**, **adaptive document chunking**, and a production-grade architecture achieving **85% test pass rate** (34/40 scenarios).
 
@@ -440,7 +440,7 @@ curl -X POST http://localhost:8000/diagnose \
 | **Avg Response Time** | 23.6 s (non-cached) |
 | **Supported Languages** | Turkish, English |
 
-### Category Pass Rates (v2.0.1)
+### Category Pass Rates (v2.0.2)
 
 | Test Category | Pass Rate | Notes |
 |---------------|-----------|-------|
@@ -627,7 +627,7 @@ pytest tests/test_api_el_harezmi.py -v
 |----------|-------------|
 | [QUICKSTART.md](QUICKSTART.md) | Rapid deployment guide (under 10 minutes) |
 | [ROADMAP.md](ROADMAP.md) | Development roadmap and planned features |
-| [CHANGELOG.md](CHANGELOG.md) | Full version history (v0.1.0 → v2.0.1) |
+| [CHANGELOG.md](CHANGELOG.md) | Full version history (v0.1.0 → v2.0.2) |
 | [ARCHITECTURE_DIAGRAMS.md](ARCHITECTURE_DIAGRAMS.md) | Mermaid diagrams for presentations |
 | [PROXMOX_DEPLOYMENT.md](PROXMOX_DEPLOYMENT.md) | Proxmox VM infrastructure guide |
 
@@ -675,5 +675,5 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 <p align="center">
   <strong>Powered by</strong> El-Harezmi Pipeline | Qdrant | Ollama | FastAPI | React
   <br><br>
-  <em>Enterprise RAG System — v2.0.1 — Production Ready</em>
+  <em>Enterprise RAG System — v2.0.2 — Production Ready</em>
 </p>

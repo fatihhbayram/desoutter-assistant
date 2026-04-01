@@ -103,6 +103,8 @@ class IntentClassifier:
             r"açı\s*ayar", r"angle\s*set",
             r"nasıl\s*ayar", r"how\s*to\s*set",
             r"değer(?:ini|i)?\s*(?:gir|ayarla|değiştir)",
+            r"set\s+(?:the\s+)?(?:torque|tork|angle|açı|speed|hız)",
+            r"(?:torque|tork|angle|açı)\s+(?:to|değerine)\s+\d",
         ],
         
         IntentType.COMPATIBILITY: [
@@ -121,6 +123,10 @@ class IntentClassifier:
             r"güç\s*tüketim", r"power\s*consumption",
             r"kaç\s*(?:kg|mm|cm|volt|watt|amp)",
             r"ne\s*kadar\s*(?:ağır|büyük|uzun)",
+            r"(?:tork|torque|açı|angle|hız|speed)\s*değer",
+            r"değeri?\s*nedir",
+            r"what\s+(?:is\s+)?(?:the\s+)?(?:torque|angle|speed|current)\s*(?:value|spec|rating|limit)?",
+            r"what\s+(?:torque|angle|speed)\s+(?:should|do|does)",
         ],
         
         IntentType.PROCEDURE: [
@@ -472,8 +478,15 @@ class IntentClassifier:
         # If parameter + value detected, likely CONFIGURATION
         if entities.parameter_type and entities.target_value:
             if primary not in [IntentType.CONFIGURATION, IntentType.SPECIFICATION]:
-                if IntentType.CONFIGURATION not in secondaries:
-                    secondaries.append(IntentType.CONFIGURATION)
+                secondaries = [primary] + secondaries[:1]
+                primary = IntentType.CONFIGURATION
+
+        # If parameter mentioned but no value, user is asking for the value → SPECIFICATION
+        elif entities.parameter_type and not entities.target_value:
+            if primary not in [IntentType.SPECIFICATION, IntentType.CONFIGURATION, IntentType.CAPABILITY_QUERY]:
+                if IntentType.SPECIFICATION not in secondaries:
+                    secondaries = [primary] + secondaries[:1]
+                    primary = IntentType.SPECIFICATION
         
         # If accessory mentioned, likely ACCESSORY_QUERY
         if entities.accessory_type:

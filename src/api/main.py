@@ -236,6 +236,36 @@ async def security_headers_middleware(request: Request, call_next):
 # RAG engine singleton - initialized on first request or at startup
 rag_engine = None
 
+# El-Harezmi Pipeline singleton (ADIM 2)
+# Lazy-initialized on first /diagnose request
+_el_harezmi_pipeline = None
+
+
+def get_el_harezmi_pipeline():
+    """
+    Get or create El-Harezmi pipeline singleton.
+
+    Reuses the same Qdrant client and embedding model as the
+    el_harezmi_router to avoid duplicate initialization.
+
+    Returns:
+        ElHarezmiPipeline: The initialized pipeline instance, or None if
+        initialization fails (graceful degradation to legacy fallback).
+    """
+    global _el_harezmi_pipeline
+    if _el_harezmi_pipeline is None:
+        try:
+            # Import lazily to avoid circular import / startup cost
+            from src.api.el_harezmi_router import (
+                get_el_harezmi_pipeline as _get_router_pipeline
+            )
+            _el_harezmi_pipeline = _get_router_pipeline()
+            logger.info("✅ El-Harezmi pipeline singleton acquired from router")
+        except Exception as e:
+            logger.warning(f"⚠️ El-Harezmi pipeline init failed: {e} — /diagnose will use legacy only")
+            _el_harezmi_pipeline = None
+    return _el_harezmi_pipeline
+
 # -----------------------------------------------------------------------------
 # AUTHENTICATION CONFIGURATION
 # -----------------------------------------------------------------------------
@@ -381,6 +411,8 @@ class DiagnoseResponse(BaseModel):
     # Priority 3: Intent Detection Metadata
     intent: Optional[str] = None
     intent_confidence: Optional[float] = None
+    # Pipeline routing metadata
+    pipeline: Optional[str] = None  # "el_harezmi" | "legacy_fallback"
 
 
 class SourceRelevanceFeedback(BaseModel):
@@ -538,27 +570,89 @@ async def diagnose(
 ):
     """
     Generate repair suggestion based on fault description.
-    Now with self-learning capabilities from user feedback.
-    
-    Uses asyncio.to_thread() to run blocking LLM calls in a thread pool,
-    preventing the event loop from blocking during long-running operations.
+
+    PRIMARY: El-Harezmi 5-stage pipeline (async, fully grounded)
+    FALLBACK: Legacy 14-stage RAGEngine (on El-Harezmi failure)
+
+    The fallback ensures /diagnose always returns 200 even when
+    El-Harezmi pipeline encounters an unrecoverable error.
+    The response always includes a 'pipeline' field indicating
+    which pipeline served the request.
     """
+    # ---------------------------------------------------------------
+    # Extract username from JWT token (optional — anonymous allowed)
+    # ---------------------------------------------------------------
+    username = "anonymous"
+    if authorization and authorization.startswith("Bearer "):
+        try:
+            token = authorization.split(" ")[1]
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+            username = payload.get("sub", "anonymous")
+        except Exception:
+            pass  # Invalid/expired token — treat as anonymous
+
+    # ---------------------------------------------------------------
+    # PRIMARY PATH: El-Harezmi Pipeline
+    # ---------------------------------------------------------------
     try:
-        # Get username from token if available
-        username = "anonymous"
-        if authorization and authorization.startswith("Bearer "):
-            try:
-                token = authorization.split(" ")[1]
-                payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
-                username = payload.get("sub", "anonymous")
-            except:
-                pass
-        
+        pipeline = get_el_harezmi_pipeline()
+
+        if pipeline is None:
+            raise RuntimeError("El-Harezmi pipeline unavailable — init failed")
+
+        from src.el_harezmi.stage5_response_formatter import Language
+        from src.el_harezmi.response_normalizer import normalize_el_harezmi_result
+
+        # Map language string to Language enum
+        lang = Language.TURKISH if request.language == "tr" else Language.ENGLISH
+
+        logger.info(
+            f"[PIPELINE:el_harezmi] user={username} "
+            f"part={request.part_number} lang={request.language}"
+        )
+
+        # El-Harezmi is fully async — no thread pool needed
+        pipeline_result = await pipeline.process(
+            query=request.fault_description,
+            context={"part_number": request.part_number},
+            language=lang
+        )
+
+        # Normalize PipelineResult → legacy DiagnoseResponse schema
+        response_dict = normalize_el_harezmi_result(
+            result=pipeline_result,
+            original_part_number=request.part_number,
+            original_language=request.language
+        )
+        response_dict["pipeline"] = "el_harezmi"  # Which pipeline served this
+
+        logger.info(
+            f"[PIPELINE:el_harezmi] done confidence={response_dict.get('confidence')} "
+            f"time={response_dict.get('response_time_ms')}ms"
+        )
+        return response_dict
+
+    except Exception as e:
+        logger.error(
+            f"[PIPELINE:el_harezmi] FAILED for user={username}: {e}, "
+            f"falling back to legacy pipeline",
+            exc_info=True
+        )
+
+    # ---------------------------------------------------------------
+    # FALLBACK PATH: Legacy RAGEngine
+    # Runs only when El-Harezmi fails — never raises HTTPException 500
+    # ---------------------------------------------------------------
+    try:
         rag = get_rag_engine()
-        
-        # Run blocking LLM call in thread pool to avoid blocking event loop
-        # This allows other requests to be processed while waiting for LLM response
-        result = await asyncio.to_thread(
+
+        logger.info(
+            f"[PIPELINE:legacy_fallback] user={username} "
+            f"part={request.part_number} lang={request.language}"
+        )
+
+        # Legacy engine is synchronous — run in thread pool
+        legacy_result = await asyncio.to_thread(
             rag.generate_repair_suggestion,
             part_number=request.part_number,
             fault_description=request.fault_description,
@@ -568,10 +662,17 @@ async def diagnose(
             is_retry=request.is_retry or False,
             retry_of=request.retry_of
         )
-        
-        return result
+
+        legacy_result["pipeline"] = "legacy_fallback"  # Fallback indicator
+
+        logger.info(
+            f"[PIPELINE:legacy_fallback] done confidence={legacy_result.get('confidence')} "
+            f"time={legacy_result.get('response_time_ms')}ms"
+        )
+        return legacy_result
+
     except Exception as e:
-        logger.error(f"Error in diagnose: {e}")
+        logger.error(f"[PIPELINE:legacy_fallback] ALSO FAILED: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
