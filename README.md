@@ -81,14 +81,7 @@ sleep 60
 # API Docs: http://localhost:8000/docs
 ```
 
-### Default Credentials
-
-| Username | Password | Role | Permissions |
-|----------|----------|------|-------------|
-| `admin` | `admin123` | Admin | Full system access |
-| `tech` | `tech123` | Technician | Query and feedback only |
-
-> **Security Note**: Change `JWT_SECRET` in `.env` file for production deployments.
+> **Security Note**: Change `JWT_SECRET` in `.env` file before deployment. User accounts are managed through the admin panel.
 
 ---
 
@@ -111,7 +104,7 @@ desoutter-assistant/
 │   │   ├── context_optimizer.py  # Token budget management
 │   │   └── response_cache.py     # LRU + TTL caching
 │   ├── vectordb/                 # Qdrant vector database client
-│   ├── el_harezmi/               # 5-stage pipeline (in progress)
+│   ├── el_harezmi/               # 5-stage experimental pipeline (suspended)
 │   ├── scraper/                  # Web scraping modules
 │   └── utils/                    # Helper functions, logging
 │
@@ -422,29 +415,30 @@ This prevents sources with few ratings from outranking well-tested sources.
 
 ## Docker Services
 
-The system runs with 4 core services:
+The system runs with 5 core services:
 
-| Service | Port | Description | Resources |
-|---------|------|-------------|-----------|
-| **mongodb** | 27017 | Database | 1 core, 2GB RAM |
-| **ollama** | 11434 | LLM server with GPU | 2 cores, 8GB RAM, GPU |
-| **desoutter-api** | 8000 | FastAPI backend | 3 cores, 12GB RAM |
-| **desoutter-frontend** | 3001 | React frontend | 1 core, 1GB RAM |
+| Service | Port | Description |
+|---------|------|-------------|
+| **ollama** | 11434 | LLM inference (GPU-accelerated) |
+| **qdrant** | 6333 | Vector database |
+| **mongodb** | 27017 | Document database |
+| **desoutter-api** | 8000 | FastAPI backend |
+| **desoutter-frontend** | 3001 | React frontend |
 
 ### Docker Commands
 
 ```bash
 # Start all services
-docker-compose up -d
+docker compose -f ai-stack.yml up -d
 
-# View logs
-docker-compose logs -f
+# View API logs
+docker compose -f ai-stack.yml logs --tail=50 desoutter-api
 
-# Stop all services
-docker-compose down
+# Restart API after code changes (no rebuild needed — src/ is volume-mounted)
+docker compose -f ai-stack.yml restart desoutter-api
 
-# Rebuild after code changes
-docker-compose up -d --build
+# Full rebuild (after Dockerfile or dependency changes)
+docker compose -f ai-stack.yml up -d --build
 ```
 
 ---
@@ -511,14 +505,12 @@ python scripts/test_product_filtering.py
 5. **Use HTTPS** - TLS termination via reverse proxy
 6. **Audit input validation** - Sanitize all user queries
 
-### Current Limitations
+### Production Checklist
 
-| Risk | Status | Mitigation |
-|------|--------|------------|
-| Default credentials | Medium | Change on first deployment |
-| Open CORS policy | Medium | Configure allowed origins |
-| No rate limiting | Medium | Add nginx/API gateway limits |
-| Single GPU dependency | Low | CPU fallback available |
+- [ ] Set strong `JWT_SECRET` in `.env`
+- [ ] Configure `CORS_ORIGINS` to your domain
+- [ ] Enable MongoDB authentication
+- [ ] Use HTTPS via reverse proxy (Cloudflare Tunnel recommended)
 
 ---
 
