@@ -547,6 +547,11 @@ class RetrievalStrategyManager:
                     qdrant_filter = Filter(must=conditions)
             
             # Use older API for Qdrant 1.7.x compatibility with named vector
+            logger.info(
+                f"[STAGE2] Qdrant arama: collection=desoutter_docs_v2 | "
+                f"vector=dense | top_k={top_k} | "
+                f"threshold={strategy.score_threshold} | filter={qdrant_filter}"
+            )
             results = self.qdrant_client.search(
                 collection_name="desoutter_docs_v2",
                 query_vector=("dense", query_vector),  # Named vector
@@ -554,19 +559,19 @@ class RetrievalStrategyManager:
                 limit=top_k,
                 score_threshold=strategy.score_threshold,
             )
-            
+
             # Convert to RetrievedChunk objects
             chunks = []
             for result in results:
                 payload = result.payload or {}
-                
+
                 # Calculate boosted score
                 boosted_score = self.calculate_boosted_score(
                     result.score,
                     payload,
                     strategy
                 )
-                
+
                 chunk = RetrievedChunk(
                     chunk_id=str(result.id),
                     content=payload.get("content", ""),
@@ -579,14 +584,16 @@ class RetrievalStrategyManager:
                     metadata=payload,
                 )
                 chunks.append(chunk)
-            
+
             # Re-sort by boosted score
             chunks.sort(key=lambda x: x.score, reverse=True)
-            
+
+            top_score = f"{chunks[0].score:.3f}" if chunks else "N/A"
+            logger.info(f"[STAGE2] Sonuç: {len(chunks)} chunk | en iyi skor: {top_score}")
             return chunks[:top_k]
-            
+
         except Exception as e:
-            logger.error(f"Qdrant search failed: {e}")
+            logger.error(f"[STAGE2] Qdrant arama HATA: {e}")
             return []
     
     def merge_secondary_results(

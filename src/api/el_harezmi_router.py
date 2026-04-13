@@ -97,17 +97,30 @@ def get_el_harezmi_pipeline():
                 port=6333,
                 timeout=30
             )
-            
+
+            # Validate Qdrant collection exists
+            try:
+                collections = _qdrant_client.get_collections()
+                names = [c.name for c in collections.collections]
+                logger.info(f"[INIT] Qdrant collections mevcut: {names}")
+                if "desoutter_docs_v2" not in names:
+                    logger.error(f"[INIT] 'desoutter_docs_v2' koleksiyonu YOK! Mevcut: {names}")
+                else:
+                    logger.info("[INIT] Qdrant koleksiyonu 'desoutter_docs_v2' ✅")
+            except Exception as e:
+                logger.error(f"[INIT] Qdrant koleksiyon kontrolü başarısız: {e}")
+
             # Initialize embedding model
             _embedding_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-            
+            logger.info("[INIT] Embedding model yüklendi: all-MiniLM-L6-v2")
+
             # Initialize pipeline
             _el_harezmi_pipeline = ElHarezmiPipeline(
                 qdrant_client=_qdrant_client,
                 embedding_model=_embedding_model
             )
-            
-            logger.info("El-Harezmi pipeline initialized successfully")
+
+            logger.info("[INIT] El-Harezmi pipeline başarıyla başlatıldı ✅")
             
         except Exception as e:
             logger.error(f"Failed to initialize El-Harezmi pipeline: {e}")

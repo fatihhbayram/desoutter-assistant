@@ -89,10 +89,10 @@ class ElHarezmiPipeline:
             try:
                 from .async_llm_client import get_async_llm_client
                 llm_client = get_async_llm_client()
-                logger.info("Auto-initialized async LLM client")
+                logger.info("[INIT] LLM client başarıyla başlatıldı")
             except Exception as e:
-                logger.warning(f"Failed to auto-initialize LLM: {e}")
-        
+                logger.error(f"[INIT] LLM init BAŞARISIZ: {e} — pipeline pattern fallback kullanacak")
+
         # Initialize stages
         self.stage1_classifier = IntentClassifier(confidence_threshold=confidence_threshold)
         self.stage2_retriever = RetrievalStrategyManager(
@@ -102,11 +102,11 @@ class ElHarezmiPipeline:
         self.stage3_extractor = InfoExtractor(llm_client=llm_client)
         self.stage4_validator = KGValidator()
         self.stage5_formatter = ResponseFormatter()
-        
+
         # Configuration
         self.confidence_threshold = confidence_threshold
-        
-        logger.info("El-Harezmi Pipeline initialized")
+
+        logger.info(f"[INIT] El-Harezmi Pipeline hazır | LLM: {'✅' if llm_client else '❌ YOK (pattern fallback aktif)'}")
     
     async def process(
         self,

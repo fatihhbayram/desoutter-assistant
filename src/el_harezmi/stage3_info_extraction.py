@@ -457,14 +457,21 @@ Return ONLY valid JSON, no explanations.
             chunks=chunk_content
         )
         
-        logger.info(f"Extracting info for intent: {intent_result.primary_intent.value}")
-        
+        logger.info(
+            f"[STAGE3] Başladı | intent={intent_result.primary_intent.value} | "
+            f"chunk={len(retrieval_result.chunks)} | "
+            f"LLM={'✅' if self.llm_client else '❌ YOK'}"
+        )
+
         # Execute LLM extraction
         raw_extraction = await self._execute_extraction(prompt)
-        
+
         # Check if extraction is empty or failed
         if self._is_empty_extraction(raw_extraction):
-            logger.warning("LLM extraction returned empty - using pattern-based fallback")
+            logger.warning(
+                f"[STAGE3] Extraction boş — pattern fallback'e geçildi | "
+                f"LLM={'vardı' if self.llm_client else 'YOKtu'}"
+            )
             return self.extract_without_llm(intent_result, retrieval_result)
         
         # Parse and validate extraction
@@ -539,29 +546,31 @@ Return ONLY valid JSON, no explanations.
     async def _execute_extraction(self, prompt: str) -> Dict[str, Any]:
         """Execute LLM extraction"""
         if not self.llm_client:
-            logger.warning("No LLM client configured - returning empty extraction")
+            logger.error("[STAGE3] LLM client YOK — LLM çağrısı atlandı, boş döndürüldü")
             return {}
-        
+
         try:
             response = await self.llm_client.generate(
                 prompt=prompt,
                 temperature=0.1,  # Low temperature for structured extraction
                 max_tokens=2000
             )
-            
+
+            logger.info(f"[STAGE3] LLM yanıtı alındı: {len(response)} karakter")
+
             # Extract JSON from response
             json_match = re.search(r'\{[\s\S]*\}', response)
             if json_match:
                 return json.loads(json_match.group())
             else:
-                logger.warning("No JSON found in LLM response")
+                logger.warning(f"[STAGE3] LLM yanıtında JSON bulunamadı | yanıt başı: {response[:100]!r}")
                 return {}
-                
+
         except json.JSONDecodeError as e:
-            logger.error(f"JSON parsing failed: {e}")
+            logger.error(f"[STAGE3] JSON parse HATA: {e}")
             return {}
         except Exception as e:
-            logger.error(f"LLM extraction failed: {e}")
+            logger.error(f"[STAGE3] LLM çağrısı HATA: {e}")
             return {}
     
     def _parse_extraction(

@@ -66,3 +66,8 @@ desoutter-scraper/frontend/dist/
 *.wt
 WiredTiger*
 journal/
+
+# Claude Code agent files (local only, not for repo)
+CLAUDE.md
+agents/
+.claude/
