@@ -581,37 +581,37 @@ class HybridSearcher:
     def _deduplicate_bulletins(self, results: List[SearchResult]) -> List[SearchResult]:
         """
         Remove duplicate chunks from same bulletin document.
-        Keep highest scoring chunk per ESDE bulletin.
-        
-        This prevents bulletins from appearing multiple times with different chunks.
+        Keep top 3 highest-scoring chunks per ESDE bulletin.
         """
-        seen_bulletins = {}  # source -> highest scoring result
+        MAX_CHUNKS_PER_BULLETIN = 3
+
+        seen_bulletins = {}  # bulletin_id -> [results]
         non_bulletin_results = []
-        
+
         for result in results:
             source = result.metadata.get('source', '')
-            
-            # Check if this is an ESDE bulletin
+
             if source.upper().startswith('ESDE'):
-                # Extract bulletin ID (e.g., "ESDE23007" from "ESDE23007 - Some title.pdf")
                 bulletin_id = source.upper().split()[0] if source else ''
-                
-                if bulletin_id in seen_bulletins:
-                    # Keep higher scoring one
-                    if result.score > seen_bulletins[bulletin_id].score:
-                        seen_bulletins[bulletin_id] = result
-                else:
-                    seen_bulletins[bulletin_id] = result
+                if bulletin_id not in seen_bulletins:
+                    seen_bulletins[bulletin_id] = []
+                seen_bulletins[bulletin_id].append(result)
             else:
                 non_bulletin_results.append(result)
-        
-        # Combine bulletins + non-bulletins, sort by score
-        all_results = list(seen_bulletins.values()) + non_bulletin_results
+
+        # Keep top MAX_CHUNKS_PER_BULLETIN per bulletin
+        bulletin_results = []
+        for chunks in seen_bulletins.values():
+            chunks.sort(key=lambda x: x.score, reverse=True)
+            bulletin_results.extend(chunks[:MAX_CHUNKS_PER_BULLETIN])
+
+        all_results = bulletin_results + non_bulletin_results
         all_results.sort(key=lambda x: x.score, reverse=True)
-        
+
         if seen_bulletins:
-            logger.debug(f"Deduplicated bulletins: kept {len(seen_bulletins)} unique bulletins")
-        
+            kept = sum(min(len(v), MAX_CHUNKS_PER_BULLETIN) for v in seen_bulletins.values())
+            logger.debug(f"Deduplicated bulletins: kept {kept} chunks from {len(seen_bulletins)} bulletins")
+
         return all_results
     
     def _semantic_search(

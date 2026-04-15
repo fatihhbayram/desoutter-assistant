@@ -87,17 +87,16 @@ class BaseChunker(ABC):
     
     def estimate_tokens(self, text: str) -> int:
         """Estimate token count (rough approximation)"""
-        # Approximate: 1 token ≈ 4 characters for English
-        # Turkish might be slightly different
+        # 1 token ≈ 4 characters for English technical text
         return len(text) // 4
-    
+
     def split_by_tokens(self, text: str, max_tokens: int) -> List[str]:
         """Split text into chunks of approximately max_tokens"""
         words = text.split()
         chunks = []
         current_chunk = []
         current_tokens = 0
-        
+
         for word in words:
             word_tokens = len(word) // 4 + 1
             if current_tokens + word_tokens > max_tokens and current_chunk:
@@ -106,7 +105,7 @@ class BaseChunker(ABC):
                 overlap_words = current_chunk[-self.overlap // 4:] if self.overlap else []
                 current_chunk = overlap_words
                 current_tokens = sum(len(w) // 4 + 1 for w in current_chunk)
-            
+
             current_chunk.append(word)
             current_tokens += word_tokens
         

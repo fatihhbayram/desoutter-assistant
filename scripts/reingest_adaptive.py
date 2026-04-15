@@ -34,6 +34,8 @@ from src.documents.chunkers import (
     Chunk
 )
 from src.documents.document_classifier import DocumentClassifier
+from src.documents.document_processor import DocumentProcessor
+from src.documents.embeddings import EmbeddingsGenerator
 from src.vectordb.qdrant_client import QdrantDBClient
 
 # Configure logging
@@ -48,12 +50,12 @@ logger = logging.getLogger(__name__)
 SOURCE_CONFIGS = {
     'manuals': {
         'path': 'documents/manuals',
-        'extensions': ['.pdf', '.txt', '.md'],
+        'extensions': ['.pdf', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.txt', '.md'],
         'default_type': 'TECHNICAL_MANUAL'
     },
     'bulletins': {
         'path': 'documents/bulletins',
-        'extensions': ['.pdf', '.txt', '.md'],
+        'extensions': ['.pdf', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.xlsm', '.xlt', '.txt', '.md'],
         'default_type': 'SERVICE_BULLETIN'
     },
     'tickets': {
@@ -77,7 +79,6 @@ class AdaptiveIngestionPipeline:
         qdrant_url: str = "localhost",
         qdrant_port: int = 6333,
         collection_name: str = "desoutter_docs_v2",
-        embedding_model: str = "all-MiniLM-L6-v2",
         dry_run: bool = False
     ):
         self.dry_run = dry_run
@@ -86,15 +87,17 @@ class AdaptiveIngestionPipeline:
         # Initialize components
         self.classifier = DocumentClassifier()
         self.chunker_factory = ChunkerFactory()
-        
+        self.doc_processor = DocumentProcessor()
+        self.embedder = EmbeddingsGenerator(device='cpu')
+
         # Initialize Qdrant (only if not dry run)
         if not dry_run:
             self.qdrant = QdrantDBClient(
                 host=qdrant_url,
                 port=qdrant_port,
-                collection_name=collection_name,
-                embedding_model=embedding_model
+                collection_name=collection_name
             )
+            self.qdrant.ensure_collection()
         else:
             self.qdrant = None
         
@@ -153,67 +156,126 @@ class AdaptiveIngestionPipeline:
         default_type: str
     ) -> List[Chunk]:
         """Ingest a single file"""
-        # Read file content
-        content = self._read_file(file_path)
+        # Read file content + product metadata
+        content, product_metadata = self._read_file(file_path)
         if not content:
-            logger.warning(f"Empty or unreadable file: {file_path}")
+            logger.warning(f"No content extracted: {file_path.name}")
             return []
-        
-        # Detect document type
-        doc_type = self.classifier.classify(content)
-        if doc_type == 'UNKNOWN':
-            doc_type = default_type
-        
-        logger.debug(f"Document type: {doc_type}")
-        
+
+        # Detect document type — filename rules first, then classifier
+        doc_type = self._classify_by_filename(file_path.name)
+        if not doc_type:
+            doc_type_result = self.classifier.classify(content, file_path.name)
+            doc_type = doc_type_result.document_type.value if hasattr(doc_type_result, 'document_type') else str(doc_type_result)
+            if not doc_type or doc_type == 'UNKNOWN':
+                doc_type = 'technical_manual'
+
+        logger.info(f"  Type: {doc_type}")
+
         # Track by type
         if doc_type not in self.stats['by_type']:
             self.stats['by_type'][doc_type] = 0
-        
-        # Extract metadata from content/filename
-        metadata = self._extract_metadata(file_path, content, doc_type)
-        
-        # Get appropriate chunker
+
+        # Build metadata — merge basic + product extractor results
+        metadata = self._extract_metadata(file_path, content, doc_type, product_metadata)
+
+        # Get appropriate chunker via factory
         chunker = self.chunker_factory.get_chunker(doc_type)
-        
+        logger.info(f"  Chunker: {chunker.__class__.__name__}")
+
         # Chunk the document
         chunks = chunker.chunk(content, metadata)
-        
-        logger.debug(f"Created {len(chunks)} chunks")
-        
+        logger.info(f"  Chunks: {len(chunks)}")
+
         # Upload to Qdrant
         if not self.dry_run and self.qdrant and chunks:
             await self._upload_chunks(chunks, file_path, doc_type)
-        
+
         # Update stats
         self.stats['documents_processed'] += 1
         self.stats['chunks_created'] += len(chunks)
         self.stats['by_type'][doc_type] += len(chunks)
-        
+
         return chunks
     
-    def _read_file(self, file_path: Path) -> Optional[str]:
-        """Read file content based on type"""
+    @staticmethod
+    def _classify_by_filename(filename: str) -> Optional[str]:
+        """
+        Classify document type by filename patterns.
+        Returns doc_type string or None if no rule matches.
+        """
+        import re
+        name = filename.upper()
+        stem = Path(filename).stem.upper()
+
+        # --- Service Bulletin ---
+        if stem.startswith('ESDE'):
+            return 'service_bulletin'
+
+        # --- Compatibility Matrix ---
+        if re.search(r'COMPATIBILITY|BATTERY.AND.TOOL.RANGE', name):
+            return 'compatibility_matrix'
+
+        # --- Error Code List ---
+        if re.search(r'ERROR.CODE|ERROR_CODE|FAULT.CODE', name):
+            return 'error_code_list'
+
+        # --- Procedure Guide ---
+        if re.search(
+            r'HOW.TO|HOW-TO|PROCEDURE|REWORK|INSTALLATION|SET.?UP|UPGRADE|'
+            r'MAINTENANCE|CALIBRAT|WIRESHARK|NETWORK.CAPTURE|REPLACE|REPAIR|'
+            r'DISASSEMBLY|ASSEMBLY|CHECKLIST|CHECK.LIST',
+            name
+        ):
+            return 'procedure_guide'
+
+        # --- Technical Manual ---
+        if re.search(
+            r'CHANGELOG|MANUAL|MANUEL|PRODUCT.INSTRUCTIONS|PRODUCT.INFORMATION|'
+            r'TRAINING|PRESENTATION|OVERVIEW|BACK.TO.BASICS|CERTIFICATE|'
+            r'SPECIFICATION|USER.?GUIDE|SPARE.PARTS|NETWORK|DATASHEET|'
+            r'NOTICE|INFORMATION.NOTE|WIRING|ARCHITECTURE',
+            name
+        ):
+            return 'technical_manual'
+
+        # Part number based files: 6159925220_EN.pdf, 8920200000_EN.pdf
+        if re.match(r'^\d{7,10}', stem):
+            return 'technical_manual'
+
+        # No match → let classifier decide
+        return None
+
+    def _read_file(self, file_path: Path):
+        """
+        Read file content for all supported formats.
+        Returns (content: str, product_metadata: dict) tuple.
+        - JSON: parsed and formatted directly
+        - All other formats (PDF, DOCX, PPTX, XLSX, TXT, MD): via DocumentProcessor
+        """
+        suffix = file_path.suffix.lower()
         try:
-            if file_path.suffix == '.json':
+            if suffix == '.json':
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    # Handle product spec format
-                    if isinstance(data, dict):
-                        return self._format_product_spec(data)
-                    return json.dumps(data, indent=2)
-            elif file_path.suffix == '.pdf':
-                # For PDF, we'd need PyPDF2 or similar
-                # Placeholder - assume text extraction done elsewhere
-                txt_path = file_path.with_suffix('.txt')
-                if txt_path.exists():
-                    return txt_path.read_text(encoding='utf-8')
-                return None
-            else:
-                return file_path.read_text(encoding='utf-8')
+                content = self._format_product_spec(data) if isinstance(data, dict) else json.dumps(data, indent=2)
+                return content, {}
+
+            # DocumentProcessor handles PDF, DOCX, DOC, PPTX, PPT, XLSX, XLS, TXT, MD
+            result = self.doc_processor.process_document(
+                file_path,
+                extract_tables=True,
+                enable_semantic_chunking=False
+            )
+            if result and result.get('text'):
+                return result['text'], result.get('product_metadata', {})
+
+            logger.warning(f"DocumentProcessor returned no content for: {file_path.name}")
+            return None, {}
+
         except Exception as e:
             logger.error(f"Error reading {file_path}: {e}")
-            return None
+            return None, {}
     
     def _format_product_spec(self, data: Dict) -> str:
         """Format product spec JSON as readable text"""
@@ -243,51 +305,86 @@ class AdaptiveIngestionPipeline:
         
         return '\n'.join(parts)
     
+    # Known Desoutter product family tokens — used for bulletin family detection
+    _KNOWN_FAMILIES = {
+        'EPBC', 'EABC', 'EABS', 'EIBS', 'BLRTC', 'BLRTA',
+        'EPB', 'EPBA', 'EAB', 'EABA',
+        'EAD', 'EPD', 'EFD', 'EIDS',
+        'ERS', 'ERSA', 'ERSF',
+        'ECS', 'ELS', 'ELB', 'ELC',
+        'EM', 'ERAL', 'EME', 'EMEL',
+        'XPB', 'QSHIELD',
+        'CVI3', 'CVIC', 'CVIR', 'CVIL',
+        'CONNECT', 'DVT',
+    }
+
+    # Bulletin filename shorthands → canonical family name
+    _FAMILY_NAME_MAP = {
+        'EXBC': 'EPBC',   # "ExBC" in bulletin titles = EPBC/EABC family
+        'EXBD': 'EPD',
+        'EXAD': 'EAD',
+        'AXON': 'CONNECT',
+    }
+
+    # Non-product words ProductExtractor sometimes misidentifies as product families
+    _NON_FAMILY_WORDS = {
+        'WIFI', 'WIRELESS', 'BLUETOOTH', 'ETHERNET', 'FIRMWARE',
+        'SOFTWARE', 'UPDATE', 'CALIBRATION', 'BATTERY', 'CONNECTOR',
+        'CABLE', 'MODULE', 'BOARD', 'ERROR', 'FAULT', 'ISSUE',
+        'CONNECTION', 'INFORMATION', 'NOTICE', 'ERP',
+    }
+
     def _extract_metadata(
         self,
         file_path: Path,
         content: str,
-        doc_type: str
+        doc_type: str,
+        product_metadata: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """Extract metadata from file and content"""
+        """Extract metadata from file, content, and ProductExtractor results"""
+        import re
+
         metadata = {
-            'source': str(file_path),
+            'source': file_path.name,
             'filename': file_path.name,
             'document_type': doc_type
         }
-        
-        # Extract product info from filename or content
-        import re
-        
-        # Product patterns
-        product_patterns = [
-            r'(E[A-Z]{2,4}[-\s]?\d{3,4}[A-Z]*)',  # EABC-3000
-            r'(CV[A-Z]{1,2}[-\s]?\d*)',  # CVI3, CVIR
-            r'(SPD[-\s]?\d{3,4})',  # SPD1200
-        ]
-        
-        for pattern in product_patterns:
-            match = re.search(pattern, file_path.name + ' ' + content[:500], re.IGNORECASE)
-            if match:
-                product = match.group(1).upper().replace(' ', '-')
-                metadata['product_model'] = product
-                
-                # Determine product family
-                if product.startswith('EABC'):
-                    metadata['product_family'] = 'EABC'
-                elif product.startswith('EFD'):
-                    metadata['product_family'] = 'EFD'
-                elif product.startswith('ERSF'):
-                    metadata['product_family'] = 'ERSF'
-                elif product.startswith('CVI') or product.startswith('CVIR'):
-                    metadata['product_family'] = 'CONTROLLER'
-                break
-        
-        # ESDE code
-        esde_match = re.search(r'ESDE[-\s]?(\d{4,5})', content, re.IGNORECASE)
+
+        # ESDE bulletin code (filename takes priority over content)
+        esde_match = re.search(r'(ESDE[-\s]?\d{4,5})', file_path.name + ' ' + content[:200], re.IGNORECASE)
         if esde_match:
-            metadata['esde_code'] = f"ESDE-{esde_match.group(1)}"
-        
+            metadata['esde_code'] = esde_match.group(1).upper().replace(' ', '')
+
+        # --- Product family detection ---
+        if doc_type == 'service_bulletin':
+            # Scan filename + first 500 chars of content for known product families
+            scan_text = (file_path.stem + ' ' + content[:500]).upper()
+
+            # Resolve shorthands first (ExBC → EPBC, etc.)
+            for alias, canonical in self._FAMILY_NAME_MAP.items():
+                scan_text = scan_text.replace(alias, canonical)
+
+            found_families = [f for f in self._KNOWN_FAMILIES if re.search(r'\b' + re.escape(f) + r'\b', scan_text)]
+
+            if len(found_families) > 1:
+                # Multi-product bulletin → mark generic so it passes all Qdrant filters
+                metadata['is_generic'] = True
+                metadata['product_family'] = found_families[0]
+            elif len(found_families) == 1:
+                metadata['product_family'] = found_families[0]
+                metadata['is_generic'] = False
+            else:
+                # No known family found → generic (don't silently drop the bulletin)
+                metadata['is_generic'] = True
+        else:
+            # Non-bulletins: use ProductExtractor if it detected a real family name
+            if product_metadata:
+                detected = (product_metadata.get('product_family') or '').upper()
+                if detected and detected not in self._NON_FAMILY_WORDS:
+                    metadata['product_family'] = detected
+                if 'is_generic' in product_metadata:
+                    metadata['is_generic'] = product_metadata['is_generic']
+
         return metadata
     
     async def _upload_chunks(
@@ -297,39 +394,37 @@ class AdaptiveIngestionPipeline:
         doc_type: str
     ):
         """Upload chunks to Qdrant"""
-        points = []
-        
-        for chunk in chunks:
-            # Prepare payload
-            payload = {
-                'text': chunk.text,
-                'document_id': str(file_path),
-                'document_type': doc_type,
-                'chunk_type': chunk.chunk_type,
-                'chunk_index': chunk.chunk_index,
-                **chunk.metadata
-            }
-            
-            # Generate ID
-            import hashlib
-            chunk_id = hashlib.md5(
-                f"{file_path}_{chunk.chunk_index}".encode()
-            ).hexdigest()
-            
-            points.append({
+        import hashlib
+
+        texts = [chunk.text for chunk in chunks]
+
+        # Generate embeddings in batch
+        embeddings = self.embedder.generate_embeddings(texts, show_progress=False)
+
+        documents = []
+        for chunk, embedding in zip(chunks, embeddings):
+            chunk_id_str = f"{file_path}_{chunk.chunk_index}"
+            chunk_id = int(hashlib.md5(chunk_id_str.encode()).hexdigest()[:16], 16)
+
+            documents.append({
                 'id': chunk_id,
                 'text': chunk.text,
-                'payload': payload
+                'embedding': embedding,
+                'metadata': {
+                    'document_id': str(file_path),
+                    'document_type': doc_type,
+                    'chunk_type': chunk.chunk_type,
+                    'chunk_index': chunk.chunk_index,
+                    **chunk.metadata
+                }
             })
-        
-        # Batch upload
+
+        # Batch upsert
         try:
-            self.qdrant.add_documents(
-                texts=[p['text'] for p in points],
-                metadatas=[p['payload'] for p in points],
-                ids=[p['id'] for p in points]
-            )
-            logger.debug(f"Uploaded {len(points)} chunks to Qdrant")
+            success, errors = self.qdrant.upsert(documents)
+            logger.debug(f"Uploaded {success} chunks, {errors} errors")
+            if errors:
+                logger.warning(f"{errors} chunks failed to upload for {file_path.name}")
         except Exception as e:
             logger.error(f"Error uploading to Qdrant: {e}")
             raise

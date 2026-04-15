@@ -203,40 +203,88 @@ class SemanticChunker(BaseChunker):
         return line[:50]
     
     def _split_large_section(self, text: str, hierarchy: Optional[str]) -> List[str]:
-        """Split large section by paragraphs"""
+        """
+        Split large section using a 3-level fallback chain:
+        1. Paragraphs (\n\n)
+        2. Sentences (. / ? / !)
+        3. Fixed-size word windows (split_by_tokens)
+        """
         paragraphs = re.split(r'\n\n+', text)
-        
+
         chunks = []
         current_chunk = []
         current_tokens = 0
-        
+
         for para in paragraphs:
             para_tokens = self.estimate_tokens(para)
-            
+
             # Check for procedure blocks (preserve together)
             if self.preserve_procedures and self._is_procedure_block(para):
-                # Save current chunk
                 if current_chunk:
                     chunks.append('\n\n'.join(current_chunk))
                     current_chunk = []
                     current_tokens = 0
-                
-                # Add procedure as its own chunk
                 chunks.append(para)
                 continue
-            
+
+            # Level 2: paragraph itself too large → split by sentences
+            if para_tokens > self.max_chunk_size:
+                if current_chunk:
+                    chunks.append('\n\n'.join(current_chunk))
+                    current_chunk = []
+                    current_tokens = 0
+                chunks.extend(self._split_by_sentences(para))
+                continue
+
             if current_tokens + para_tokens > self.max_chunk_size and current_chunk:
                 chunks.append('\n\n'.join(current_chunk))
                 current_chunk = []
                 current_tokens = 0
-            
+
             current_chunk.append(para)
             current_tokens += para_tokens
-        
+
         if current_chunk:
             chunks.append('\n\n'.join(current_chunk))
-        
+
         return chunks
+
+    def _split_by_sentences(self, text: str) -> List[str]:
+        """
+        Split text by sentence boundaries.
+        Fallback to fixed-size word windows if a sentence is still too large.
+        """
+        # Split on sentence-ending punctuation followed by whitespace
+        sentences = re.split(r'(?<=[.?!])\s+', text)
+
+        chunks = []
+        current_chunk = []
+        current_tokens = 0
+
+        for sentence in sentences:
+            sentence_tokens = self.estimate_tokens(sentence)
+
+            # Level 3: single sentence still too large → fixed-size windows
+            if sentence_tokens > self.max_chunk_size:
+                if current_chunk:
+                    chunks.append(' '.join(current_chunk))
+                    current_chunk = []
+                    current_tokens = 0
+                chunks.extend(self.split_by_tokens(sentence, self.max_chunk_size))
+                continue
+
+            if current_tokens + sentence_tokens > self.max_chunk_size and current_chunk:
+                chunks.append(' '.join(current_chunk))
+                current_chunk = []
+                current_tokens = 0
+
+            current_chunk.append(sentence)
+            current_tokens += sentence_tokens
+
+        if current_chunk:
+            chunks.append(' '.join(current_chunk))
+
+        return chunks if chunks else [text]
     
     def _is_procedure_block(self, text: str) -> bool:
         """Check if text is a procedure/steps block"""

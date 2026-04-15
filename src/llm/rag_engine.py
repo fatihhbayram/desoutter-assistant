@@ -31,7 +31,7 @@ from config.ai_settings import (
     ENABLE_METADATA_BOOST, SERVICE_BULLETIN_BOOST, PROCEDURE_BOOST,
     WARNING_BOOST, IMPORTANCE_BOOST_FACTOR,
     ENABLE_DOMAIN_EMBEDDINGS, ENABLE_FAULT_FILTERING,
-    LLM_TIMEOUT_SECONDS
+    LLM_TIMEOUT_SECONDS, OLLAMA_MAX_TOKENS
 )
 from src.utils.logger import setup_logger
 
@@ -352,9 +352,15 @@ class RAGEngine:
         # CONNECT variants are all interchangeable (W/X/D are deployment types, not different products)
         # Using list format for consistency and multi-directional mapping
         FAMILY_ALIASES = {
-            'EPBC': ['EPB'], 'EPB': ['EPBC'],  # EPB <-> EPBC (WiFi)
-            'EABC': ['EAB'], 'EAB': ['EABC'],  # EAB <-> EABC (WiFi)
-            'EABS': ['EAB', 'EABC'],            # EABS -> EAB family
+            # WiFi battery family: EPBC, EABC, EABS, EIBS share WiFi module bulletins
+            # Non-WiFi (EPB, EPBA, EAB, EABA) are standalone — no cross-alias into WiFi group
+            'EPBC': ['EABC', 'EABS', 'EIBS'],
+            'EABC': ['EPBC', 'EABS', 'EIBS'],
+            'EABS': ['EPBC', 'EABC', 'EIBS'],
+            'EIBS': ['EPBC', 'EABC', 'EABS'],
+            'ERS':  ['ERSA', 'ERSF'],
+            'ERSA': ['ERS', 'ERSF'],
+            'ERSF': ['ERS', 'ERSA'],
             # CONNECT family - all variants share same bulletins
             'CONNECT-W': ['CONNECT', 'CONNECT-X', 'CONNECT-D'],
             'CONNECT-X': ['CONNECT', 'CONNECT-W', 'CONNECT-D'],
@@ -798,12 +804,14 @@ class RAGEngine:
         # Include: matching family + aliases + GENERAL (generic docs) + UNKNOWN (unclassified)
         
         # Family aliases for cross-product retrieval
-        # CONNECT variants are all interchangeable (W/X/D are deployment types, not different products)
+        # WiFi battery family: EPBC, EABC, EABS, EIBS share the same WiFi module — bulletins apply across all
+        # Non-WiFi standalone tools (EPB, EPBA, EAB, EABA) do NOT cross into WiFi bulletins
         FAMILY_ALIASES = {
-            'EPBC': ['EPB'], 'EPB': ['EPBC'],  # EPB/EPBC are interchangeable
-            'EABC': ['EAB'], 'EAB': ['EABC'],  # EAB/EABC are interchangeable
-            'EABS': ['EAB', 'EABC'],            # EABS maps to EAB family
-            'ERS': ['ERSA', 'ERSF'],            # ERS variants
+            'EPBC': ['EABC', 'EABS', 'EIBS'],
+            'EABC': ['EPBC', 'EABS', 'EIBS'],
+            'EABS': ['EPBC', 'EABC', 'EIBS'],
+            'EIBS': ['EPBC', 'EABC', 'EABS'],
+            'ERS':  ['ERSA', 'ERSF'],           # ERS variants
             'ERSA': ['ERS', 'ERSF'],
             'ERSF': ['ERS', 'ERSA'],
             # CONNECT family - all variants share same bulletins
@@ -1049,7 +1057,7 @@ class RAGEngine:
             logger.info("[HYBRID] Product filter active, passing to Qdrant query")
         results = self.hybrid_searcher.search(
             query=query,
-            top_k=top_k * 2,  # Get more candidates for boosting/reranking
+            top_k=top_k * 4,  # Get more candidates for boosting/reranking + diversity quota
             expand_query=ENABLE_QUERY_EXPANSION,
             use_hybrid=True,
             where_filter=product_filter,  # Pass product filter to Qdrant
@@ -1141,17 +1149,53 @@ class RAGEngine:
                 if recommendations.get("mappings_found", 0) > 0:
                     logger.info(f"Applied self-learning: {len(boost_sources)} boost, {len(avoid_sources)} avoid sources")
         
-        # Re-sort by boosted score and limit to top_k
+        # Re-sort by boosted score, then apply diversity quota
         filtered_docs.sort(key=lambda x: x.get("boosted_score", x.get("similarity", 0)), reverse=True)
-        filtered_docs = filtered_docs[:top_k]
-        
+        filtered_docs = self._apply_diversity_quota(filtered_docs, top_k)
+
         logger.info(f"Hybrid search retrieved {len(filtered_docs)} documents (with metadata + learned boost)")
         return {
             "documents": filtered_docs,
             "query": query,
             "search_type": "hybrid"
         }
-    
+
+    def _apply_diversity_quota(self, docs: list, top_k: int) -> list:
+        """
+        Select top_k documents with diversity quota:
+        - At least 1 service_bulletin (ESDE)
+        - At least 1 technical_manual or procedure_guide
+        - Remaining slots filled by score (any type)
+        """
+        QUOTA_BULLETIN = 1
+        QUOTA_MANUAL = 1
+
+        bulletins = [d for d in docs if d.get("metadata", {}).get("document_type") == "service_bulletin"]
+        manuals = [d for d in docs if d.get("metadata", {}).get("document_type") in ("technical_manual", "procedure_guide")]
+        others = [d for d in docs if d not in bulletins and d not in manuals]
+
+        selected = []
+
+        # Fill quotas first (highest score within each type)
+        if bulletins:
+            selected.append(bulletins[0])
+        if manuals:
+            selected.append(manuals[0])
+
+        # Fill remaining slots by score from all remaining docs
+        quota_used = {id(d) for d in selected}
+        remaining = [d for d in docs if id(d) not in quota_used]
+        remaining.sort(key=lambda x: x.get("boosted_score", x.get("similarity", 0)), reverse=True)
+        selected.extend(remaining[:top_k - len(selected)])
+
+        # Final sort by score
+        selected.sort(key=lambda x: x.get("boosted_score", x.get("similarity", 0)), reverse=True)
+
+        types = [d.get("metadata", {}).get("document_type", "?") for d in selected]
+        logger.debug(f"Diversity quota applied: {types}")
+
+        return selected
+
     def _retrieve_with_semantic_search(
         self, 
         query: str, 
@@ -1596,9 +1640,12 @@ class RAGEngine:
         
         # Generate suggestion from LLM
         logger.info("Generating LLM response...")
-        suggestion = self.llm.generate(
-            prompt=prompt,
-            system=system_prompt
+        suggestion = self.llm.chat(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=OLLAMA_MAX_TOKENS
         )
         
         if not suggestion:
