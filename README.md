@@ -18,7 +18,7 @@ An intelligent **Retrieval-Augmented Generation (RAG)** system that provides con
 When a technician encounters an issue with a Desoutter tool:
 
 1. **Asks a question**: "My EPBC8-1800-4Q shows error code E018"
-2. **System searches**: Hybrid retrieval across 26,513 document chunks
+2. **System searches**: Hybrid retrieval across 4,082 document chunks
 3. **Generates response**: AI-powered solution with cited sources
 4. **Learns**: Continuously improves from user feedback
 
@@ -155,7 +155,7 @@ desoutter-assistant/
 ┌─────────────────┐  ┌─────────────────┐         ┌─────────────────┐
 │    MongoDB      │  │     Ollama      │         │     Qdrant      │
 │    (27017)      │  │    (11434)      │         │    (6333)       │
-│  • users        │  │  Qwen2.5:7b     │         │  26,513 chunks  │
+│  • users        │  │  Qwen2.5:7b     │         │  4,082 chunks  │
 │  • feedback     │  │  GPU-accelerated│         │  384-dim vectors│
 │  • mappings     │  └─────────────────┘         └─────────────────┘
 └─────────────────┘
@@ -321,7 +321,7 @@ curl -X POST http://localhost:8000/diagnose \
 | **Test Pass Rate** | 85% (34/40 scenarios) |
 | **Timeout Rate** | 0% (all resolved) |
 | **Total Products** | 451 indexed |
-| **Vector DB** | Qdrant - 26,513 semantic chunks (384-dim) |
+| **Vector DB** | Qdrant - 4,082 semantic chunks (384-dim, language-filtered) |
 | **Indexed Documents** | 541 (121 PDF + 420 Word) |
 | **Freshdesk Tickets** | 2,249 processed |
 | **BM25 Index Terms** | 19,032 unique terms |

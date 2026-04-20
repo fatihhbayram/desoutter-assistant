@@ -21,7 +21,7 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 | Products Indexed | 451 |
 | Documents Processed | 541 (121 PDF + 420 Word) |
 | Freshdesk Tickets | 2,249 |
-| Vector DB | Qdrant - 26,513 chunks (384-dim) |
+| Vector DB | Qdrant - 4,082 chunks (384-dim, language-filtered) |
 | BM25 Terms | 19,032 |
 | Intent Types | 15 (expanded from 8) |
 

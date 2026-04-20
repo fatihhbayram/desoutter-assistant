@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (2026-04-20 — Faz 6f: Language Filtering)
+- **Multilingual PDF filtering** (`scripts/reingest_adaptive.py`)
+  - `_is_english_text()` — ASCII ratio + English function-word density, no external library
+  - `_filter_english_pages()` — splits on `--- Page N ---` markers, drops non-English pages
+  - `_EN_WORDS` frozenset includes technical vocabulary (dimensions, torque, speed, connector…)
+  - Short pages (<15 words) always kept — preserves spec/data table pages
+- **Re-ingestion completed**: 3,722 → 4,082 chunks (ERS manual: 72 pages → 12 English pages)
+
 ### In Progress (Phase 6 - Tuning & Accuracy)
 - Test suite quality improvements (85% pass rate, 34/40 scenarios)
 - Prompt hardening with key terms repetition

@@ -54,58 +54,59 @@ logger = logging.getLogger(__name__)
 CHUNKER_CONFIG: Dict[str, Dict[str, Any]] = {
     DocumentType.TECHNICAL_MANUAL.value: {
         "chunker_class": SemanticChunker,
-        "max_chunk_size": 1000,
-        "min_chunk_size": 100,
+        "max_chunk_size": 400,
+        "min_chunk_size": 50,
         "split_by": "section_headers",
     },
-    
+
     DocumentType.SERVICE_BULLETIN.value: {
         "chunker_class": ProblemSolutionChunker,
-        "max_chunk_size": 1500,
-        "min_chunk_size": 200,
+        "max_chunk_size": 600,
+        "min_chunk_size": 80,
         "preserve_esde_blocks": True,
     },
-    
+
     DocumentType.CONFIGURATION_GUIDE.value: {
         "chunker_class": SemanticChunker,
-        "max_chunk_size": 1000,
-        "min_chunk_size": 100,
+        "max_chunk_size": 400,
+        "min_chunk_size": 50,
         "preserve_procedures": True,
     },
-    
+
     DocumentType.COMPATIBILITY_MATRIX.value: {
         "chunker_class": TableAwareChunker,
-        "max_chunk_size": 1500,
+        "max_chunk_size": 600,
         "min_chunk_size": 50,
         "preserve_headers": True,
         "chunk_by_row": True,
     },
-    
+
     DocumentType.SPEC_SHEET.value: {
         "chunker_class": SemanticChunker,
-        "max_chunk_size": 500,
+        "max_chunk_size": 400,
         "min_chunk_size": 50,
         "split_by": "section_headers",
     },
-    
+
     DocumentType.ERROR_CODE_LIST.value: {
         "chunker_class": EntityChunker,
-        "max_chunk_size": 800,
-        "min_chunk_size": 50,
+        "max_chunk_size": 400,
+        "min_chunk_size": 20,
         "entity_type": "error_code",
+        "entities_per_chunk": 1,  # 1 error code = 1 chunk for precise retrieval
     },
-    
+
     DocumentType.PROCEDURE_GUIDE.value: {
         "chunker_class": StepPreservingChunker,
-        "max_chunk_size": 1500,
-        "min_chunk_size": 100,
+        "max_chunk_size": 400,
+        "min_chunk_size": 50,
         "preserve_steps": True,
     },
-    
+
     DocumentType.FRESHDESK_TICKET.value: {
         "chunker_class": ProblemSolutionChunker,
-        "max_chunk_size": 1000,
-        "min_chunk_size": 100,
+        "max_chunk_size": 400,
+        "min_chunk_size": 80,
         "preserve_qa_format": True,
     },
 }
@@ -113,8 +114,8 @@ CHUNKER_CONFIG: Dict[str, Dict[str, Any]] = {
 # Default configuration for unknown document types
 DEFAULT_CONFIG = {
     "chunker_class": HybridChunker,
-    "max_chunk_size": 1000,
-    "min_chunk_size": 100,
+    "max_chunk_size": 400,
+    "min_chunk_size": 50,
 }
 
 

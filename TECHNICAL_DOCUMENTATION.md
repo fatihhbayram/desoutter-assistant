@@ -44,7 +44,7 @@ Desoutter Assistant is an **enterprise-grade AI-powered technical support system
 | Metric | Value | Note |
 |--------|-------|------|
 | Test Pass Rate | 85% (34/40) | Production-ready |
-| Vector DB Size | 26,513 chunks | 384-dimensional embeddings |
+| Vector DB Size | 4,082 chunks | 384-dim, language-filtered (multilingual PDF denoised) |
 | Documents Indexed | 541 + 2,249 tickets | PDF, Word, Freshdesk |
 | Products Supported | 451 | 71 wireless, 380 cable |
 | Intent Types | 15 categories | Expanded from 8 |
@@ -179,7 +179,7 @@ User Query
 │  │  MongoDB    │  │   Qdrant    │  │   Ollama    │                │
 │  │  (27017)    │  │   (6333)    │  │   (11434)   │                │
 │  │             │  │             │  │             │                │
-│  │ • users     │  │ • 26,513    │  │ • Qwen2.5   │                │
+│  │ • users     │  │ • 4,082     │  │ • Qwen2.5   │                │
 │  │ • products  │  │   chunks    │  │   :7b       │                │
 │  │ • feedback  │  │ • 384-dim   │  │ • GPU       │                │
 │  │ • mappings  │  │   vectors   │  │   accel     │                │
@@ -948,7 +948,7 @@ Authorization: Bearer <admin_token>
     "freshdesk_tickets": 2249
   },
   "vector_db": {
-    "total_chunks": 26513,
+    "total_chunks": 4082,
     "dimension": 384,
     "collection": "desoutter_docs_v2"
   },
@@ -2553,7 +2553,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 
 # Check chunk count
 curl http://localhost:6333/collections/desoutter_docs_v2
-# Expected: ~26,513 chunks
+# Expected: ~4,082 chunks (language-filtered)
 ```
 
 ---

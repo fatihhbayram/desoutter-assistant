@@ -16,6 +16,7 @@ Usage:
     python scripts/reingest_adaptive.py --source bulletins --dry-run
 """
 import os
+import re
 import sys
 import json
 import time
@@ -44,6 +45,87 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# LANGUAGE FILTER — Keep English pages only
+# =============================================================================
+
+# Common English function words — high frequency, rarely appear in other languages
+_EN_WORDS = frozenset([
+    # Function words
+    'the', 'this', 'that', 'these', 'those', 'with', 'from', 'have', 'will',
+    'are', 'was', 'were', 'been', 'not', 'for', 'and', 'but', 'when', 'also',
+    'must', 'may', 'should', 'ensure', 'check', 'use', 'note', 'warning',
+    # Technical English — common in Desoutter manuals
+    'data', 'dimensions', 'torque', 'speed', 'weight', 'model', 'number',
+    'output', 'min', 'max', 'type', 'issue', 'part', 'operating', 'mode',
+    'tool', 'cable', 'connector', 'system', 'error', 'fault', 'step',
+    'procedure', 'assembly', 'maintenance', 'installation', 'manual',
+    'product', 'specification', 'technical', 'page', 'instructions',
+])
+
+_PAGE_SPLIT = re.compile(r'(--- Page \d+ ---)')
+
+
+def _is_english_text(text: str) -> bool:
+    """Return True if text is likely English."""
+    if not text.strip():
+        return True  # empty → don't filter
+
+    # Non-ASCII ratio: Greek/Russian/Chinese/Arabic → very high → reject fast
+    non_ascii = sum(1 for c in text if ord(c) > 127)
+    if non_ascii / len(text) > 0.25:
+        return False
+
+    # English word match: count how many EN function words appear
+    words = re.findall(r'\b[a-z]+\b', text.lower())
+    if not words:
+        return True  # only numbers/symbols → keep (spec tables, part numbers)
+
+    # Few words = likely a data/spec table (dimensions, torque values) → keep
+    if len(words) < 15:
+        return True
+
+    en_hits = sum(1 for w in words if w in _EN_WORDS)
+    en_ratio = en_hits / len(words)
+    return en_ratio >= 0.04  # ≥4% function word density → English
+
+
+def _filter_english_pages(text: str) -> str:
+    """
+    Split text on --- Page N --- markers, keep only English pages.
+    Returns filtered text with original page markers preserved.
+    """
+    parts = _PAGE_SPLIT.split(text)
+    # parts alternates: [pre, marker, content, marker, content, ...]
+    result = []
+    kept = 0
+    dropped = 0
+
+    i = 0
+    while i < len(parts):
+        part = parts[i]
+        if _PAGE_SPLIT.match(part):
+            # This is a page marker — peek at next part (page content)
+            marker = part
+            content = parts[i + 1] if i + 1 < len(parts) else ''
+            if _is_english_text(content):
+                result.append(marker)
+                result.append(content)
+                kept += 1
+            else:
+                dropped += 1
+            i += 2
+        else:
+            # Pre-first-page text
+            result.append(part)
+            i += 1
+
+    if dropped:
+        logger.debug(f"    Pages: kept {kept}, dropped {dropped} non-English")
+
+    return ''.join(result)
 
 
 # Source configurations
@@ -178,6 +260,9 @@ class AdaptiveIngestionPipeline:
 
         # Build metadata — merge basic + product extractor results
         metadata = self._extract_metadata(file_path, content, doc_type, product_metadata)
+
+        # Filter non-English pages (multilingual manuals: DE, FR, ES, ZH, RU, ...)
+        content = _filter_english_pages(content)
 
         # Get appropriate chunker via factory
         chunker = self.chunker_factory.get_chunker(doc_type)
