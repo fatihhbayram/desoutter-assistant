@@ -113,6 +113,7 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 
 | Priority | Feature | Description | Effort |
 |----------|---------|-------------|--------|
+| 🔴 High | Basic Troubleshooting Docs | 6-category pre-check lists ingested to knowledge base (Faz 8) | 1 day |
 | 🔴 High | Cross-Encoder Re-ranking | Top-10 → Top-5 semantic re-ranking | 2 days |
 | 🔴 High | Confidence Score API | Numeric confidence in responses | 1 day |
 | 🟡 Medium | TechWizard Integration | Deploy wizard UI to production | 1 day |

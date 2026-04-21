@@ -329,6 +329,7 @@ curl -X POST http://localhost:8000/diagnose \
 | **Hallucination Rate** | <2% |
 | **Intent Categories** | 15 types (troubleshoot, error_code, spec, config, compat, etc.) |
 | **Avg Response Time** | 23.6s (non-cached) |
+| **Planned (Faz 8)** | Basic troubleshooting docs — 6-category pre-check knowledge base |
 
 ---
 
