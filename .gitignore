@@ -57,6 +57,7 @@ documents/manuals/**
 documents/bulletins/**
 !documents/manuals/.gitkeep
 !documents/bulletins/.gitkeep
+!documents/bulletins/basic_troubleshooting_*.docx
 
 # Build artifacts
 frontend/dist/

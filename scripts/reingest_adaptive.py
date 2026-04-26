@@ -309,7 +309,7 @@ class AdaptiveIngestionPipeline:
         if re.search(
             r'HOW.TO|HOW-TO|PROCEDURE|REWORK|INSTALLATION|SET.?UP|UPGRADE|'
             r'MAINTENANCE|CALIBRAT|WIRESHARK|NETWORK.CAPTURE|REPLACE|REPAIR|'
-            r'DISASSEMBLY|ASSEMBLY|CHECKLIST|CHECK.LIST',
+            r'DISASSEMBLY|ASSEMBLY|CHECKLIST|CHECK.LIST|BASIC.TROUBLESHOOTING|TROUBLESHOOTING',
             name
         ):
             return 'procedure_guide'

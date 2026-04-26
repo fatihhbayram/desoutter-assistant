@@ -321,15 +321,15 @@ curl -X POST http://localhost:8000/diagnose \
 | **Test Pass Rate** | 85% (34/40 scenarios) |
 | **Timeout Rate** | 0% (all resolved) |
 | **Total Products** | 451 indexed |
-| **Vector DB** | Qdrant - 4,082 semantic chunks (384-dim, language-filtered) |
-| **Indexed Documents** | 541 (121 PDF + 420 Word) |
+| **Vector DB** | Qdrant - 6,195 semantic chunks (384-dim, language-filtered) |
+| **Indexed Documents** | 547 (121 PDF + 426 Word) |
 | **Freshdesk Tickets** | 2,249 processed |
 | **BM25 Index Terms** | 19,032 unique terms |
 | **Cache Speedup** | ~100,000x for repeated queries |
 | **Hallucination Rate** | <2% |
 | **Intent Categories** | 15 types (troubleshoot, error_code, spec, config, compat, etc.) |
 | **Avg Response Time** | 23.6s (non-cached) |
-| **Planned (Faz 8)** | Basic troubleshooting docs — 6-category pre-check knowledge base |
+| **Knowledge Base (Faz 8)** | 6 basic troubleshooting guides (Motor/Battery/Connectivity/Memory/Drive/Software) |
 
 ---
 

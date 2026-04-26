@@ -88,22 +88,18 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 
 ## In Progress
 
-### Q2 2026 - El-Harezmi Pipeline Migration
+### Q2 2026 - Knowledge Base Enrichment
 
 **Status**: Active Development
 
-- [ ] **El-Harezmi 5-Stage Pipeline**
-  - 5-stage intelligent pipeline implementation
-  - A/B testing against Legacy RAG (85% baseline)
-  - Gradual rollout with performance monitoring
-  - Target: Match or exceed 85% accuracy with improved latency
+- [x] **Faz 8: Basic Troubleshooting Docs** *(2026-04-26)*
+  - 6 procedure_guide documents ingested (Motor/Battery/Connectivity/Memory/Drive/Software)
+  - Product filter updated: `is_generic=True` docs bypass cross-product exclusion
+  - Score boost added: `procedure_guide` type gets 2.0x boost
+  - Classifier pattern added: `BASIC.TROUBLESHOOTING` → procedure_guide
 
-**Components**:
-- `stage1_intent_classifier.py` - Intent detection
-- `stage2_retrieval_strategy.py` - Adaptive retrieval
-- `stage3_info_extraction.py` - Information extraction
-- `stage4_kg_validation.py` - Knowledge graph validation
-- `stage5_response_formatter.py` - Response formatting
+- [ ] **Faz 4: product_model support in /diagnose**
+  - Technicians can query by model name instead of part number
 
 ---
 
@@ -113,7 +109,6 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 
 | Priority | Feature | Description | Effort |
 |----------|---------|-------------|--------|
-| 🔴 High | Basic Troubleshooting Docs | 6-category pre-check lists ingested to knowledge base (Faz 8) | 1 day |
 | 🔴 High | Cross-Encoder Re-ranking | Top-10 → Top-5 semantic re-ranking | 2 days |
 | 🔴 High | Confidence Score API | Numeric confidence in responses | 1 day |
 | 🟡 Medium | TechWizard Integration | Deploy wizard UI to production | 1 day |

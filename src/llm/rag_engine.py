@@ -390,6 +390,11 @@ class RAGEngine:
             if is_esde_bulletin:
                 filtered.append(doc)
                 continue
+
+            # is_generic=True docs (e.g. basic troubleshooting guides) apply to all products
+            if metadata.get('is_generic'):
+                filtered.append(doc)
+                continue
             
             # Extract product family from document
             doc_family = metadata.get('product_family', '')
@@ -468,18 +473,21 @@ class RAGEngine:
         
         # 1. Service bulletin boost (ESD/ESB documents)
         source = metadata.get("source", "")
-        doc_type = metadata.get("doc_type", "")
-        
+        doc_type = metadata.get("doc_type", "") or metadata.get("document_type", "")
+
         is_service_bulletin = (
-            "ESD" in source.upper() or 
+            "ESD" in source.upper() or
             "ESB" in source.upper() or
             doc_type == "service_bulletin"
         )
-        
+
         if is_service_bulletin:
             boost *= SERVICE_BULLETIN_BOOST
             boost_reasons.append(f"service_bulletin({SERVICE_BULLETIN_BOOST}x)")
-        
+        elif doc_type == "procedure_guide":
+            boost *= 2.0
+            boost_reasons.append("procedure_guide(2.0x)")
+
         # 2. Procedure section boost
         section_type = metadata.get("section_type", "")
         is_procedure = metadata.get("is_procedure", False)
