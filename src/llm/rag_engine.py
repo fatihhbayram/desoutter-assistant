@@ -28,7 +28,7 @@ from config.ai_settings import (
     USE_HYBRID_SEARCH, HYBRID_SEMANTIC_WEIGHT, HYBRID_BM25_WEIGHT,
     HYBRID_RRF_K, ENABLE_QUERY_EXPANSION,
     USE_CACHE, CACHE_TTL,
-    ENABLE_METADATA_BOOST, SERVICE_BULLETIN_BOOST, PROCEDURE_BOOST,
+    ENABLE_METADATA_BOOST, SERVICE_BULLETIN_BOOST, TECHNICAL_MANUAL_BOOST, PROCEDURE_BOOST,
     WARNING_BOOST, IMPORTANCE_BOOST_FACTOR,
     ENABLE_DOMAIN_EMBEDDINGS, ENABLE_FAULT_FILTERING,
     LLM_TIMEOUT_SECONDS, OLLAMA_MAX_TOKENS
@@ -487,6 +487,9 @@ class RAGEngine:
         elif doc_type == "procedure_guide":
             boost *= 2.0
             boost_reasons.append("procedure_guide(2.0x)")
+        elif doc_type == "technical_manual":
+            boost *= TECHNICAL_MANUAL_BOOST
+            boost_reasons.append(f"technical_manual({TECHNICAL_MANUAL_BOOST}x)")
 
         # 2. Procedure section boost
         section_type = metadata.get("section_type", "")

@@ -234,9 +234,11 @@ ENABLE_METADATA_BOOST = os.getenv("ENABLE_METADATA_BOOST", "true").lower() == "t
 
 # Boost factor for service bulletins (ESD/ESB documents)
 # Applied: score *= SERVICE_BULLETIN_BOOST
-# Increased from 2.5 to 4.0 to ensure bulletins rank above generic manual content
-# especially for symptom-based queries where semantic similarity may be lower
-SERVICE_BULLETIN_BOOST = float(os.getenv("SERVICE_BULLETIN_BOOST", "4.0"))
+# Lowered from 4.0 to 2.5 to allow technical manuals to compete in retrieval
+SERVICE_BULLETIN_BOOST = float(os.getenv("SERVICE_BULLETIN_BOOST", "2.5"))
+
+# Boost factor for technical manuals
+TECHNICAL_MANUAL_BOOST = float(os.getenv("TECHNICAL_MANUAL_BOOST", "1.5"))
 
 # Boost factor for procedure sections (step-by-step instructions)
 PROCEDURE_BOOST = float(os.getenv("PROCEDURE_BOOST", "1.3"))

@@ -321,15 +321,15 @@ curl -X POST http://localhost:8000/diagnose \
 | **Test Pass Rate** | 85% (34/40 scenarios) |
 | **Timeout Rate** | 0% (all resolved) |
 | **Total Products** | 451 indexed |
-| **Vector DB** | Qdrant - 6,195 semantic chunks (384-dim, language-filtered) |
+| **Vector DB** | Qdrant — 6,195 semantic chunks (384-dim, language-filtered) |
 | **Indexed Documents** | 547 (121 PDF + 426 Word) |
-| **Freshdesk Tickets** | 2,249 processed |
+| **Q&A Evaluation Dataset** | 459 real-world field support Q&A pairs |
 | **BM25 Index Terms** | 19,032 unique terms |
 | **Cache Speedup** | ~100,000x for repeated queries |
 | **Hallucination Rate** | <2% |
 | **Intent Categories** | 15 types (troubleshoot, error_code, spec, config, compat, etc.) |
-| **Avg Response Time** | 23.6s (non-cached) |
-| **Knowledge Base (Faz 8)** | 6 basic troubleshooting guides (Motor/Battery/Connectivity/Memory/Drive/Software) |
+| **Avg Response Time** | ~20s (non-cached) |
+| **Knowledge Base** | 6 basic troubleshooting guides (Motor/Battery/Connectivity/Memory/Drive/Software) |
 
 ---
 
@@ -489,7 +489,8 @@ python scripts/test_product_filtering.py
 | [src/llm/response_cache.py](src/llm/response_cache.py) | LRU + TTL caching layer |
 | [src/api/main.py](src/api/main.py) | FastAPI routes and middleware |
 | [src/vectordb/qdrant_client.py](src/vectordb/qdrant_client.py) | Qdrant vector database operations |
-| [src/el_harezmi/pipeline.py](src/el_harezmi/pipeline.py) | 5-stage pipeline (in progress) |
+| [scripts/build_qa_dataset.py](scripts/build_qa_dataset.py) | Build Q&A evaluation dataset from field support cases |
+| [scripts/evaluate_rag.py](scripts/evaluate_rag.py) | Evaluate RAG quality using keyword overlap scoring |
 | [config/ai_settings.py](config/ai_settings.py) | RAG parameters and thresholds |
 | [frontend/src/App.jsx](frontend/src/App.jsx) | Main React component |
 

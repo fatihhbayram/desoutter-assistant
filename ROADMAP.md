@@ -12,16 +12,16 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 
 ## Current Status
 
-**Phase**: Phase 6 Complete - Production Ready (March 2026)
+**Phase**: Phase 7 — Evaluation Pipeline (April 2026)
 
 | Metric | Value |
 |--------|-------|
 | Test Pass Rate | 85% (34/40 scenarios) |
 | Timeout Rate | 0% (all resolved) |
 | Products Indexed | 451 |
-| Documents Processed | 541 (121 PDF + 420 Word) |
-| Freshdesk Tickets | 2,249 |
-| Vector DB | Qdrant - 4,082 chunks (384-dim, language-filtered) |
+| Documents Processed | 547 (121 PDF + 426 Word) |
+| Vector DB | Qdrant — 6,195 chunks (384-dim, language-filtered) |
+| Q&A Evaluation Dataset | 459 real-world field support Q&A pairs |
 | BM25 Terms | 19,032 |
 | Intent Types | 15 (expanded from 8) |
 
@@ -92,14 +92,18 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 
 **Status**: Active Development
 
-- [x] **Faz 8: Basic Troubleshooting Docs** *(2026-04-26)*
+- [x] **Phase 8: Basic Troubleshooting Knowledge Base** *(2026-04-26)*
   - 6 procedure_guide documents ingested (Motor/Battery/Connectivity/Memory/Drive/Software)
-  - Product filter updated: `is_generic=True` docs bypass cross-product exclusion
-  - Score boost added: `procedure_guide` type gets 2.0x boost
-  - Classifier pattern added: `BASIC.TROUBLESHOOTING` → procedure_guide
+  - `is_generic=True` docs bypass cross-product exclusion in retrieval
+  - `procedure_guide` type gets 2.0x score boost
 
-- [ ] **Faz 4: product_model support in /diagnose**
-  - Technicians can query by model name instead of part number
+- [x] **Phase 7: Evaluation Pipeline** *(2026-04-30)*
+  - 459 real-world field Q&A pairs built from field support cases
+  - `evaluate_rag.py` — keyword overlap scoring against `/diagnose` endpoint
+  - Score boost rebalancing: `service_bulletin` 4.0x → 2.5x, `technical_manual` 1.5x added
+  - Early results: Good 60%, Partial 20%, Fail 20% (5-question sample)
+
+- ~~**Faz 4: product_model support in /diagnose**~~ — *Cancelled: frontend already resolves model name to part number via search autocomplete*
 
 ---
 
@@ -283,4 +287,4 @@ We welcome feature suggestions and contributions!
 
 ---
 
-*Last Updated: March 23, 2026*
+*Last Updated: April 30, 2026*

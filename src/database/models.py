@@ -174,11 +174,19 @@ class TicketModel(BaseModel):
     # Metadata
     scraped_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     is_resolved: bool = Field(default=False, description="Has agent response")
-    
+    status: Optional[str] = Field(default=None, description="Ticket status: Resolved/Open/Closed/Pending")
+    created_at: Optional[str] = Field(default=None, description="Ticket creation date")
+    updated_at: Optional[str] = Field(default=None, description="Ticket last update date")
+
+    # Content classification
+    language: Optional[str] = Field(default=None, description="Detected language: en/tr/fr/de/other")
+    ticket_type: Optional[str] = Field(default=None, description="technical_problem / bulletin_info / general")
+    solution: Optional[str] = Field(default=None, description="Best agent reply — used as Q&A answer")
+
     # Product association (auto-detected from content)
     related_products: List[str] = Field(default_factory=list, description="Detected product part numbers")
     related_models: List[str] = Field(default_factory=list, description="Detected model names")
-    
+
     # RAG-specific
     tags: List[str] = Field(default_factory=list, description="Auto-generated tags for retrieval")
     has_pdf_content: bool = Field(default=False, description="Has extracted PDF text")

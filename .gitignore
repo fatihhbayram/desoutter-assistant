@@ -72,3 +72,14 @@ journal/
 CLAUDE.md
 agents/
 .claude/
+
+# Web scraping scripts (contain internal URLs and credentials)
+src/scraper/desoutter_scraper.py
+src/scraper/ticket_scraper_sync.py
+scripts/scrape_*.py
+
+# Security assessment reports (internal)
+security_test_*.py
+security_test_*.txt
+security_test_*.json
+SECURITY_ASSESSMENT_REPORT_TR.md

@@ -9,20 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added (2026-04-20 — Faz 6f: Language Filtering)
+### Added (2026-04-30 — Phase 7: Evaluation Pipeline)
+- **Q&A Evaluation Dataset** (`scripts/build_qa_dataset.py`)
+  - 459 real-world field support Q&A pairs (filtered from 2,000 cases)
+  - Filters: out-of-scope products, logistic replies, warranty claims, info requests, non-English, short solutions
+- **RAG Evaluation Script** (`scripts/evaluate_rag.py`)
+  - Calls `/diagnose` endpoint for each Q&A pair, measures keyword overlap
+  - Grading: good ≥ 0.15, partial ≥ 0.07
+  - `--limit` and `--offset` flags for batch testing
+  - Outputs `eval_results.json` + `eval_summary.json` with per-model breakdown
+
+### Changed (2026-04-30 — Score Boost Rebalancing)
+- **`SERVICE_BULLETIN_BOOST`** lowered 4.0x → 2.5x (`config/ai_settings.py`)
+- **`TECHNICAL_MANUAL_BOOST`** added at 1.5x — manual chunks now compete in retrieval
+- **Impact**: 5-question evaluation sample: Good rate 40% → 60%
+
+### Added (2026-04-26 — Phase 8: Basic Troubleshooting Knowledge Base)
+- **6 basic troubleshooting guides** ingested as `procedure_guide` documents
+  - Categories: Motor / Battery / Connectivity / Memory / Drive / Software
+  - `is_generic=True` — visible across all product queries (bypass cross-product filter)
+  - 2.0x score boost for `procedure_guide` document type
+- **`ingest_basic_troubleshooting.py`** — targeted ingestion script
+- **`reingest_adaptive.py`** classifier: `BASIC.TROUBLESHOOTING` pattern → procedure_guide
+
+### Added (2026-04-20 — Language Filtering)
 - **Multilingual PDF filtering** (`scripts/reingest_adaptive.py`)
   - `_is_english_text()` — ASCII ratio + English function-word density, no external library
   - `_filter_english_pages()` — splits on `--- Page N ---` markers, drops non-English pages
   - `_EN_WORDS` frozenset includes technical vocabulary (dimensions, torque, speed, connector…)
   - Short pages (<15 words) always kept — preserves spec/data table pages
 - **Re-ingestion completed**: 3,722 → 4,082 chunks (ERS manual: 72 pages → 12 English pages)
-
-### In Progress (Phase 6 - Tuning & Accuracy)
-- Test suite quality improvements (85% pass rate, 34/40 scenarios)
-- Prompt hardening with key terms repetition
-- Timeout elimination (3 resolved)
-- Knowledge Graph validation with hard-coded compatibility matrix
-- Controller units scraping (10 units)
 
 ---
 
