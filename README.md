@@ -323,7 +323,7 @@ curl -X POST http://localhost:8000/diagnose \
 | **Total Products** | 451 indexed |
 | **Vector DB** | Qdrant — 6,195 semantic chunks (384-dim, language-filtered) |
 | **Indexed Documents** | 547 (121 PDF + 426 Word) |
-| **Q&A Evaluation Dataset** | 459 real-world field support Q&A pairs |
+| **Q&A Evaluation Dataset** | 421 real-world field support Q&A pairs (expanding to ~850) |
 | **BM25 Index Terms** | 19,032 unique terms |
 | **Cache Speedup** | ~100,000x for repeated queries |
 | **Hallucination Rate** | <2% |

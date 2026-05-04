@@ -35,6 +35,8 @@ LOGISTIC_PATTERNS = [
     r'given.*to.*leo', r'donné.*au.*leo', r'given.*for.*analysis',
     r'sent.*for.*repair', r'collect.*tool',
     r'\bwarranty\b', r'under warranty', r'warranty claim',
+    r'worn.*screw', r'screw.*worn', r'broken.*screw', r'screw.*broken',
+    r'balancer.*screw', r'torque.*balancer',
 ]
 
 INFO_REQUEST_PATTERNS = [
@@ -50,7 +52,18 @@ INFO_REQUEST_PATTERNS = [
 OUT_OF_SCOPE_PATTERNS = [
     r'\brapid\b', r'\bnexonar\b', r'\bpivotware\b',
     r'\bscrew.?feed', r'\bscrewfeeder\b', r'\bfeeder\b',
+    r'\bdemeter\b', r'\bsetitec\b',
+    r'\bpatent\b', r'patent\s+document', r'patent\s+name',
+    r'\biso.?rig\b', r'\bepd\b',
 ]
+
+# CJK Unicode ranges — Korean, Japanese, Chinese
+_CJK_RE = re.compile(
+    r'[぀-ヿ'   # Japanese hiragana/katakana
+    r'㐀-䶿'    # CJK Extension A
+    r'一-鿿'    # CJK Unified Ideographs
+    r'가-힯]'   # Korean Hangul
+)
 
 
 TECHNICAL_INDICATORS = [
@@ -67,13 +80,16 @@ TECHNICAL_INDICATORS = [
 
 
 def is_out_of_scope(ticket: dict) -> bool:
-    """Returns True if ticket is about a product/system the RAG is not ready for."""
-    text = (
-        ticket.get('title', '') + ' ' +
-        (ticket.get('description') or {}).get('content', '') if isinstance(ticket.get('description'), dict)
-        else ticket.get('title', '') + ' ' + (ticket.get('description') or '')
-    ).lower()
-    return any(re.search(p, text) for p in OUT_OF_SCOPE_PATTERNS)
+    """Returns True if ticket is about a product/system the RAG is not ready for, or contains CJK text."""
+    desc = ticket.get('description')
+    desc_text = desc.get('content', '') if isinstance(desc, dict) else (desc or '')
+    text = ticket.get('title', '') + ' ' + desc_text
+
+    # CJK characters → non-English content, skip
+    if _CJK_RE.search(text):
+        return True
+
+    return any(re.search(p, text.lower()) for p in OUT_OF_SCOPE_PATTERNS)
 
 
 def is_logistic_reply(text: str) -> bool:

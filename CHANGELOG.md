@@ -9,9 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (2026-05-04 — Evaluation Quality Improvements)
+- **Dataset filter improvements** (`scripts/build_qa_dataset.py`)
+  - Out-of-scope: added demeter, setitec, patent, ISO RIG, EPD
+  - Logistic: added worn/broken screw, balancer screw patterns
+  - CJK filter: Korean/Japanese/Chinese Unicode → auto-excluded
+- **`MODEL_PATTERNS` whitelist** (`src/scraper/ticket_scraper_sync.py`)
+  - Replaced broad regex with known Desoutter family whitelist (EPB/EAB/ERS/ELB/EID/EAD/ERP/EFD/EIB)
+  - Eliminates false positives like ENGINEER, EMAIL, EXAMPLE in per-model analysis
+- **`scripts/reingest_specific_bulletins.py`** — targeted re-ingestion for under-chunked bulletins
+  - ESDE16008 (ERxL TRD fault), ESDE21010 (Pset battery tools), ESDE22002 (CVI3 Pset), TRD rework
+- **Evaluation baseline** (100 questions): Good 42%, Partial 44%, Fail 13%, avg overlap 0.143
+
 ### Added (2026-04-30 — Phase 7: Evaluation Pipeline)
 - **Q&A Evaluation Dataset** (`scripts/build_qa_dataset.py`)
-  - 459 real-world field support Q&A pairs (filtered from 2,000 cases)
+  - 421 real-world field support Q&A pairs (filtered from 2,000 cases, expanding to ~850)
   - Filters: out-of-scope products, logistic replies, warranty claims, info requests, non-English, short solutions
 - **RAG Evaluation Script** (`scripts/evaluate_rag.py`)
   - Calls `/diagnose` endpoint for each Q&A pair, measures keyword overlap
