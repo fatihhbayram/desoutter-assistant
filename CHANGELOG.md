@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (2026-05-07 — Knowledge Base Enrichment: EABC / ELS / EFD / CVI3)
+- **`scripts/ingest_eabc_els_efd.py`** — targeted ingestion for under-covered product families
+  - EABC: 5→52 chunks — 5 how-to guides (logs, firmware, calibration, WiFi board, comms settings) + ESDE24016 transducer bulletin
+  - ELS/ELB/ELC: 0→40 chunks — Pistol Product Instructions PDF (ELB2.5/6/8/12, ELC6/8)
+  - EFD: 5→12 chunks — ESDE20014 (E013 removal), ESDE23018 (CVI Monitor version), CHANGELOG 9.2.2
+- **CVI3 Installation Manual** (`6159924330_EN_06.pdf`) re-ingested: 5→19 chunks
+  - WiFi Access Point setup, cordless tool pairing (eDOCK + CVI MONITOR), easy-pairing via CVI CONFIG
+  - Old duplicate copy (`CVI3 tightening controllers - Installation and Upgrade Manual_EN_6159924330_EN.pdf`) removed
+- **Full 725-question evaluation results**: Good 37.5%, Partial 49.7%, Fail 12.8%, avg overlap 0.138
+  - Worst performers: EABC 56% fail, EFD 29% fail, ELS 0 chunks (all now addressed)
+  - `unknown` category (37% of dataset, 17% fail): model extraction limitation
+
+### Added (2026-05-06 — Dataset Expansion & Evaluation Launch)
+- **Dataset expanded to 725 Q&A pairs** (`scripts/build_qa_dataset.py`)
+  - Scraped pages 1–800 from field support portal → 4,000 unique tickets (full coverage)
+  - Applied info_request filter improvements: added "could you confirm/provide/send" patterns
+  - Final dataset: 725 Q&A pairs after all filter passes
+- **Full 725-question evaluation** started — results will drive next round of improvements
+
 ### Added (2026-05-04 — Evaluation Quality Improvements)
 - **Dataset filter improvements** (`scripts/build_qa_dataset.py`)
   - Out-of-scope: added demeter, setitec, patent, ISO RIG, EPD

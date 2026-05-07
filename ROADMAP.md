@@ -12,18 +12,19 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 
 ## Current Status
 
-**Phase**: Phase 7 — Evaluation Pipeline (April 2026)
+**Phase**: Phase 9 — Knowledge Base Enrichment (May 2026)
 
 | Metric | Value |
 |--------|-------|
-| Test Pass Rate | 85% (34/40 scenarios) |
-| Timeout Rate | 0% (all resolved) |
+| **Evaluation Good Rate** | 37.5% (725 Q&A pairs) |
+| **Evaluation Partial Rate** | 49.7% |
+| **Evaluation Fail Rate** | 12.8% |
+| **Avg Keyword Overlap** | 0.138 |
 | Products Indexed | 451 |
-| Documents Processed | 547 (121 PDF + 426 Word) |
-| Vector DB | Qdrant — 6,195 chunks (384-dim, language-filtered) |
-| Q&A Evaluation Dataset | 459 real-world field support Q&A pairs |
-| BM25 Terms | 19,032 |
-| Intent Types | 15 (expanded from 8) |
+| Vector DB | Qdrant — 6,200+ chunks (384-dim, language-filtered) |
+| Q&A Evaluation Dataset | 725 real-world field support Q&A pairs (from 4,000 field cases) |
+| Intent Types | 15 (troubleshoot, error_code, spec, config, compat, etc.) |
+| Avg Response Time | ~20.5s (non-cached) |
 
 ---
 
@@ -92,16 +93,27 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 
 **Status**: Active Development
 
+- [x] **Phase 9: Targeted Knowledge Base Expansion** *(2026-05-07)*
+  - EABC: 5 → 52 chunks (how-to guides: logs, firmware, calibration, WiFi board, comms settings + ESDE24016)
+  - ELS/ELB/ELC: 0 → 40 chunks (Pistol Product Instructions PDF)
+  - EFD: 5 → 12 chunks (ESDE20014, ESDE23018, CHANGELOG 9.2.2)
+  - CVI3 Installation Manual (6159924330): 5 → 19 chunks, WiFi AP + eDOCK pairing sections included
+  - Driven by evaluation analysis: EABC 56% fail, ELS 0 chunks, EFD 29% fail
+
+- [x] **Phase 7+: Full Evaluation** *(2026-05-07)*
+  - 725-question evaluation completed: Good 37.5%, Partial 49.7%, Fail 12.8%
+  - Per-model analysis: `unknown` category (37% of dataset) has 17% fail — model extraction limitation
+  - Hardest queries: ELS (PCB burned), software/calibration requests (out of scope for RAG)
+
 - [x] **Phase 8: Basic Troubleshooting Knowledge Base** *(2026-04-26)*
   - 6 procedure_guide documents ingested (Motor/Battery/Connectivity/Memory/Drive/Software)
   - `is_generic=True` docs bypass cross-product exclusion in retrieval
   - `procedure_guide` type gets 2.0x score boost
 
 - [x] **Phase 7: Evaluation Pipeline** *(2026-04-30)*
-  - 459 real-world field Q&A pairs built from field support cases
+  - 725 real-world field Q&A pairs built from 4,000 field support cases
   - `evaluate_rag.py` — keyword overlap scoring against `/diagnose` endpoint
   - Score boost rebalancing: `service_bulletin` 4.0x → 2.5x, `technical_manual` 1.5x added
-  - Early results: Good 60%, Partial 20%, Fail 20% (5-question sample)
 
 - ~~**Faz 4: product_model support in /diagnose**~~ — *Cancelled: frontend already resolves model name to part number via search autocomplete*
 
@@ -241,8 +253,9 @@ A comprehensive service management module to track repairs, manage customers, an
 
 | Metric | Current | Target | Timeline |
 |--------|---------|--------|----------|
-| Test Pass Rate | 85% | >85% | Maintain |
-| Response Time | 23.6s (non-cached) | <20s | Q2 2026 |
+| Evaluation (Good+Partial) | 87.2% | >90% | Q3 2026 |
+| Evaluation Good Rate | 37.5% | >50% | Q3 2026 |
+| Response Time | 20.5s (non-cached) | <15s | Q3 2026 |
 | Cache Hit Rate | High | >60% | Q2 2026 |
 | Hallucination Rate | <2% | <1% | Q3 2026 |
 | "I don't know" Rate | 12% | 10-15% | Maintain |
@@ -287,4 +300,4 @@ We welcome feature suggestions and contributions!
 
 ---
 
-*Last Updated: April 30, 2026*
+*Last Updated: May 7, 2026*

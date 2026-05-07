@@ -44,8 +44,11 @@ INFO_REQUEST_PATTERNS = [
     r'can you.*provide', r'please.*provide.*more',
     r'more.*details.*needed', r'need.*serial.*number',
     r'what.*firmware.*version', r'please.*confirm',
+    r'could you confirm', r'could you.*provide', r'could you.*send',
+    r'can you confirm', r'can you.*send.*video', r'can you.*share',
     r'avez.vous', r'pouvez.vous.*envoyer',
     r'check your ticket status',
+    r'is.*installed at', r'is this.*installed',
 ]
 
 # Products/systems the RAG is not ready for — exclude these tickets
