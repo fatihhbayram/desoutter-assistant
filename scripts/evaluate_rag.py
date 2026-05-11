@@ -30,6 +30,41 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
+def _tokenize(text: str) -> list:
+    """Lowercase + split into word tokens, strip HTML."""
+    text = re.sub(r'<[^>]+>', ' ', text.lower())
+    return re.findall(r'\b[a-z][a-z0-9\-]+\b', text)
+
+
+def rouge_l_score(expected: str, actual: str) -> float:
+    """
+    ROUGE-L: F1 score based on Longest Common Subsequence (LCS).
+    Does not require external libraries.
+    Returns 0.0-1.0.
+    """
+    ref = _tokenize(expected)
+    hyp = _tokenize(actual)
+    if not ref or not hyp:
+        return 0.0
+
+    # LCS via dynamic programming
+    m, n = len(ref), len(hyp)
+    # Use 1D DP to save memory
+    prev = [0] * (n + 1)
+    for token in ref:
+        curr = [0] * (n + 1)
+        for j, h in enumerate(hyp, 1):
+            curr[j] = prev[j - 1] + 1 if token == h else max(curr[j - 1], prev[j])
+        prev = curr
+    lcs = prev[n]
+
+    precision = lcs / n
+    recall = lcs / m
+    if precision + recall == 0:
+        return 0.0
+    return round(2 * precision * recall / (precision + recall), 4)
+
+
 def extract_keywords(text: str, min_len: int = 4) -> set:
     """Extract meaningful words from text for overlap comparison."""
     text = text.lower()
@@ -105,11 +140,13 @@ def evaluate_single(qa: dict, api_url: str) -> dict:
     actual = result.get("suggestion", "") or result.get("answer", "") or result.get("response", "") or ""
 
     overlap = keyword_overlap_score(expected, actual)
+    rouge_l = rouge_l_score(expected, actual)
     has_answer = len(actual.strip()) > 50
     has_source = has_source_citation(actual)
     hallucination = is_hallucination_risk(actual, expected)
     error = result.get("error")
 
+    # Keyword overlap grade (mevcut metrik)
     if error or not has_answer:
         grade = 0
     elif overlap >= 0.15:
@@ -118,6 +155,17 @@ def evaluate_single(qa: dict, api_url: str) -> dict:
         grade = 1
     else:
         grade = 0
+
+    # ROUGE-L grade (yeni metrik — tez için)
+    # Threshold'lar düşük: cross-style karşılaştırma (formal RAG vs informal email)
+    if error or not has_answer:
+        rouge_grade = 0
+    elif rouge_l >= 0.10:
+        rouge_grade = 2
+    elif rouge_l >= 0.05:
+        rouge_grade = 1
+    else:
+        rouge_grade = 0
 
     return {
         "id": qa["id"],
@@ -128,11 +176,14 @@ def evaluate_single(qa: dict, api_url: str) -> dict:
         "language": qa.get("language", "en"),
         "related_models": models,
         "keyword_overlap": round(overlap, 3),
+        "rouge_l": rouge_l,
         "has_answer": has_answer,
         "has_source": has_source,
         "hallucination_risk": hallucination,
         "grade": grade,
         "grade_label": ["fail", "partial", "good"][grade],
+        "rouge_grade": rouge_grade,
+        "rouge_grade_label": ["fail", "partial", "good"][rouge_grade],
         "elapsed_sec": round(elapsed, 2),
         "error": error,
     }
@@ -145,13 +196,18 @@ def build_summary(results: list) -> dict:
         return {}
 
     overlaps = [r["keyword_overlap"] for r in results]
+    rouge_scores = [r.get("rouge_l", 0.0) for r in results]
     errors = [r for r in results if r.get("error")]
     good = [r for r in results if r["grade"] == 2]
     partial = [r for r in results if r["grade"] == 1]
     fail = [r for r in results if r["grade"] == 0]
+    rouge_good = [r for r in results if r.get("rouge_grade") == 2]
+    rouge_partial = [r for r in results if r.get("rouge_grade") == 1]
+    rouge_fail = [r for r in results if r.get("rouge_grade") == 0]
     hallucinations = [r for r in results if r["hallucination_risk"]]
 
     avg_overlap = sum(overlaps) / total
+    avg_rouge_l = sum(rouge_scores) / total
     avg_elapsed = sum(r["elapsed_sec"] for r in results) / total
 
     model_grades = {}
@@ -179,6 +235,14 @@ def build_summary(results: list) -> dict:
         "partial_pct": round(len(partial) / total * 100, 1),
         "fail_pct": round(len(fail) / total * 100, 1),
         "avg_keyword_overlap": round(avg_overlap, 3),
+        "avg_rouge_l": round(avg_rouge_l, 3),
+        # ROUGE-L grade dağılımı
+        "rouge_good": len(rouge_good),
+        "rouge_partial": len(rouge_partial),
+        "rouge_fail": len(rouge_fail),
+        "rouge_good_pct": round(len(rouge_good) / total * 100, 1),
+        "rouge_partial_pct": round(len(rouge_partial) / total * 100, 1),
+        "rouge_fail_pct": round(len(rouge_fail) / total * 100, 1),
         "avg_elapsed_sec": round(avg_elapsed, 2),
         "per_model": dict(
             sorted(model_grades.items(), key=lambda x: -x[1]["total"])[:15]
@@ -221,7 +285,7 @@ def main():
         logger.info(f"[{i+1}/{len(dataset)}] Ticket #{qa['id']} — {qa['question'][:60]}...")
         result = evaluate_single(qa, args.api_url)
         results.append(result)
-        logger.info(f"  grade={result['grade_label']} overlap={result['keyword_overlap']} elapsed={result['elapsed_sec']}s")
+        logger.info(f"  grade={result['grade_label']} overlap={result['keyword_overlap']} rouge_l={result['rouge_l']} elapsed={result['elapsed_sec']}s")
         if args.delay > 0 and i < len(dataset) - 1:
             time.sleep(args.delay)
 
@@ -244,7 +308,19 @@ def main():
     logger.info(f"Partial:  {summary['partial']} ({summary['partial_pct']}%)")
     logger.info(f"Fail:     {summary['fail']} ({summary['fail_pct']}%)")
     logger.info(f"Errors:   {summary['errors']}")
+    logger.info(f"")
+    logger.info(f"── Keyword Overlap ──────────────────")
     logger.info(f"Avg overlap: {summary['avg_keyword_overlap']}")
+    logger.info(f"Good (≥0.15):    {summary['good']} ({summary['good_pct']}%)")
+    logger.info(f"Partial (≥0.07): {summary['partial']} ({summary['partial_pct']}%)")
+    logger.info(f"Fail (<0.07):    {summary['fail']} ({summary['fail_pct']}%)")
+    logger.info(f"")
+    logger.info(f"── ROUGE-L ──────────────────────────")
+    logger.info(f"Avg ROUGE-L: {summary['avg_rouge_l']}")
+    logger.info(f"Good (≥0.10):    {summary['rouge_good']} ({summary['rouge_good_pct']}%)")
+    logger.info(f"Partial (≥0.05): {summary['rouge_partial']} ({summary['rouge_partial_pct']}%)")
+    logger.info(f"Fail (<0.05):    {summary['rouge_fail']} ({summary['rouge_fail_pct']}%)")
+    logger.info(f"")
     logger.info(f"Avg response time: {summary['avg_elapsed_sec']}s")
     logger.info(f"\nSummary saved to {summary_path}")
 

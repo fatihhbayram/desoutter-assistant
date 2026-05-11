@@ -12,14 +12,15 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 
 ## Current Status
 
-**Phase**: Phase 9 — Knowledge Base Enrichment (May 2026)
+**Phase**: Phase 10 — Retrieval Quality Improvement (May 2026)
 
 | Metric | Value |
 |--------|-------|
-| **Evaluation Good Rate** | 37.5% (725 Q&A pairs) |
+| **Evaluation Good Rate** | 37.5% full pipeline (725 Q&A pairs, 2026-05-07) |
 | **Evaluation Partial Rate** | 49.7% |
 | **Evaluation Fail Rate** | 12.8% |
-| **Avg Keyword Overlap** | 0.138 |
+| **Retrieval Good@10** | 92.1% (Hybrid BM25+Semantic, isolated) |
+| **Avg Keyword Overlap** | 0.138 (full pipeline) |
 | Products Indexed | 451 |
 | Vector DB | Qdrant — 6,200+ chunks (384-dim, language-filtered) |
 | Q&A Evaluation Dataset | 725 real-world field support Q&A pairs (from 4,000 field cases) |
@@ -92,6 +93,14 @@ Build an **enterprise-grade AI support system** that enables technicians to diag
 ### Q2 2026 - Knowledge Base Enrichment
 
 **Status**: Active Development
+
+- [x] **Phase 10: Retrieval Quality Improvement** *(2026-05-08)*
+  - RAG_TOP_K: 5 → 10, RAG_SIMILARITY_THRESHOLD: 0.30 → 0.15
+  - HYBRID_BM25_WEIGHT: 0.4 → 0.5 (BM25-only eval'da Hybrid'i geçmişti)
+  - Retrieval Good@10: 72.0% → 92.1% (+20 puan)
+  - Confidence Score API: `/diagnose` response'una `confidence_score: float` eklendi
+  - 4-model retrieval comparison script: `scripts/evaluate_retrieval_configs.py`
+  - Dataset filters: PCB burned, Delta 6D, SHIELD, AXON, BLDC, GSD/license patterns
 
 - [x] **Phase 9: Targeted Knowledge Base Expansion** *(2026-05-07)*
   - EABC: 5 → 52 chunks (how-to guides: logs, firmware, calibration, WiFi board, comms settings + ESDE24016)

@@ -381,6 +381,8 @@ class DiagnoseResponse(BaseModel):
     # Priority 3: Intent Detection Metadata
     intent: Optional[str] = None
     intent_confidence: Optional[float] = None
+    # Numeric confidence score (0.0-1.0) — maps from internal confidence_numeric
+    confidence_score: Optional[float] = None
 
 
 class SourceRelevanceFeedback(BaseModel):
@@ -569,6 +571,7 @@ async def diagnose(
             retry_of=request.retry_of
         )
         
+        result["confidence_score"] = result.get("confidence_numeric")
         return result
     except Exception as e:
         logger.error(f"Error in diagnose: {e}")

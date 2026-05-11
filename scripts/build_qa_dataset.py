@@ -49,6 +49,9 @@ INFO_REQUEST_PATTERNS = [
     r'avez.vous', r'pouvez.vous.*envoyer',
     r'check your ticket status',
     r'is.*installed at', r'is this.*installed',
+    r'\bgsd\s*file\b', r'gsd.*update', r'official.*gsd',
+    r'\blicense\s*(request|file|key)\b', r'suv\s*(request|application)',
+    r'changelog.*link', r'link.*not.*working',
 ]
 
 # Products/systems the RAG is not ready for — exclude these tickets
@@ -58,6 +61,14 @@ OUT_OF_SCOPE_PATTERNS = [
     r'\bdemeter\b', r'\bsetitec\b',
     r'\bpatent\b', r'patent\s+document', r'patent\s+name',
     r'\biso.?rig\b', r'\bepd\b',
+    r'\bdelta.?6d\b', r'\bw.delta\b',
+    r'\bshield\s*150\b', r'\bshield.?c\b',
+    r'\baxon\b',
+    r'\bbldc\b', r'\bbldc\s*iec\b',
+    r'\bcamera\s*cable\b', r'\b30m\s*cable\b',
+    # Physical hardware damage — RAG cannot diagnose remotely, answer is always "send to service center"
+    r'pcb\s*(burned|burnt)', r'electronics?\s*(do\s*not\s*work|burned|burnt|damaged)',
+    r'burnt\s*electronic', r'burned\s*electronic', r'pcb\s*(damage|fail)',
 ]
 
 # CJK Unicode ranges — Korean, Japanese, Chinese

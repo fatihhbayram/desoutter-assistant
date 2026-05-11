@@ -53,6 +53,10 @@ FILES = [
     ('ESDE24016 - EABCLRT - Technical changes_transducer wires_rework procedure (1).docx',
      'service_bulletin', 'EABC', True),
 
+    # ── ELS/ELB/ELC hardware failure guide → procedure_guide, 2.0x boost ───────
+    ('ELS_ELB_PCB_burned_hardware_failure.docx',
+     'procedure_guide', None, True),
+
     # ── ELS/ELB/ELC product manual → technical_manual, 1.5x boost ───────────
     ('ELB-ELS-ELC_Pistol_Product Instructions_EN_6159929240_EN.pdf',
      'technical_manual', None, True),

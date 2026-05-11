@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (2026-05-11 — ROUGE-L Metriği)
+- **ROUGE-L metriği** (`scripts/evaluate_rag.py`)
+  - Saf Python LCS implementasyonu — harici kütüphane gerektirmiyor
+  - Keyword overlap ile birlikte her evaluation'da otomatik hesaplanıyor
+  - Threshold: good ≥0.10, partial ≥0.05 (cross-style için düşük)
+  - Tez danışman geri bildirimine yanıt: "uygun analiz yöntemi" isteği
+- **725 soru ROUGE-L'li evaluation** başlatıldı (qwen3:8b, devam ediyor)
+
+### Added (2026-05-09 — LLM Model Karşılaştırması)
+- **3 LLM karşılaştırması** — Qwen2.5:7b / Llama3:latest / Qwen3:8b (725 soru full pipeline)
+  - Qwen2.5:7b: Good 37.5%, Fail 12.8%, ~20.5s
+  - Llama3:latest: Good 37.0%, Fail 8.0%, ~23.7s (100 soru)
+  - Qwen3:8b: Good 37.9%, Fail 12.1%, ~21.1s ← **aktif model seçildi**
+- **Bulgu:** Keyword overlap metriği LLM değişimine duyarsız — ~37-38% metrik tavanı
+- **Aktif model güncellendi:** `qwen3:8b` (`ai-stack.yml`)
+
+### Added (2026-05-08 — Retrieval Quality Improvement: Faz 10)
+- **Retrieval parameter tuning** (`ai-stack.yml`, `config/ai_settings.py`)
+  - `RAG_TOP_K`: 5 → 10 — retrieval coverage artırıldı
+  - `RAG_SIMILARITY_THRESHOLD`: 0.30 → 0.15 — daha fazla chunk geçiyor
+  - `HYBRID_BM25_WEIGHT`: 0.4 → 0.5, `HYBRID_SEMANTIC_WEIGHT`: 0.6 → 0.5
+- **Retrieval Good@10 result**: 92.1% (Hybrid) — önceki 72.0%'den +20.1 puan
+  - A Semantic-only: 68.7% → 88.6% | B BM25-only: 72.7% → 91.0% | C TF-IDF: 55.3% → 83.0%
+- **Confidence Score API** (`src/api/main.py`)
+  - `DiagnoseResponse`'a `confidence_score: float (0.0-1.0)` eklendi
+  - Önceden sadece `confidence: str` (high/medium/low) vardı — geriye uyumlu
+- **4-model retrieval comparison** (`scripts/evaluate_retrieval_configs.py`)
+  - Semantic-only / BM25-only / TF-IDF / Hybrid — 725 soru, keyword overlap@5
+  - Tez danışman geri bildirimine yanıt: BM25'e ek model karşılaştırması
+- **Dataset filter expansion** (`scripts/build_qa_dataset.py`)
+  - OUT_OF_SCOPE: PCB burned/burnt, Delta 6D, SHIELD 150/C, AXON, BLDC, camera cable
+  - INFO_REQUEST: GSD file, license request, changelog link, link not working
+
 ### Added (2026-05-07 — Knowledge Base Enrichment: EABC / ELS / EFD / CVI3)
 - **`scripts/ingest_eabc_els_efd.py`** — targeted ingestion for under-covered product families
   - EABC: 5→52 chunks — 5 how-to guides (logs, firmware, calibration, WiFi board, comms settings) + ESDE24016 transducer bulletin

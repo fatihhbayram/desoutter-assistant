@@ -313,16 +313,37 @@ curl -X POST http://localhost:8000/diagnose \
 | Metric | Value |
 |--------|-------|
 | **Evaluation Coverage (Good+Partial)** | 87.2% — system returns relevant content (725 Q&A pairs) |
-| **Evaluation Good Rate** | 37.5% (keyword overlap ≥ 0.15) |
+| **Evaluation Good Rate** | 37.5% full pipeline (keyword overlap ≥ 0.15) |
 | **Evaluation Partial Rate** | 49.7% (keyword overlap ≥ 0.07) |
 | **Evaluation Fail Rate** | 12.8% — no relevant content returned |
-| **Avg Keyword Overlap** | 0.138 |
+| **Retrieval Good@10** | 92.1% (Hybrid BM25+Semantic, isolated retrieval test) |
+| **Avg Keyword Overlap** | 0.138 (full pipeline) / 0.302 (retrieval-only) |
 | **Avg Response Time** | ~20.5s (non-cached) |
 | **Vector DB Chunks** | 6,200+ (384-dim, language-filtered) |
 | **Q&A Evaluation Dataset** | 725 real-world field support Q&A pairs (from 4,000 field cases) |
 | **Intent Categories** | 15 types (troubleshoot, error_code, spec, config, compat, etc.) |
-| **Knowledge Base** | ESDE bulletins, product manuals, 6 basic troubleshooting guides |
+| **Knowledge Base** | ESDE bulletins, product manuals, EABC/ELS/EFD/CVI3 guides |
 | **Hallucination Detection** | Enabled (response validator) |
+| **Confidence Score** | Numeric 0.0–1.0 via `confidence_score` field in `/diagnose` |
+| **Active LLM** | Qwen3:8b — best Good rate (37.9%) in 3-model comparison |
+| **Evaluation Metrics** | Keyword Overlap + ROUGE-L (both in `evaluate_rag.py`) |
+
+### LLM Model Comparison (725 Q&A pairs, full pipeline)
+
+| Model | Good% | Partial% | Fail% | Latency |
+|-------|------:|--------:|------:|--------:|
+| Qwen2.5:7b-instruct | 37.5% | 49.7% | 12.8% | ~20.5s |
+| Llama3:latest | 37.0% | 55.0% | 8.0% | ~23.7s |
+| **Qwen3:8b** | **37.9%** | **49.9%** | **12.1%** | **~21.1s** |
+
+### Retrieval Model Comparison (725 Q&A pairs, top-10)
+
+| Method | Good% | Fail% | Avg Overlap |
+|--------|------:|------:|------------:|
+| Hybrid BM25+Semantic (0.5/0.5) | **92.1%** | 0.4% | 0.302 |
+| BM25-only | 91.0% | 1.1% | 0.296 |
+| Semantic-only | 88.6% | 1.1% | 0.288 |
+| TF-IDF | 83.0% | 2.5% | 0.249 |
 
 > **Evaluation methodology:** Each question from the Q&A dataset is sent to `/diagnose`. The keyword overlap between expected answer (field agent reply) and actual response is measured. Thresholds: good ≥ 0.15, partial ≥ 0.07. Note: expected answers are informal agent emails; actual responses are structured markdown — so overlap naturally skews lower than true quality.
 

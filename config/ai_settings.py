@@ -177,12 +177,12 @@ RAG_SIMILARITY_THRESHOLD = float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.30"))
 USE_HYBRID_SEARCH = os.getenv("USE_HYBRID_SEARCH", "true").lower() == "true"
 
 # Weight for semantic search in fusion (0.0-1.0)
-# Reduced from 0.7 to 0.6 to give more weight to exact keyword matches
-HYBRID_SEMANTIC_WEIGHT = float(os.getenv("HYBRID_SEMANTIC_WEIGHT", "0.6"))
+# Faz 10a: 0.6→0.5 (BM25-only eval'da Hybrid'i geçti, BM25 ağırlığı artırıldı)
+HYBRID_SEMANTIC_WEIGHT = float(os.getenv("HYBRID_SEMANTIC_WEIGHT", "0.5"))
 
 # Weight for BM25 keyword search in fusion (0.0-1.0)
-# Increased from 0.3 to 0.4 for better error code and technical term matching
-HYBRID_BM25_WEIGHT = float(os.getenv("HYBRID_BM25_WEIGHT", "0.4"))
+# Faz 10a: 0.4→0.5 (endüstriyel teknik dilde keyword eşleşmesi güçlü)
+HYBRID_BM25_WEIGHT = float(os.getenv("HYBRID_BM25_WEIGHT", "0.5"))
 
 # RRF (Reciprocal Rank Fusion) constant - higher = more uniform weighting
 HYBRID_RRF_K = int(os.getenv("HYBRID_RRF_K", "60"))
