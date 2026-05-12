@@ -9,13 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added (2026-05-11 — ROUGE-L Metriği)
+### Fixed (2026-05-12 — Response Completeness + Document Quality)
+- **LLM yanıt kesintisi giderildi** (`config/ai_settings.py`)
+  - `OLLAMA_MAX_TOKENS`: 512 → 1024 — uzun prosedürlerin yarıda kesilmesi önlendi
+- **Prompt kuralı güncellendi** (`src/llm/prompts.py`)
+  - `GENERAL_SYSTEM_PROMPT_EN`: sabit "max 4 bullet" sınırı kaldırıldı
+  - Troubleshooting/prosedür sorgularında kaynak dokumenttaki tüm adımlar zorunlu
+  - Basit sorular (spec, uyumluluk) için özet kural korundu
+- **ESDE-20024 Qdrant'tan silindi** — "CANCELLED" watermark'lı belge, yanlış bağlamda retrieve ediliyordu
+- **ESDE-22012 yeniden indexlendi** (`scripts/ingest_esde22012_manual.py`)
+  - Etkilenen EABS S/N aralıkları ve spare P/N 6153995960 chunk'a eklendi
+  - Orijinal docx tablo verisi eksikti — manuel enrichment uygulandı
+- **`scripts/ingest_single.py`** eklendi — tekli dosya Qdrant ingestion aracı
+
+### Added (2026-05-11 — ROUGE-L Metriği + Evaluation)
 - **ROUGE-L metriği** (`scripts/evaluate_rag.py`)
   - Saf Python LCS implementasyonu — harici kütüphane gerektirmiyor
   - Keyword overlap ile birlikte her evaluation'da otomatik hesaplanıyor
-  - Threshold: good ≥0.10, partial ≥0.05 (cross-style için düşük)
+  - Threshold: good ≥0.10, partial ≥0.05 (cross-style karşılaştırma için)
   - Tez danışman geri bildirimine yanıt: "uygun analiz yöntemi" isteği
-- **725 soru ROUGE-L'li evaluation** başlatıldı (qwen3:8b, devam ediyor)
+- **725 soru ROUGE-L'li evaluation tamamlandı** (qwen3:8b)
+  - Keyword Overlap Good: 37.9% → ROUGE-L Good: **62.3%** (+24.4 puan)
+  - Avg ROUGE-L: 0.108, Fail: 6.3%, Latency: 20.86s
+  - Bulgu: metrik sınırlılığı kanıtlandı — formal RAG çıktısı vs informal field agent e-postası
 
 ### Added (2026-05-09 — LLM Model Karşılaştırması)
 - **3 LLM karşılaştırması** — Qwen2.5:7b / Llama3:latest / Qwen3:8b (725 soru full pipeline)

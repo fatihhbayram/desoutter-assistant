@@ -319,6 +319,7 @@ curl -X POST http://localhost:8000/diagnose \
 | **Retrieval Good@10** | 92.1% (Hybrid BM25+Semantic, isolated retrieval test) |
 | **Avg Keyword Overlap** | 0.138 (full pipeline) / 0.302 (retrieval-only) |
 | **Avg Response Time** | ~20.5s (non-cached) |
+| **Max Response Tokens** | 1024 (increased from 512 to prevent truncation) |
 | **Vector DB Chunks** | 6,200+ (384-dim, language-filtered) |
 | **Q&A Evaluation Dataset** | 725 real-world field support Q&A pairs (from 4,000 field cases) |
 | **Intent Categories** | 15 types (troubleshoot, error_code, spec, config, compat, etc.) |
@@ -327,6 +328,7 @@ curl -X POST http://localhost:8000/diagnose \
 | **Confidence Score** | Numeric 0.0–1.0 via `confidence_score` field in `/diagnose` |
 | **Active LLM** | Qwen3:8b — best Good rate (37.9%) in 3-model comparison |
 | **Evaluation Metrics** | Keyword Overlap + ROUGE-L (both in `evaluate_rag.py`) |
+| **ROUGE-L Good Rate** | 62.3% (vs Keyword Overlap 37.9%) — same system, different metric |
 
 ### LLM Model Comparison (725 Q&A pairs, full pipeline)
 
@@ -345,7 +347,7 @@ curl -X POST http://localhost:8000/diagnose \
 | Semantic-only | 88.6% | 1.1% | 0.288 |
 | TF-IDF | 83.0% | 2.5% | 0.249 |
 
-> **Evaluation methodology:** Each question from the Q&A dataset is sent to `/diagnose`. The keyword overlap between expected answer (field agent reply) and actual response is measured. Thresholds: good ≥ 0.15, partial ≥ 0.07. Note: expected answers are informal agent emails; actual responses are structured markdown — so overlap naturally skews lower than true quality.
+> **Evaluation methodology:** Each question from the Q&A dataset is sent to `/diagnose`. Two metrics are measured: (1) Keyword Overlap — thresholds: good ≥ 0.15, partial ≥ 0.07; (2) ROUGE-L (LCS F1) — thresholds: good ≥ 0.10, partial ≥ 0.05. Note: expected answers are informal field agent emails; actual responses are structured markdown — so overlap naturally skews lower than true quality. ROUGE-L better captures partial matches across different writing styles.
 
 ---
 
