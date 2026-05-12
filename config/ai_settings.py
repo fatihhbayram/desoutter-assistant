@@ -146,7 +146,7 @@ OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "120"))
 
 # Maximum tokens in LLM response (num_predict parameter)
 # Higher = longer responses, but may exceed context window
-OLLAMA_MAX_TOKENS = int(os.getenv("OLLAMA_MAX_TOKENS", "512"))
+OLLAMA_MAX_TOKENS = int(os.getenv("OLLAMA_MAX_TOKENS", "1024"))
 
 # =============================================================================
 # RAG (Retrieval Augmented Generation) SETTINGS
